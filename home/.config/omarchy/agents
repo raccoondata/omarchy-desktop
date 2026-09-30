@@ -192,7 +192,7 @@ case "${1:-}" in
       mkdir -p "$(dirname "$default_file")"
       printf '%s\n' "$2" > "$default_file"
       tmp="$(mktemp)"
-      { [[ -f $conf ]] && grep -v '^second=' "$conf"; echo "second=$3"; } > "$tmp"
+      { [[ -f $conf ]] && grep -v '^second=' "$conf" || true; echo "second=$3"; } > "$tmp"
       mv "$tmp" "$conf"
     fi
     primaries | paste -sd, -
@@ -203,7 +203,7 @@ case "${1:-}" in
     if [[ -n ${3:-} ]]; then
       [[ " $(efforts_of "$id") " == *" $3 "* ]] || { echo "$id has no effort level $3 (it has: $(efforts_of "$id"))" >&2; exit 2; }
       tmp="$(mktemp)"
-      { [[ -f $conf ]] && grep -v "^effort\.$id=" "$conf"; echo "effort.$id=$3"; } > "$tmp"
+      { [[ -f $conf ]] && grep -v "^effort\.$id=" "$conf" || true; echo "effort.$id=$3"; } > "$tmp"
       mv "$tmp" "$conf"
     fi
     effort_of "$id"

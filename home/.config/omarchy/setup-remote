@@ -32,7 +32,7 @@ state="$omarchy/desktop.conf"
 set_state() {  # set_state <key> <value>  (desktop.conf, read by selfcheck/update)
   local tmp
   tmp="$(mktemp)"
-  { [[ -f $state ]] && grep -v "^$1=" "$state"; echo "$1=$2"; } > "$tmp"
+  { [[ -f $state ]] && grep -v "^$1=" "$state" || true; echo "$1=$2"; } > "$tmp"
   mv "$tmp" "$state"
 }
 
