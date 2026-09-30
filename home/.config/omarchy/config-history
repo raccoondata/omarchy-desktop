@@ -86,6 +86,7 @@ desktop_excludes() {  # desktop_excludes <path>
 sync_in() {
   local p ex
   for p in "${paths[@]}"; do
+    printf '%s\n' "${desktop[@]%/}" | grep -qxF -- "$p" && continue
     mapfile -t ex < <(desktop_excludes "$p")
     copy "$HOME" "$repo" "$p" --delete --delete-excluded "${ex[@]}"
   done

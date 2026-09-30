@@ -71,9 +71,11 @@ put() {  # put <path> < content
   if ! sudo cmp -s "$tmp" "$1" 2>/dev/null; then
     sudo install -D -m 644 "$tmp" "$1"
     echo "  installed $1"
+    changed=true
   fi
   rm -f "$tmp"
 }
+changed=false
 uid="$(id -u)"
 put /etc/systemd/system/rustdesk.service.d/wayland-session.conf <<EOF
 # Session environment for the RustDesk service on Hyprland (Wayland).
@@ -94,6 +96,7 @@ EOF
 
 # --- portals -----------------------------------------------------------------
 mkdir -p "$(dirname "$portals")" "$(dirname "$luminous")"
+before="$(cat "$portals" "$luminous" 2>/dev/null | md5sum)"
 cat > "$portals" <<'EOF'
 # Hyprland's portal for everything, including the screen video (it remembers
 # the chosen screen through restore tokens: allow_token_by_default in
@@ -113,6 +116,7 @@ remote_permission_check = false
 screenshot_permission_check = true
 usb_permission_check = true
 EOF
+[[ "$(cat "$portals" "$luminous" | md5sum)" == "$before" ]] || changed=true
 
 # --- screen picker -------------------------------------------------------------
 [[ -f $xdph ]] || cp /usr/share/omarchy/config/hypr/xdph.conf "$xdph"
@@ -123,12 +127,13 @@ fi
 grep -q 'allow_token_by_default' "$xdph" || sed -i 's|^screencopy {|screencopy {\n    allow_token_by_default = true|' "$xdph"
 
 # --- services ------------------------------------------------------------------
+# Only restarted when something changed: a restart drops a remote session.
 sudo systemctl daemon-reload
 sudo systemctl enable --now rustdesk.service
-sudo systemctl try-restart rustdesk.service
+$changed && sudo systemctl try-restart rustdesk.service
 systemctl --user daemon-reload
 systemctl --user enable --now remote-screen.service
-systemctl --user restart xdg-desktop-portal 2>/dev/null || true
+$changed && { systemctl --user restart xdg-desktop-portal 2>/dev/null || true; }
 set_state remote on
 
 echo
