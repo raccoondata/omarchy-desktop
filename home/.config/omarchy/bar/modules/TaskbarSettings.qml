@@ -20,6 +20,9 @@ Item {
 
   required property var taskbar
   property bool opened: false
+  // Opened for a look only (settingsPreview IPC, for screenshots and tests):
+  // no keyboard focus, so it can't take anyone's typing.
+  property bool previewOnly: false
   property string tab: "taskbar"
 
   readonly property string dir: taskbar.omarchyDir
@@ -28,7 +31,8 @@ Item {
 
   function open(which) {
     // Older names (menu entries, keybindings) for what's now inside another tab.
-    var moved = { corners: "desktop", effects: "desktop", mouse: "desktop", titlebars: "windows" }
+    var moved = { corners: "desktop", effects: "desktop", mouse: "desktop", titlebars: "windows",
+                  nowplaying: "media", visualizers: "media", equalizer: "media" }
     tab = which && which.length > 0 ? (moved[which] || which) : "taskbar"
     barHeightRead.running = true
     scrollRead.running = true
@@ -39,7 +43,11 @@ Item {
     opened = true
   }
 
-  function close() { opened = false }
+  function close() { opened = false; previewOnly = false }
+  function preview(which) {
+    previewOnly = true
+    open(which)
+  }
 
   function set(key, value) {
     Util.execArgv([dir + "/taskbar-setting", "set", key, String(value)])
@@ -262,7 +270,7 @@ Item {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "omarchy-taskbar-settings"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: settings.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: settings.opened && !settings.previewOnly ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Rectangle {
       anchors.fill: parent
@@ -346,8 +354,7 @@ Item {
             { value: "windows", label: "Windows" },
             { value: "desktop", label: "Desktop" },
             { value: "icons", label: "Icons" },
-            { value: "nowplaying", label: "Now Playing" },
-            { value: "visualizers", label: "Equalizer" },
+            { value: "media", label: "Media" },
             { value: "screenshots", label: "Screenshots" },
             { value: "agents", label: "Agents" }
           ]
@@ -363,7 +370,7 @@ Item {
         // The tab's content, scrolling when it's taller than the screen allows.
         Flickable {
           width: parent.width
-          height: Math.min(tabContent.height, Math.max(Style.space(200), Screen.height * 0.72))
+          height: Math.min(tabContent.height, Math.max(Style.space(200), (panel.screen ? panel.screen.height : panel.height) * 0.78))
           contentWidth: width
           contentHeight: tabContent.height
           clip: true
@@ -374,11 +381,10 @@ Item {
           width: parent.width
           sourceComponent: settings.tab === "desktop" ? desktopTab
             : settings.tab === "windows" ? windowsPage
-            : settings.tab === "nowplaying" ? nowPlayingTab
+            : settings.tab === "media" ? mediaTab
             : settings.tab === "agents" ? agentsTab
             : settings.tab === "screenshots" ? screenshotsTab
             : settings.tab === "icons" ? iconsTab
-            : settings.tab === "visualizers" ? visualizersTab
             : taskbarTab
         }
         }
@@ -418,6 +424,18 @@ Item {
       Loader { width: parent.width; sourceComponent: cornersTab }
       Loader { width: parent.width; sourceComponent: effectsTab }
       Loader { width: parent.width; sourceComponent: mouseTab }
+    }
+  }
+
+  // Media: the now-playing widget, then the equalizers and effects.
+  Component {
+    id: mediaTab
+
+    Column {
+      width: settings.cardWidth
+      spacing: Style.space(16)
+      Loader { width: parent.width; sourceComponent: nowPlayingTab }
+      Loader { width: parent.width; sourceComponent: visualizersTab }
     }
   }
 
@@ -569,11 +587,6 @@ Item {
             onToggled: settings.set("clickActive", checked ? "none" : "minimize")
           }
         }
-      }
-
-      Column {
-        width: tbTab.columnWidth
-        spacing: Style.space(6)
         SettingRow {
           label: "Icon order"
           description: "forget where you've dragged icons"
@@ -859,7 +872,12 @@ Item {
           font.pixelSize: Style.font.caption
         }
 
-        Item { width: 1; height: Style.space(6) }
+      }
+
+      Column {
+        width: winTab.columnWidth
+        spacing: Style.space(6)
+
         Section { title: "Apps that come to you" }
         Text {
           width: parent.width
@@ -1025,7 +1043,7 @@ Item {
         width: parent.columnWidth
         spacing: Style.space(6)
 
-        Section { title: "Where" }
+        Section { title: "Equalizers and effects" }
 
         SettingRow {
           label: "Taskbar"
