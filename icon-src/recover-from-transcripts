@@ -232,6 +232,9 @@ def main():
         d = OUT / "by-icon" / name
         d.mkdir(exist_ok=True)
         (d / "final.svgbody").write_text(body + "\n")
+        script = pathlib.Path(__file__).resolve().parent / "icons" / f"{name}.icon.py"
+        if script.exists() and not (d / "script.icon.py").exists():
+            (d / "script.icon.py").symlink_to(pathlib.Path("../../..") / "icons" / script.name)
     rows.sort()
     with (OUT / "INDEX.md").open("w") as idx:
         idx.write("# Recovered icon work\n\nFrom Claude Code transcripts (`recover-from-transcripts`). "

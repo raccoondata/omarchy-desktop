@@ -1,0 +1,1 @@
+../../../icons/lazygit.icon.py

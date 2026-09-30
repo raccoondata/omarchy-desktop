@@ -1,0 +1,8 @@
+"""imv: imv: viewfinder corners around a small mountain and sun."""
+from iconkit import *
+
+icon(
+    path("M3.5 8V5.5a2 2 0 0 1 2-2H8M16 3.5h2.5a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2H16M8 20.5H5.5a2 2 0 0 1-2-2V16"),
+    path("M7 16.5l3.5-4 2.5 2.5 1.5-1.5 2.5 3"),
+    circle(15, 8.8, 1.4),
+)

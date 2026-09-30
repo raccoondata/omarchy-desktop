@@ -1,0 +1,1 @@
+../../../icons/writer.icon.py

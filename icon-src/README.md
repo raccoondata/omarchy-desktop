@@ -1,19 +1,17 @@
 # icon-src
 
-How the taskbar icons (`home/.config/omarchy/bar/modules/taskbar-icons.js`)
-were made. Nothing here is installed; it's for redrawing or tweaking one.
+The taskbar icons' sources. Nothing here is installed: `icon-build` (the
+`taskbar-icons` skill, `home/.claude/skills/taskbar-icons/`) builds them
+into `home/.config/omarchy/bar/modules/taskbar-icons.js`. The spec and the
+script format: the skill's `ICON-SPEC.md`.
 
-- `sources/<name>/<date>/`: the working files the `taskbar-icons` skill's
-  `icon-set` keeps each time it adds an icon on the maintainer's PC: the
-  final drawing, its drafts and any generator script.
-- `recovered/`: the same, dug out of the Claude Code session transcripts for
-  icons made before `icon-set` kept anything (`./recover-from-transcripts`
-  rebuilds it):
-  - `by-icon/<name>/`: every drawing of that icon, oldest first (drafts and
-    alternates), links to the commands and generator scripts that made or
-    installed it, and `final.svgbody`, the version in use.
-  - `commands/`: those commands and scripts.
-  - `INDEX.md`: all of it by date.
-
-Preview any drawing with the skill:
-`~/.claude/skills/taskbar-icons/scripts/icon-preview out.png <file>...`
+- `icons/<name>.icon.py`: one script per icon, the source of truth. Edit a
+  script and run `icon-build`, or install a new one with `icon-set`.
+- `drafts/<name>/<date>/`: the drafts `icon-set` keeps each time it
+  installs an icon.
+- `recovered/`: history dug out of the Claude Code session transcripts,
+  from before the icons were scripts (`./recover-from-transcripts` rebuilds
+  it): every drawing of each icon (`by-icon/<name>/`), the commands and
+  generators that made them (`commands/`), `INDEX.md` by date. The
+  generators there were ported into `icons/` (claude, codex, chrome, photos,
+  localsend, rustdesk, chatgpt, obs).

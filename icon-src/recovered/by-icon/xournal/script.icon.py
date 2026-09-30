@@ -1,0 +1,1 @@
+../../../icons/xournal.icon.py

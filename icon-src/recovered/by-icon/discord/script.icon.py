@@ -1,0 +1,1 @@
+../../../icons/discord.icon.py

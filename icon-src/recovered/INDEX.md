@@ -193,5 +193,19 @@ From Claude Code transcripts (`recover-from-transcripts`). Newest at the bottom.
 | 2026-09-30_2055 | 2e631dbf | bash | --list, writer | commands/2026-09-30_2055_2e631dbf_1451_bash_command.sh | cd ~/Projects/personal/omarchy-desktop/icon-src && python3 - <<'PYEOF' |
 | 2026-09-30_2056 | 2e631dbf | bash | demo | commands/2026-09-30_2056_2e631dbf_1455_bash_command.sh | cd ~/.claude/skills/taskbar-icons/scripts && python3 - <<'PYEOF' |
 | 2026-09-30_2056 | 2e631dbf | bash | keeps | commands/2026-09-30_2056_2e631dbf_1456_bash_command.sh | cd ~/.claude/skills/taskbar-icons && python3 - <<'PYEOF' |
+| 2026-09-30_2056 | 2e631dbf | bash | keeps | commands/2026-09-30_2056_2e631dbf_1458_bash_command.sh | ~/.config/omarchy/config-history snapshot "icon-set keeps working files" \| tail -2; cd ~/P |
 | 2026-09-30_2056 | 2e631dbf | drawing | _other | by-icon/_other/2026-09-30_2056_2e631dbf_demo-b.svgbody | echo in a Bash command |
 | 2026-09-30_2056 | 2e631dbf | drawing | _other | by-icon/_other/2026-09-30_2056_2e631dbf_demo.svgbody | echo in a Bash command |
+| 2026-09-30_2059 | 2e631dbf | file |  | commands/2026-09-30_2059_2e631dbf_1463_file_iconkit.py | ~/.claude/skills/taskbar-icons/scripts/iconkit.py |
+| 2026-09-30_2059 | 2e631dbf | generator |  | commands/2026-09-30_2059_2e631dbf_1464_generator_command.sh | cd ~/.claude/skills/taskbar-icons/scripts && python3 - <<'PYEOF' |
+| 2026-09-30_2100 | 2e631dbf | bash |  | commands/2026-09-30_2100_2e631dbf_1466_bash_command.sh | O=/tmp/claude-1000/-home-user-Work/2e631dbf-6b6a-4eb9-8346-4759cc1800bc/scratchpad/sheet; |
+| 2026-09-30_2102 | 2e631dbf | file |  | commands/2026-09-30_2102_2e631dbf_1476_file_icon-build | ~/.claude/skills/taskbar-icons/scripts/icon-build |
+| 2026-09-30_2102 | 2e631dbf | file |  | commands/2026-09-30_2102_2e631dbf_1477_file_icon-lint | ~/.claude/skills/taskbar-icons/scripts/icon-lint |
+| 2026-09-30_2102 | 2e631dbf | file |  | commands/2026-09-30_2102_2e631dbf_1478_file_icon-new | ~/.claude/skills/taskbar-icons/scripts/icon-new |
+| 2026-09-30_2103 | 2e631dbf | file | --list, --user | commands/2026-09-30_2103_2e631dbf_1479_file_icon-set | ~/.claude/skills/taskbar-icons/scripts/icon-set |
+| 2026-09-30_2103 | 2e631dbf | file | --list | commands/2026-09-30_2103_2e631dbf_1480_file_icon-preview | ~/.claude/skills/taskbar-icons/scripts/icon-preview |
+| 2026-09-30_2103 | 2e631dbf | file | ghostty | commands/2026-09-30_2103_2e631dbf_1481_file_icon-test | ~/.claude/skills/taskbar-icons/scripts/icon-test |
+| 2026-09-30_2104 | 2e631dbf | bash |  | commands/2026-09-30_2104_2e631dbf_1484_bash_command.sh | cd ~/.claude/skills/taskbar-icons/scripts && python3 - <<'PYEOF' |
+| 2026-09-30_2105 | 2e631dbf | file |  | commands/2026-09-30_2105_2e631dbf_1492_file_ICON-SPEC.md | ~/Projects/personal/omarchy-desktop/icon-src/ICON-SPEC.md |
+| 2026-09-30_2106 | 2e631dbf | bash |  | commands/2026-09-30_2106_2e631dbf_1496_bash_command.sh | cat > ~/Projects/personal/omarchy-desktop/icon-src/README.md <<'EOF' |
+| 2026-09-30_2106 | 2e631dbf | file | kept | commands/2026-09-30_2106_2e631dbf_1495_file_SKILL.md | ~/.claude/skills/taskbar-icons/SKILL.md |

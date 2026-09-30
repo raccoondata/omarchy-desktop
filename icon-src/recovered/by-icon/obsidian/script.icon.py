@@ -1,0 +1,1 @@
+../../../icons/obsidian.icon.py
