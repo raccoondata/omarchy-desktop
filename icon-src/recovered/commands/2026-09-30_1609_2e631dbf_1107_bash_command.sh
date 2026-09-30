@@ -1,0 +1,1 @@
+cd /tmp/claude-1000/-home-user-Work/2e631dbf-6b6a-4eb9-8346-4759cc1800bc/scratchpad/ic; cp hermes2.svg hermes.svg; cp copilot2.svg copilot.svg; S=~/.claude/skills/taskbar-icons/scripts; for n in gemini copilot cursor opencode crush pi omp hermes muse openclaw; do $S/icon-set $n $n.svg | tail -1; done

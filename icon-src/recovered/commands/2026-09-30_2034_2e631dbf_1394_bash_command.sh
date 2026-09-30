@@ -1,0 +1,1 @@
+cd ~/.config/omarchy/bar/modules; head -12 taskbar-icons.js; grep -nE '^(function|var|const|let)|^\}' taskbar-icons.js | head; tail -30 taskbar-icons.js | grep -v '^  "'; grep -nE 'open\(|re\.|json|write|marker|START|END' ~/.claude/skills/taskbar-icons/scripts/icon-set | head -20; grep -n 'function iconName' -A12 taskbar.qml

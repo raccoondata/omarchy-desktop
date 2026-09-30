@@ -1,0 +1,1 @@
+~/.claude/skills/taskbar-icons/scripts/icon-set edge /tmp/claude-1000/-home-user-Work/2e631dbf-6b6a-4eb9-8346-4759cc1800bc/scratchpad/edgeB.svg && omarchy restart shell >/dev/null 2>&1; sleep 4; qs log --id $(ls -t /run/user/1000/quickshell/by-id/ | head -1) 2>/dev/null | grep -iE 'taskbar|modules/' | tail -3; grim -g "0,0 700x42" /tmp/claude-1000/bar.png

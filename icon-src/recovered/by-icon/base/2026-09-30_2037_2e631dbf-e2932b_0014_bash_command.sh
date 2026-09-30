@@ -1,0 +1,1 @@
+../../commands/2026-09-30_2037_2e631dbf-e2932b_0014_bash_command.sh

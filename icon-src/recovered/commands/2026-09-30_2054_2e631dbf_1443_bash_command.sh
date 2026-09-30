@@ -1,0 +1,1 @@
+cd ~/Projects/personal/omarchy-desktop/icon-src/recovered; comm -23 <(ls by-icon) <(~/.claude/skills/taskbar-icons/scripts/icon-set --list | tr ' ' '\n' | grep -v ':' | sort) | tr '\n' ' '; echo; grep -E '^\| 2026-09-(27|28|29)' INDEX.md | cut -c1-230 | head -40
