@@ -347,7 +347,7 @@ Item {
             { value: "corners", label: "Hot Corners" },
             { value: "titlebars", label: "Title Bars" },
             { value: "nowplaying", label: "Now Playing" },
-            { value: "visualizers", label: "Visualizers" },
+            { value: "visualizers", label: "Equalizer" },
             { value: "screenshots", label: "Screenshots" },
             { value: "icons", label: "Icons" },
             { value: "mouse", label: "Mouse" }
@@ -965,7 +965,7 @@ Item {
     }
   }
 
-  // Visualizers: where the equalizers and effects show, and which style each
+  // Equalizer tab: where the equalizers and effects show, and which style each
   // uses. All drawn on the GPU (Equalizer.qml, Visualizer.qml, artfx), and
   // each only runs while it's shown and something plays.
   Component {
@@ -1006,7 +1006,7 @@ Item {
         }
         SettingRow {
           label: "Card header"
-          description: "by NOW PLAYING in the card"
+          description: "by NOW PLAYING in the card, when the card visualizer is off"
           Dropdown {
             width: Style.space(180)
             showLabel: false
