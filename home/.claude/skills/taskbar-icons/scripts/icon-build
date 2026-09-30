@@ -105,6 +105,9 @@ def main():
         from iconkit import KIT
         res = subprocess.run([str(KIT / "icon-font")], capture_output=True, text=True)
         print(res.stdout.strip() or f"icon font NOT rebuilt: {res.stderr.strip()[-300:]}")
+        # And each icon's brand colour (the "App colours" setting).
+        res = subprocess.run([str(KIT / "icon-colors")], capture_output=True, text=True)
+        print((res.stdout.strip().splitlines() or ["icon colours NOT rebuilt"])[-1])
 
 
 main()

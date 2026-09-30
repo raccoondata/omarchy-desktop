@@ -87,6 +87,13 @@ icon(
 | `icon-build [--check]` | all scripts → the icon file the taskbar reads |
 | `icon-test <out.png> <class>...` | throwaway windows, screenshot of the real bar |
 | `icon-font [--check]` | maintainer: the built-in set as a font, for Omarchy's menu (`icon-build` runs it) |
+| `icon-colors [--check]` | maintainer: each icon's brand colour from the app's own icon (`icon-build` runs it) |
+
+**Colour** is never in a drawing: the place and the Icons setting decide it
+(`bar/modules/IconColors.js`): the theme's colours, each app's brand colour
+(`icon-colors.json`), or that colour moved to the nearest theme colour.
+Generic icons and black-and-white brands have no colour and stay on the
+theme.
 
 All Python, all on `iconkit`, all with `-h`; exit 0 ok, 1 refused or
 failed, 2 usage.

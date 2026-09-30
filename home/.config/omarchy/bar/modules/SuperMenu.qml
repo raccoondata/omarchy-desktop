@@ -397,13 +397,21 @@ Item {
     Component.onCompleted: running = true
   }
 
+  // The playing app's name: a browser web app's own ("YouTube Music"), not
+  // the browser's, which hosts its player (as now playing does).
+  function playerAppName(p) {
+    var site = MediaWindow.webAppSite(MediaWindow.bestWindow(p, Hyprland.toplevels.values))
+    var entry = MediaWindow.webAppEntry(site, DesktopEntries.applications.values)
+    return entry ? String(entry.name) : String(p.identity || "")
+  }
+
   // Taskbar & Desktop > Icons > Super menu: the app's own icon ("app", the
   // default) or the desktop's line icon ("line"; apps without one keep
   // their own).
   readonly property bool lineIcons: menu.taskbar.pref("iconsSuperMenu", "app") === "line"
   function tileIcon(entry) {
     var name = lineIcons ? menu.taskbar.lineIconForEntry(entry) : ""
-    return name ? TaskbarIcons.svg(name, String(Color.menu.text)) : menu.library.iconSource(entry ? entry.icon : "")
+    return name ? TaskbarIcons.svg(name, menu.taskbar.lineColor(name, Color.menu.text)) : menu.library.iconSource(entry ? entry.icon : "")
   }
 
   // Omarchy's "suspend off" toggle hides Suspend, as in its own menu.
@@ -689,7 +697,7 @@ Item {
               width: parent.width
               text: menu.mediaShowingVolume
                 ? (menu.mediaMuted ? "Muted" : "Volume " + Math.round(menu.mediaVolume * 100) + "%")
-                : nowPlaying.p ? [String(nowPlaying.p.trackArtist || ""), String(nowPlaying.p.identity || "")].filter(function(x) { return x !== "" }).join("  ·  ") : ""
+                : nowPlaying.p ? [String(nowPlaying.p.trackArtist || ""), menu.playerAppName(nowPlaying.p)].filter(function(x) { return x !== "" }).join("  ·  ") : ""
               textFormat: Text.PlainText
               elide: Text.ElideRight
               color: Color.menu.text

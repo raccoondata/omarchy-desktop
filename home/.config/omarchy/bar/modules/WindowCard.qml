@@ -15,6 +15,8 @@ Rectangle {
   property string icon: "app"
   // The app's own icon (Icons > App colours), used instead when set.
   property string appIcon: ""
+  // The line icon's own colour (Icons > Line icon colours), when it has one.
+  property string iconColor: ""
   property int thumbWidth: Style.space(200)
   property bool selected: false
   property bool active: false
@@ -107,7 +109,7 @@ Rectangle {
         height: Style.font.iconLarge
         sourceSize.width: Math.round(width * Screen.devicePixelRatio)
         sourceSize.height: Math.round(height * Screen.devicePixelRatio)
-        source: card.appIcon || TaskbarIcons.svg(card.icon, String(card.active || card.selected ? Color.accent : card.textColor))
+        source: card.appIcon || TaskbarIcons.svg(card.icon, card.iconColor || String(card.active || card.selected ? Color.accent : card.textColor))
         smooth: true
       }
 
@@ -184,7 +186,7 @@ Rectangle {
         height: width
         sourceSize.width: Math.round(width * Screen.devicePixelRatio)
         sourceSize.height: Math.round(height * Screen.devicePixelRatio)
-        source: card.appIcon || TaskbarIcons.svg(card.icon, String(card.textColor))
+        source: card.appIcon || TaskbarIcons.svg(card.icon, card.iconColor || String(card.textColor))
         opacity: 0.3
         smooth: true
       }

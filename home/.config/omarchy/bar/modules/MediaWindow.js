@@ -73,3 +73,22 @@ function playerStream(player, nodes) {
   }
   return null
 }
+
+// A browser web app's site, from its window class (chrome-/msedge-/brave-
+// <site>__...), or "".
+function webAppSite(toplevel) {
+  var ipc = toplevel && toplevel.lastIpcObject ? toplevel.lastIpcObject : null
+  var m = /^(?:chrome|msedge|brave|chromium)-([^_]+)__/i.exec(String(ipc ? ipc.class : ""))
+  return m ? m[1] : ""
+}
+
+// The launcher entry that opens a web app's site (entries: DesktopEntries
+// .applications.values), or null.
+function webAppEntry(site, entries) {
+  if (!site) return null
+  for (var i = 0; i < entries.length; i++) {
+    var exec = String(entries[i].execString || "")
+    if (exec.indexOf("://" + site) !== -1 || exec.indexOf("://www." + site) !== -1) return entries[i]
+  }
+  return null
+}

@@ -3,10 +3,13 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Mpris
 import qs.Commons
 import qs.Ui
 import "taskbar-icons.js" as TaskbarIcons
 import "TaskbarMatch.js" as TaskbarMatch
+import "IconColors.js" as IconColors
+import "MediaWindow.js" as MediaWindow
 import "TaskbarStatus.js" as TaskbarStatus
 
 // Taskbar built from Hyprland's own window list, so each entry knows its
@@ -413,6 +416,7 @@ BarWidget {
     return {
       icon: iconName(hexAddress(toplevel), classOf(toplevel)),
       appIcon: appIcons ? appIconFor(classOf(toplevel), "") : "",
+      iconColor: lineColor(iconName(hexAddress(toplevel), classOf(toplevel)), ""),
       minimized: isMinimized(toplevel),
       place: placeOf(toplevel),
       agent: agentOf(toplevel),
@@ -939,11 +943,32 @@ BarWidget {
     }
   }
 
+  // A browser and its web apps share one process, so its sound traces to
+  // whichever of their windows came first. When several windows share the
+  // process, the one its media player is showing (MediaWindow.bestWindow:
+  // the window whose title names the track) gets it instead.
+  function audioWindow(address) {
+    var owner = null
+    for (var i = 0; i < toplevels.length; i++) if (hexAddress(toplevels[i]) === address) owner = toplevels[i]
+    var ipc = owner && owner.lastIpcObject ? owner.lastIpcObject : null
+    if (!ipc || !ipc.pid) return address
+    var shared = toplevels.filter(function(t) { return t.lastIpcObject && t.lastIpcObject.pid === ipc.pid })
+    if (shared.length < 2) return address
+    var players = Mpris.players.values || []
+    for (var p = 0; p < players.length; p++) {
+      var m = /instance_?(\d+)$/.exec(String(players[p].dbusName || ""))
+      if (!m || Number(m[1]) !== ipc.pid || !players[p].isPlaying) continue
+      var win = MediaWindow.bestWindow(players[p], shared)
+      if (win) return hexAddress(win)
+    }
+    return address
+  }
+
   function rebuildAudio() {
     var map = {}
     for (var pid in audioOwners) {
       if (streamMuted[pid] === undefined) continue
-      var address = audioOwners[pid]
+      var address = audioWindow(audioOwners[pid])
       if (!map[address]) map[address] = { muted: true }
       map[address].muted = map[address].muted && streamMuted[pid]
     }
@@ -1599,9 +1624,38 @@ BarWidget {
   }
 
   // The image for an icon: the app's own in "app" mode (when it has one),
-  // else the line icon in `color`.
+  // else the line icon, in `color` or its colour (Icons > Line icon colours).
   function iconSource(name, appIcon, color) {
-    return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, color)
+    return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, lineColor(name, color))
+  }
+
+  // Line icon colours: "mono" (the theme's, as each place draws), "brand"
+  // (each app's own) or "palette" (that, moved onto the theme). IconColors.js.
+  readonly property string iconColorMode: pref("iconColors", "mono")
+  property int iconColorsRevision: 0
+  function lineColor(name, fallback) {
+    var revision = iconColorsRevision
+    return IconColors.colorFor(name, iconColorMode, String(fallback))
+  }
+  FileView {
+    path: root.omarchyDir + "/bar/modules/icon-colors.json"
+    blockLoading: true
+    printErrors: false
+    onLoaded: {
+      try { IconColors.setBrand(JSON.parse(text())) } catch (e) { }
+      root.iconColorsRevision += 1
+    }
+  }
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/colors.toml"
+    watchChanges: true
+    blockLoading: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      IconColors.setPalette(text())
+      root.iconColorsRevision += 1
+    }
   }
 
   // The line icon for a launcher entry (the Super menu's line mode).
@@ -2505,6 +2559,7 @@ BarWidget {
           thumbWidth: root.pickerThumbWidth
           icon: info.icon
           appIcon: info.appIcon
+          iconColor: info.iconColor
           active: !info.minimized && modelData === Hyprland.activeToplevel
           minimized: info.minimized
           place: info.place
