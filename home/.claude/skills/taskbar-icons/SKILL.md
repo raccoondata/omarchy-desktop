@@ -51,6 +51,11 @@ Scripts live in `~/.claude/skills/taskbar-icons/scripts/`.
    `scripts/icon-preview <out.png> <body-file>` and Read the PNG. When unsure,
    draw two or three options and preview them together (pass several body
    files; one row each). Iterate until it reads clearly at the small size.
+   Name every file after the icon, in one scratch folder: drafts
+   `<name>-b.svgbody`, `<name>-c.svgbody`; if you compute the drawing (arcs,
+   rays), save the script as `<name>.py` and run it from the file rather than
+   inline. icon-set keeps all of them (step 3), so the work isn't lost with
+   the scratchpad.
 
 3. **Add and map it.** Names are lowercase, one word, e.g. `steam`, `youtube`.
    Where it goes depends on the PC (icon-set decides):
