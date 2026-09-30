@@ -56,3 +56,7 @@
 .claude/skills/taskbar-icons/
 .local/share/icons/hicolor/256x256/apps/teams.png
 .local/share/icons/hicolor/256x256/apps/youtube-music.png
+.local/share/fonts/omarchy-desktop-icons.otf
+.config/omarchy/icon-codepoints.json
+.config/omarchy/menu-icons
+.config/omarchy/menu-icons.json

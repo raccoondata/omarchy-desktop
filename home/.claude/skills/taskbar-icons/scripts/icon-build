@@ -99,6 +99,12 @@ def main():
     tmp.write_text(text)
     tmp.replace(target)
     print(f"built {len(bodies)} icons from {src} into {target}. Then: omarchy restart shell")
+    if not user:
+        # The icon font (Omarchy's menu) follows the built-in set.
+        import subprocess
+        from iconkit import KIT
+        res = subprocess.run([str(KIT / "icon-font")], capture_output=True, text=True)
+        print(res.stdout.strip() or f"icon font NOT rebuilt: {res.stderr.strip()[-300:]}")
 
 
 main()

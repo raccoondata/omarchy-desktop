@@ -6,6 +6,7 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
 import "taskbar-icons.js" as TaskbarIcons
+import "TaskbarMatch.js" as TaskbarMatch
 import "TaskbarStatus.js" as TaskbarStatus
 
 // Taskbar built from Hyprland's own window list, so each entry knows its
@@ -117,29 +118,8 @@ BarWidget {
   property var programByAddress: ({})
   property string programsText: ""
 
-  // Terminal programs -> icon. A terminal at a plain prompt shows "terminal".
-  readonly property var programIcons: ({
-    claude: "claude", codex: "codex",
-    // The other coding agents Omarchy knows (~/.config/omarchy/agents).
-    grok: "grok", gemini: "gemini", opencode: "opencode", copilot: "copilot",
-    "cursor-agent": "cursor", crush: "crush", pi: "pi", omp: "omp",
-    hermes: "hermes", muse: "muse", openclaw: "openclaw",
-    nvim: "neovim", vim: "neovim",
-    btop: "btop", htop: "htop", top: "monitor",
-    docker: "docker", lazydocker: "lazydocker",
-    lazygit: "lazygit", git: "git",
-    // Omarchy's own terminal tools (audio, Wi-Fi, Bluetooth, About, disk use).
-    wiremix: "wiremix", impala: "impala", bluetui: "bluetui",
-    fastfetch: "fastfetch", dua: "dua", uuctl: "uuctl",
-    "limine-snapper-restore": "restore",
-    python: "python", python3: "python", ipython: "python",
-    node: "node", bun: "node", deno: "node",
-    ssh: "server", mosh: "server",
-    man: "document", less: "document", bat: "document",
-    tmux: "tmux", zellij: "tmux",
-    yazi: "folder", ranger: "folder", lf: "folder",
-    cliamp: "cliamp", spotify_player: "music", ncspot: "music"
-  })
+  // Matching rules: TaskbarMatch.js (shared with the Super menu and now playing).
+  readonly property var programIcons: TaskbarMatch.programIcons
 
   // Window classes -> icon, first match wins. Anything unmatched shows "app".
   // Your own icons and which windows get them, kept apart from the built-in
@@ -159,100 +139,17 @@ BarWidget {
       try {
         var data = JSON.parse(text()) || {}
         if (data.icons) TaskbarIcons.addIcons(data.icons)
-        root.userPrograms = data.programs || {}
-        root.userClasses = (data.classes || []).map(function(c) {
+        var classes = (data.classes || []).map(function(c) {
           try { return [new RegExp(c[0], "i"), String(c[1])] } catch (e) { return null }
         }).filter(function(c) { return c !== null })
+        TaskbarMatch.setUser(data.programs || {}, classes)
+        root.userPrograms = data.programs || {}
+        root.userClasses = classes
       } catch (e) { }
     }
   }
 
-  readonly property var classIcons: [
-    // Super+C C / Super+V V agent windows (own classes, own Ghostty process).
-    [/^org\.omarchy\.claude$/, "claude"],
-    [/^org\.omarchy\.codex$/, "codex"],
-    // Other agents started from the ask card / Files (./agents launch).
-    [/^org\.omarchy\.grok$/, "grok"],
-    [/^org\.omarchy\.gemini$/, "gemini"],
-    [/^org\.omarchy\.opencode$/, "opencode"],
-    [/^org\.omarchy\.copilot$/, "copilot"],
-    [/^org\.omarchy\.cursor_agent$/, "cursor"],
-    [/^org\.omarchy\.crush$/, "crush"],
-    [/^org\.omarchy\.pi$/, "pi"],
-    [/^org\.omarchy\.omp$/, "omp"],
-    [/^org\.omarchy\.hermes$/, "hermes"],
-    [/^org\.omarchy\.muse$/, "muse"],
-    [/^org\.omarchy\.openclaw$/, "openclaw"],
-    // Omarchy's TUI and agent windows run in Ghostty too.
-    [/^(com\.mitchellh\.ghostty|org\.omarchy\.|TUI\.)/, "ghostty"],
-    [/^(Alacritty|kitty|foot)/, "terminal"],
-    // Omarchy web apps are chrome-<site>__<path>-<profile> windows (msedge-/
-    // brave- when the default browser is Edge/Brave); known sites
-    // get their own mark, any other site keeps the globe.
-    [/^(chrome|msedge|brave)-(www\.)?youtube\.com/i, "youtube"],
-    [/^(chrome|msedge|brave)-music\.youtube\.com/i, "youtubemusic"],
-    [/^(chrome|msedge|brave)-(x|twitter)\.com/i, "x"],
-    [/^(chrome|msedge|brave)-web\.whatsapp\.com/i, "whatsapp"],
-    [/^(chrome|msedge|brave)-discord\.com/i, "discord"],
-    [/^(chrome|msedge|brave)-web\.telegram\.org/i, "telegram"],
-    [/^(chrome|msedge|brave)-teams\.(microsoft|live)\.com/i, "teams"],
-    [/^(chrome|msedge|brave)-(launchpad\.37signals|3\.basecamp)\.com/i, "basecamp"],
-    [/^(chrome|msedge|brave)-chatgpt\.com/i, "chatgpt"],
-    [/^(chrome|msedge|brave)-github\.com/i, "github"],
-    [/^(chrome|msedge|brave)-app\.zoom\.us/i, "zoom"],
-    [/^(chrome|msedge|brave)-grok\.com/i, "grok"],
-    [/^(chrome|msedge|brave)-app\.hey\.com__calendar/i, "calendar"],
-    [/^(chrome|msedge|brave)-app\.hey\.com/i, "mail"],
-    [/^(chrome|msedge|brave)-messages\.google\.com/i, "messages"],
-    [/^(chrome|msedge|brave)-photos\.google\.com/i, "photos"],
-    [/^(chrome|msedge|brave)-maps\.google\.com/i, "maps"],
-    [/^(chrome|msedge|brave)-contacts\.google\.com/i, "contacts"],
-    // The browser itself gets its mark.
-    [/^(chromium|chromium-browser|google-chrome|google-chrome-stable)$/i, "chrome"],
-    [/^microsoft-edge/i, "edge"],
-    [/^(chrome-|msedge-|firefox|zen|brave)/i, "browser"],
-    [/^(com\.microsoft\.vscode|code|code-oss|code-url-handler|visual-studio-code)$/i, "vscode"],
-    [/^(cursor|dev\.zed)/i, "code"],
-    [/^(org\.gnome\.nautilus|nautilus|thunar)/i, "folder"],
-    [/^dev\.tensaku\.Tensaku$/i, "tensaku"],
-    [/^(rustdesk|com\.carriez\.flutter_hbb)$/i, "rustdesk"],
-    [/^discord/i, "discord"],
-    [/^(org\.telegram\.desktop|telegramdesktop)$/i, "telegram"],
-    [/^(signal|slack)/i, "chat"],
-    [/^zoom/i, "zoom"],
-    [/^mpv$/i, "mpv"],
-    [/^imv/i, "imv"],
-    [/xournalpp/i, "xournal"],
-    [/pinta/i, "pinta"],
-    [/kdenlive/i, "kdenlive"],
-    [/^(obs|com\.obsproject\.studio)$/i, "obs"],
-    [/moonlight/i, "moonlight"],
-    // Omarchy's own apps and system tools.
-    [/^omacalc$/i, "omacalc"],
-    [/^omacut$/i, "omacut"],
-    [/aether/i, "aether"],
-    [/^(org\.gnome\.diskutility|gnome-disks)$/i, "disks"],
-    [/system-config-printer/i, "printer"],
-    [/fcitx/i, "keyboard"],
-    [/limine-snapper/i, "restore"],
-    [/^(avahi-discover|bssh|bvnc)/i, "network"],
-    [/uuctl/i, "uuctl"],
-    [/^omawrite$/i, "omawrite"],
-    [/libreoffice-writer/i, "writer"],
-    [/libreoffice-calc/i, "calc"],
-    [/libreoffice-impress/i, "impress"],
-    [/libreoffice-draw/i, "draw"],
-    [/libreoffice-math/i, "math"],
-    [/libreoffice-base/i, "base"],
-    [/(libreoffice|soffice)/i, "libreoffice"],
-    [/obsidian/i, "obsidian"],
-    [/^(org\.gnome\.(evince|papers)|evince|papers)$/i, "pdf"],
-    [/typora/i, "document"],
-    [/localsend/i, "localsend"],
-    [/^spotify/i, "music"],
-    // The Steam client, and games it launches (steam_app_<id> windows).
-    [/^(steam|steam_app_\d+)$/i, "steam"]
-  ]
+  readonly property var classIcons: TaskbarMatch.classIcons
 
   // Names for tooltips and pins; anything else uses its window class.
   readonly property var appNames: ({
@@ -446,7 +343,7 @@ BarWidget {
     for (var p = 0; p < pins.length; p++) {
       var pin = pins[p]
       if (!pin || !pin.key || byKey[pin.key]) continue
-      byKey[pin.key] = { key: pin.key, icon: pin.icon || "app", name: pin.name || pin.key, pinned: true, windows: [] }
+      byKey[pin.key] = { key: pin.key, icon: pin.icon || "app", appIcon: appIconFor("", pin.desktop), name: pin.name || pin.key, pinned: true, windows: [] }
       list.push(byKey[pin.key])
     }
     for (var i = 0; i < toplevels.length; i++) {
@@ -458,7 +355,7 @@ BarWidget {
       // entry (keyed after it, so it sits next to it).
       if (!groupWindows && byKey[key] && byKey[key].windows.length > 0) key = key + "#" + hexAddress(toplevel)
       if (!byKey[key]) {
-        byKey[key] = { key: key, icon: icon, name: appNames[icon] || windowClass || "Application", pinned: false, windows: [] }
+        byKey[key] = { key: key, icon: icon, appIcon: appIconFor(windowClass, ""), name: appNames[icon] || windowClass || "Application", pinned: false, windows: [] }
         list.push(byKey[key])
       }
       byKey[key].windows.push(toplevel)
@@ -515,6 +412,7 @@ BarWidget {
   function windowInfo(toplevel) {
     return {
       icon: iconName(hexAddress(toplevel), classOf(toplevel)),
+      appIcon: appIcons ? appIconFor(classOf(toplevel), "") : "",
       minimized: isMinimized(toplevel),
       place: placeOf(toplevel),
       agent: agentOf(toplevel),
@@ -878,7 +776,7 @@ BarWidget {
     }
     var toplevel = null
     for (var i = 0; i < toplevels.length; i++) if (hexAddress(toplevels[i]) === address) toplevel = toplevels[i]
-    var group = { key: "window:" + address, icon: iconName(address, classOf(toplevel)), windows: [toplevel || { address: address }] }
+    var group = { key: "window:" + address, icon: iconName(address, classOf(toplevel)), appIcon: appIconFor(classOf(toplevel), ""), windows: [toplevel || { address: address }] }
     var win = root.QsWindow.window
     var from = win ? root.mapFromItem(win.contentItem, x - win.screen.x, y - win.screen.y) : Qt.point(x, y)
     var size = Math.min(hit.item.width, hit.item.height)
@@ -1426,7 +1324,7 @@ BarWidget {
   }
 
   function startWindowDrag(toplevel) {
-    startDrag({ key: "window:" + hexAddress(toplevel), icon: iconName(hexAddress(toplevel), classOf(toplevel)),
+    startDrag({ key: "window:" + hexAddress(toplevel), icon: iconName(hexAddress(toplevel), classOf(toplevel)), appIcon: appIconFor(classOf(toplevel), ""),
       name: title(toplevel), windows: [toplevel] })
   }
 
@@ -1677,17 +1575,44 @@ BarWidget {
     return primary ? [primary].concat(windows.filter(function(w) { return w !== primary })) : []
   }
 
+  // Taskbar & Desktop > Icons > Taskbar and switcher: "line" (ours) or
+  // "app" (each app's own colour icon; line where it has none).
+  readonly property bool appIcons: pref("iconsTaskbar", "line") === "app"
+
+  // An app's own icon (its launcher entry's), as an image URL, or "".
+  function appIconFor(windowClass, desktopId) {
+    var entry = null
+    if (desktopId) entry = DesktopEntries.byId(String(desktopId).replace(/\.desktop$/, ""))
+    if (!entry && windowClass) {
+      // A web app (chrome-/msedge-/brave-<site>__...): the launcher that opens that site.
+      var site = /^(?:chrome|msedge|brave|chromium)-([^_]+)__/i.exec(windowClass)
+      if (site) {
+        var apps = DesktopEntries.applications.values
+        for (var i = 0; i < apps.length && !entry; i++) {
+          if (String(apps[i].execString || "").indexOf("://" + site[1]) !== -1
+              || String(apps[i].execString || "").indexOf("://www." + site[1]) !== -1) entry = apps[i]
+        }
+      }
+      if (!entry) entry = DesktopEntries.heuristicLookup(windowClass)
+    }
+    return entry && entry.icon ? Quickshell.iconPath(entry.icon, true) : ""
+  }
+
+  // The image for an icon: the app's own in "app" mode (when it has one),
+  // else the line icon in `color`.
+  function iconSource(name, appIcon, color) {
+    return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, color)
+  }
+
+  // The line icon for a launcher entry (the Super menu's line mode).
+  function lineIconForEntry(entry) {
+    var dependsOnUserRules = userPrograms && userClasses
+    return TaskbarMatch.forEntry(entry)
+  }
+
   function iconName(address, windowClass) {
-    var program = programByAddress[address]
-    if (program && userPrograms[program]) return userPrograms[program]
-    for (var u = 0; u < userClasses.length; u++) {
-      if (userClasses[u][0].test(windowClass)) return userClasses[u][1]
-    }
-    if (program && programIcons[program]) return programIcons[program]
-    for (var i = 0; i < classIcons.length; i++) {
-      if (classIcons[i][0].test(windowClass)) return classIcons[i][1]
-    }
-    return "app"
+    var dependsOnUserRules = userPrograms && userClasses
+    return TaskbarMatch.forWindow(programByAddress[address] || "", windowClass)
   }
 
   // ---------------------------------------------------------------- events
@@ -2034,7 +1959,7 @@ BarWidget {
           height: taskIcon.height
           sourceSize.width: taskIcon.sourceSize.width
           sourceSize.height: taskIcon.sourceSize.height
-          source: visible ? TaskbarIcons.halo(task.modelData.icon, String(Color.bar.background), 5) : ""
+          source: visible && !(root.appIcons && task.modelData.appIcon) ? TaskbarIcons.halo(task.modelData.icon, String(Color.bar.background), 5) : ""
           smooth: true
         }
 
@@ -2053,7 +1978,7 @@ BarWidget {
             height: root.iconSize
             sourceSize.width: Math.round(root.iconSize * Screen.devicePixelRatio)
             sourceSize.height: Math.round(root.iconSize * Screen.devicePixelRatio)
-            source: TaskbarIcons.svg(task.modelData.icon, String(task.active ? Color.accent : root.foreground))
+            source: root.iconSource(task.modelData.icon, task.modelData.appIcon, String(task.active ? Color.accent : root.foreground))
             opacity: task.active ? 1 : 0.75
             smooth: true
 
@@ -2467,7 +2392,7 @@ BarWidget {
     y: root.dragPos.y - height / 2
     sourceSize.width: Math.round(root.iconSize * Screen.devicePixelRatio)
     sourceSize.height: Math.round(root.iconSize * Screen.devicePixelRatio)
-    source: root.dragGroup ? TaskbarIcons.svg(root.dragGroup.icon, String(Color.accent)) : ""
+    source: root.dragGroup ? root.iconSource(root.dragGroup.icon, root.dragGroup.appIcon, String(Color.accent)) : ""
     opacity: 0.85
   }
 
@@ -2509,7 +2434,7 @@ BarWidget {
       height: root.iconSize
       sourceSize.width: Math.round(root.iconSize * Screen.devicePixelRatio)
       sourceSize.height: Math.round(root.iconSize * Screen.devicePixelRatio)
-      source: dropFx.group ? TaskbarIcons.svg(dropFx.group.icon, String(Color.accent)) : ""
+      source: dropFx.group ? root.iconSource(dropFx.group.icon, dropFx.group.appIcon, String(Color.accent)) : ""
     }
 
     // A soft accent circle behind the number, sized to stay inside the bar.
@@ -2579,6 +2504,7 @@ BarWidget {
           toplevel: modelData
           thumbWidth: root.pickerThumbWidth
           icon: info.icon
+          appIcon: info.appIcon
           active: !info.minimized && modelData === Hyprland.activeToplevel
           minimized: info.minimized
           place: info.place

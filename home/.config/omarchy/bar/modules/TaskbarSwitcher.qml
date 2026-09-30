@@ -152,6 +152,7 @@ Item {
             thumbWidth: switcher.cardThumbWidth
             selected: index === switcher.selected
             icon: info.icon
+            appIcon: info.appIcon
             active: false
             minimized: info.minimized
             place: info.place

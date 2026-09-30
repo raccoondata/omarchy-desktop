@@ -86,6 +86,7 @@ icon(
 | `icon-set <name> <file>` | check, install as the icon's script, keep drafts, build |
 | `icon-build [--check]` | all scripts → the icon file the taskbar reads |
 | `icon-test <out.png> <class>...` | throwaway windows, screenshot of the real bar |
+| `icon-font [--check]` | maintainer: the built-in set as a font, for Omarchy's menu (`icon-build` runs it) |
 
 All Python, all on `iconkit`, all with `-h`; exit 0 ok, 1 refused or
 failed, 2 usage.

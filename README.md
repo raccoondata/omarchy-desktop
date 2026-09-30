@@ -76,6 +76,10 @@ back; your settings files stay).
   ask Claude Code or Codex for "a taskbar icon for <app>" (the bundled
   `taskbar-icons` skill draws one in the same style). Yours are kept in
   `~/.config/omarchy/taskbar-icons.json`, which updates never touch.
+  Taskbar & Desktop > Icons chooses where they're used: the taskbar and
+  switcher (on), the Super menu, now playing and Omarchy's own menu (off:
+  apps keep their own colour icons there), or each app's own icon on the
+  taskbar too.
 
 Settings: **Super+Alt+Space > Setup > Taskbar & Desktop**. Health check:
 `omarchy-desktop check`.

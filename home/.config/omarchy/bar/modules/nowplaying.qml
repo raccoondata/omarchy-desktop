@@ -8,6 +8,8 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
 import "MediaWindow.js" as MediaWindow
+import "taskbar-icons.js" as TaskbarIcons
+import "TaskbarMatch.js" as TaskbarMatch
 
 // Now playing, in place of Omarchy's Media widget (omarchy.media). Reads MPRIS
 // (any player: Edge/Chromium tabs, Spotify, mpv, ...) directly.
@@ -292,6 +294,9 @@ BarWidget {
   // The scroll volume meter: "center" (percent in the middle, the level
   // growing out both sides) or "side" (a bar, the percent at the right).
   property string volumeStyle: "center"
+  // Taskbar & Desktop > Icons > Now playing: the apps' own icons, or the
+  // desktop's line icons (where an app has one).
+  property bool lineIcons: false
   FileView {
     path: root.omarchyDir + "/taskbar-settings.json"
     watchChanges: true
@@ -302,6 +307,7 @@ BarWidget {
       try { o = JSON.parse(text()) || {} } catch (e) { }
       root.equalizerStyle = String(o.equalizerStyle || "spectrum")
       root.clickMode = o.nowPlayingClick === "play" ? "play" : "card"
+      root.lineIcons = o.iconsNowPlaying === "line"
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
       root.mixerOpen = o.nowPlayingMixer === true || o.nowPlayingMixer === "true"
@@ -344,11 +350,17 @@ BarWidget {
   }
   function streamIcon(n) {
     var p = nodeProps(n)
-    var name = p["application.icon-name"] || ""
-    if (!name) {
-      var entry = DesktopEntries.heuristicLookup(String(p["application.process.binary"] || p["application.name"] || ""))
-      name = entry ? entry.icon : ""
+    var binary = String(p["application.process.binary"] || "")
+    var entry = DesktopEntries.heuristicLookup(binary || String(p["application.name"] || ""))
+    if (lineIcons) {
+      var line = TaskbarMatch.forEntry(entry)
+      if (!line && binary) {
+        line = TaskbarMatch.forWindow(binary, binary)
+        if (line === "app" || line === "browser") line = ""
+      }
+      if (line) return TaskbarIcons.svg(line, String(Color.popups.text))
     }
+    var name = p["application.icon-name"] || (entry ? entry.icon : "")
     return name ? Quickshell.iconPath(name, true) : ""
   }
   // The playing app's own stream (its volume in the card and on scroll).

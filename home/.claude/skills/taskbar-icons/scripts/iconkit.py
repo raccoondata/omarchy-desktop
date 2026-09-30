@@ -302,6 +302,41 @@ def lint(b, measure=True):
     return problems
 
 
+# --- elements as path data (for outlining, e.g. icon-font) -----------------------------
+def parts(b):
+    """[(d, stroked, filled, weight)] for every element of a body: circles,
+    ellipses and rects as path data, with how they're painted."""
+    out = []
+    for el in re.findall(r"<[a-z]+\b[^>]*/>", b):
+        tag = re.match(r"<([a-z]+)", el).group(1)
+        at = dict(re.findall(r'\s([a-zA-Z-]+)="([^"]*)"', el))
+        f = lambda k, d=0.0: float(at.get(k, d))
+        if tag == "path":
+            d = at["d"]
+        elif tag in ("circle", "ellipse"):
+            cx, cy = f("cx"), f("cy")
+            rx = f("r") if tag == "circle" else f("rx")
+            ry = f("r") if tag == "circle" else f("ry")
+            d = (f"M{num(cx - rx)} {num(cy)}A{num(rx)} {num(ry)} 0 1 0 {num(cx + rx)} {num(cy)}"
+                 f"A{num(rx)} {num(ry)} 0 1 0 {num(cx - rx)} {num(cy)}Z")
+        elif tag == "rect":
+            x, y, w, h = f("x"), f("y"), f("width"), f("height")
+            r = min(f("rx", f("ry")), w / 2, h / 2)
+            if r <= 0:
+                d = f"M{num(x)} {num(y)}H{num(x + w)}V{num(y + h)}H{num(x)}Z"
+            else:
+                a = f"A{num(r)} {num(r)} 0 0 1"
+                d = (f"M{num(x + r)} {num(y)}H{num(x + w - r)}{a} {num(x + w)} {num(y + r)}"
+                     f"V{num(y + h - r)}{a} {num(x + w - r)} {num(y + h)}H{num(x + r)}"
+                     f"{a} {num(x)} {num(y + h - r)}V{num(y + r)}{a} {num(x + r)} {num(y)}Z")
+        else:
+            continue
+        stroked = at.get("stroke") != "none"
+        filled = at.get("fill") == "%C"
+        out.append((d, stroked, filled, f("stroke-width", STROKE)))
+    return out
+
+
 # --- running icon scripts -----------------------------------------------------------
 KIT = pathlib.Path(__file__).resolve().parent
 

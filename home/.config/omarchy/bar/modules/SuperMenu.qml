@@ -397,6 +397,15 @@ Item {
     Component.onCompleted: running = true
   }
 
+  // Taskbar & Desktop > Icons > Super menu: the app's own icon ("app", the
+  // default) or the desktop's line icon ("line"; apps without one keep
+  // their own).
+  readonly property bool lineIcons: menu.taskbar.pref("iconsSuperMenu", "app") === "line"
+  function tileIcon(entry) {
+    var name = lineIcons ? menu.taskbar.lineIconForEntry(entry) : ""
+    return name ? TaskbarIcons.svg(name, String(Color.menu.text)) : menu.library.iconSource(entry ? entry.icon : "")
+  }
+
   // Omarchy's "suspend off" toggle hides Suspend, as in its own menu.
   property bool suspendOff: false
   FileView {
@@ -891,7 +900,7 @@ Item {
       y: menu.dragPoint.y - height / 2
       sourceSize.width: Math.round(menu.iconSize * Screen.devicePixelRatio)
       sourceSize.height: Math.round(menu.iconSize * Screen.devicePixelRatio)
-      source: menu.dragEntry ? menu.library.iconSource(menu.dragEntry.icon) : ""
+      source: menu.dragEntry ? menu.tileIcon(menu.dragEntry) : ""
       opacity: 0.9
     }
   }
