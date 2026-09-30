@@ -112,6 +112,14 @@ case "${1:-status}" in
       commit="$(g commit-tree "$tree" -m "$msg")"
     fi
     g push -q origin "main" "$commit:refs/heads/stable"
+    # The one-line setup (bootstrap.sh) lives on as a public gist too.
+    gist="$(cat "$repo/bootstrap.gist" 2>/dev/null || true)"
+    if [[ -n $gist ]] && ! curl -fsSL "https://gist.githubusercontent.com/raccoondata/$gist/raw/omarchy-desktop-setup.sh" 2>/dev/null | cmp -s - "$repo/bootstrap.sh"; then
+      tmpd="$(mktemp -d)"
+      cp "$repo/bootstrap.sh" "$tmpd/omarchy-desktop-setup.sh"
+      gh gist edit "$gist" -f omarchy-desktop-setup.sh "$tmpd/omarchy-desktop-setup.sh" && echo "Updated the setup gist."
+      rm -rf "$tmpd"
+    fi
     echo "Released: $msg ($(g rev-parse --short "$commit")). Others get it with: omarchy-desktop update"
     ;;
 
