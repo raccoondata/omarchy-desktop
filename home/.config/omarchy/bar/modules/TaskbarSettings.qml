@@ -567,17 +567,25 @@ Item {
         Section { title: "Equalizer style" }
 
         Grid {
-          columns: 2
-          columnSpacing: Style.space(10)
-          rowSpacing: Style.space(10)
-          readonly property real tileWidth: (parent.width - columnSpacing) / 2
+          columns: 3
+          columnSpacing: Style.space(8)
+          rowSpacing: Style.space(8)
+          readonly property real tileWidth: (parent.width - 2 * columnSpacing) / 3
 
           Repeater {
             model: [
               { value: "spectrum", label: "Spectrum" },
               { value: "wave", label: "Wave" },
               { value: "embers", label: "Embers" },
-              { value: "ripple", label: "Ripple" }
+              { value: "ripple", label: "Ripple" },
+              { value: "scope", label: "Scope" },
+              { value: "mist", label: "Mist" },
+              { value: "fire", label: "Fire" },
+              { value: "radar", label: "Radar" },
+              { value: "swirl", label: "Swirl" },
+              { value: "plasma", label: "Plasma" },
+              { value: "rain", label: "Rain" },
+              { value: "shuffle", label: "Shuffle" }
             ]
 
             Rectangle {
@@ -586,7 +594,7 @@ Item {
               readonly property bool current: settings.taskbar.equalizerStyle === modelData.value
 
               width: parent.tileWidth
-              height: Style.space(84)
+              height: Style.space(76)
               radius: Style.cornerRadius
               color: current ? Color.menu.selectedBackground : (swatchMouse.containsMouse ? Util.alpha(Color.menu.text, 0.05) : "transparent")
               border.width: current ? 2 : 1
@@ -1070,6 +1078,19 @@ Item {
           fontFamily: Style.font.menuFamily
           fontSize: Style.font.bodySmall
           onChanged: function(v) { settings.set("nowPlayingScroll", v) }
+        }
+      }
+      SettingRow {
+        label: "Visualizer in the card"
+        description: "the equalizer style, card-wide; runs only while the card is open"
+        ButtonGroup {
+          options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }]
+          value: npTab.prefs.nowPlayingVisualizer === false ? "false" : "true"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("nowPlayingVisualizer", v) }
         }
       }
       SettingRow {
