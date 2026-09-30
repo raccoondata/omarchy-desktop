@@ -82,7 +82,7 @@ case "${1:-status}" in
     fi
     [[ $2 =~ ^(all|new|off)$ ]] || { echo "usage: omarchy-desktop keys all|new|off"; exit 2; }
     tmp="$(mktemp)"
-    { [[ -f $conf ]] && grep -v '^keys=' "$conf"; echo "keys=$2"; } > "$tmp"
+    { [[ -f $conf ]] && grep -v '^keys=' "$conf" || true; echo "keys=$2"; } > "$tmp"
     mv "$tmp" "$conf"
     hyprctl reload >/dev/null 2>&1 || true
     echo "keybindings: $2 (applied)"

@@ -40,7 +40,7 @@ conf_set() {
   local tmp
   mkdir -p "$(dirname "$conf")"
   tmp="$(mktemp)"
-  { [[ -f $conf ]] && grep -v "^$1=" "$conf"; echo "$1=$2"; } > "$tmp"
+  { [[ -f $conf ]] && grep -v "^$1=" "$conf" || true; echo "$1=$2"; } > "$tmp"
   mv "$tmp" "$conf"
 }
 
