@@ -15,8 +15,10 @@ GitHub first:
     gh repo clone raccoondata/omarchy-desktop ~/.local/share/omarchy-desktop/src
     ~/.local/share/omarchy-desktop/src/install.sh
 
-It asks for your password (for the system parts) and whether you want remote
-access (off unless you say yes), then tells you to log out and back in.
+It asks for your password (for the system parts), which keybindings you want
+(it lists them: all, only the new ones, or none) and whether you want remote
+access (off unless you say yes), then tells you to log out and back in. What
+it printed is kept in `~/.local/state/omarchy-desktop/install.log`.
 
 ## Update
 
@@ -24,6 +26,11 @@ access (off unless you say yes), then tells you to log out and back in.
 
 or **Super+Alt+Space > Update > Desktop**. It shows what's new, then installs
 it. `omarchy-desktop status` says whether there's an update.
+
+Other commands: `omarchy-desktop keys all|new|off` (change the keybindings),
+`remote on|off` (remote access), `check` (is everything working?), and
+`uninstall` (takes it all out again, putting Omarchy's bar, keys and menus
+back; your settings files stay).
 
 ## What you get
 
@@ -58,6 +65,8 @@ Settings: **Super+Alt+Space > Setup > Taskbar & Desktop**. Health check:
 ## Keybindings
 
 What differs from stock Omarchy (in `~/.config/hypr/desktop/bindings.lua`).
+Which ones you get is up to you (`omarchy-desktop keys`): **all**, only the
+**new** ones (marked ✚: they don't change any Omarchy key), or none.
 **Super+K** lists every binding, these included. They load after your own
 `~/.config/hypr/bindings.lua`, so to change one, put your version in a file
 of your own (say `hypr/mine.lua`) and add `require("hypr.mine")` after
@@ -66,28 +75,28 @@ of your own (say `hypr/mine.lua`) and add `require("hypr.mine")` after
 | Keys | Does | Replaces Omarchy's |
 |---|---|---|
 | Super+W / A / S / D | focus the window above / left / below / right | W: close window, S: scratchpad |
-| Super+Q, twice | close the window (Omarchy's close was Super+W) | – |
+| Super+Q, twice ✚ | close the window (Omarchy's close was Super+W) | – |
 | Super+Up | maximize, or restore a minimized window | focus up |
 | Super+Down | un-maximize, then minimize | focus down |
 | Super+Left / Right | dock the window to that half | focus left / right |
 | Super+Shift+Up / Down | restore all / minimize all windows | swap window up / down |
 | Super+Alt+S | minimize now | move to scratchpad |
 | Super+Tab, Super+Shift+Tab | window switcher (previews) | next / previous workspace |
-| Super, twice (or Caps Lock, twice) | the Super menu (type to search, Ctrl+Enter to ask an agent) | – |
+| Super, twice (or Caps Lock, twice) ✚ | the Super menu (type to search, Ctrl+Enter to ask an agent) | – |
 | Super+Return (twice: another window of the focused app) | terminal | – |
-| Super+C, twice | your first coding agent (once: universal copy, as before) | – |
-| Super+V, twice | your second coding agent (once: universal paste, as before) | – |
+| Super+C, twice ✚ | your first coding agent (once: universal copy, as before) | – |
+| Super+V, twice ✚ | your second coding agent (once: universal paste, as before) | – |
 | Super+G, twice | Ghostty (once: toggle grouping, as before) | – |
 | Print Screen | screenshot, then the editor with the ask panel | Omarchy's screenshot |
-| Super+Alt+A | ask an agent about the selected text | – |
-| Super+Ctrl+L | lock (backup lock if needed) | lock |
+| Super+Alt+A ✚ | ask an agent about the selected text | – |
+| Super+Ctrl+L ✚ | lock (backup lock if needed) | lock |
 | Ctrl+Alt+Delete | text console 3 with `rescue` (Ctrl+Alt+F1 back) | close all windows |
-| Super+Shift+Escape, twice | restart into Windows (only with Windows) | – |
+| Super+Shift+Escape, twice ✚ | restart into Windows (only with Windows) | – |
 
-Caps Lock works as a second Super key (real Caps Lock: both Shifts), and
-Compose moves to Right Alt (`hypr/desktop/input.lua`).
+With all of them, Caps Lock works as a second Super key (real Caps Lock: both
+Shifts), and Compose moves to Right Alt (`hypr/desktop/input.lua`).
 
-Mouse: middle-drag a window's top strip to move it (onto a workspace number
+Mouse (always on, in `hypr/desktop/core.lua`): middle-drag a window's top strip to move it (onto a workspace number
 moves it there, to a screen edge snaps it); Shift+click a taskbar icon for a
 new window. Esc in the screenshot editor folds its ask panel first.
 
@@ -102,7 +111,8 @@ new window. Esc in the screenshot editor folds its ask panel first.
   `hyprland.lua`, the bar widgets in `shell.json`, menu entries, agent
   notification hooks), runs `setup-system` (packages, rescue console), builds
   the two Hyprland plugins, starts the background services.
-- `bin/omarchy-desktop`: update / status / check / remote.
+- `bin/omarchy-desktop`: update / status / check / keys / remote / uninstall
+  (`uninstall.sh`).
 
 After a Hyprland update the plugins rebuild themselves on the next
 `omarchy-desktop update` (or run `~/.config/omarchy/hyprland-plugins/build`);

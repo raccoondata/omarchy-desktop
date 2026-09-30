@@ -26,7 +26,7 @@ update=false
 [[ ${1:-} == --update ]] && update=true
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 failed=()
-steps=7
+steps=8
 
 step() { echo; echo "${bold}[$1/$steps] $2${off}"; }
 warn() { echo "  ! $*"; failed+=("$*"); }
@@ -51,7 +51,20 @@ if [[ ! -f /usr/share/omarchy/default/hypr/bootstrap.lua || ! -f $HOME/.config/h
   echo "Update Omarchy first (Super+Alt+Space > Update > Omarchy)."
   exit 1
 fi
+[[ $EUID -ne 0 ]] || { echo "Run this as yourself, not root (it asks for your password when it needs it)."; exit 1; }
+command -v yay >/dev/null || { echo "This needs yay (part of Omarchy)."; exit 1; }
+if ! curl -fsI --max-time 8 https://aur.archlinux.org >/dev/null 2>&1; then
+  echo "Can't reach the internet (aur.archlinux.org); it's needed for packages. Connect, then run this again."
+  exit 1
+fi
+[[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || echo "${dim}(Not in a Hyprland session: it'll take effect at your next login.)${off}"
 export OMARCHY_DESKTOP_INSTALL=1   # setup scripts skip their "Press Enter" pause
+
+# Everything it prints also goes to a log, for when something goes wrong.
+mkdir -p "$state"
+log="$state/install.log"
+echo "=== $(date '+%F %T') install.sh ${1:-} ($(git -C "$repo" rev-parse --short HEAD 2>/dev/null))" >> "$log"
+exec > >(tee -a "$log") 2>&1
 
 if $update; then
   echo "${bold}Updating omarchy-desktop${off} ${dim}($(git -C "$repo" log -1 --format='%h, %cd' --date=short 2>/dev/null))${off}"
@@ -109,8 +122,54 @@ else
   echo "  done"
 fi
 
-# --- 2 hook up -------------------------------------------------------------------
-step 2 "Hooking into Omarchy"
+# --- 2 keybindings ------------------------------------------------------------
+step 2 "Keybindings"
+if [[ -n "$(conf_get keys)" ]]; then
+  echo "  $(conf_get keys) ${dim}(change: omarchy-desktop keys all|new|off)${off}"
+elif $update; then
+  conf_set keys all
+else
+  cat <<EOF
+  ${bold}New${off} (no Omarchy key changes)
+    Super, twice             the Super menu: apps, search, now playing, ask an agent
+    Super+Alt+A              ask an agent about the selected text
+    Super+C, twice           your first coding agent   (once: copy, as before)
+    Super+V, twice           your second coding agent  (once: paste, as before)
+    Super+Q, twice           close the window
+    Super+Ctrl+L             lock, with a backup lock screen   (same key)
+EOF
+  "$omarchy/reboot-to-windows" --check && \
+  echo "    Super+Shift+Esc, twice   restart into Windows"
+  cat <<EOF
+  ${bold}Windows-style${off} (these change Omarchy's keys)
+    Super+W / A / S / D      focus the window up / left / down / right
+                             ${dim}was: W close window (now Super+Q twice), S scratchpad${off}
+    Super+Up / Down          maximize, restore, minimize     ${dim}was: focus up / down${off}
+    Super+Left / Right       dock to the left / right half   ${dim}was: focus left / right${off}
+    Super+Shift+Up / Down    restore all / minimize all      ${dim}was: swap window up / down${off}
+    Super+Alt+S              minimize                        ${dim}was: to the scratchpad${off}
+    Super+Tab                window switcher                 ${dim}was: next workspace${off}
+    Print Screen             screenshot, then the editor with the ask panel
+                             ${dim}was: Omarchy's screenshot (picker, saved, copied)${off}
+    Ctrl+Alt+Delete          rescue console                  ${dim}was: close all windows${off}
+    Super+G, twice           a terminal in this folder       ${dim}once: grouping, as before${off}
+    Super+Return, twice      another window of this app      ${dim}once: terminal, as before${off}
+    Caps Lock                a second Super key              ${dim}was: Compose (now Right Alt);
+                             real Caps Lock: both Shifts${off}
+  Mouse (always): middle-drag a window by its top to move it; Shift+click a
+  taskbar icon for a new window.
+EOF
+  read -r -p "  Install [a]ll, only the [n]ew ones, or [s]kip? [A/n/s] " a
+  case "$a" in
+    [nN]*) conf_set keys new ;;
+    [sS]*) conf_set keys off ;;
+    *) conf_set keys all ;;
+  esac
+  echo "  keybindings: $(conf_get keys) ${dim}(change any time: omarchy-desktop keys all|new|off)${off}"
+fi
+
+# --- 3 hook up -------------------------------------------------------------------
+step 3 "Hooking into Omarchy"
 # Hyprland: hypr/desktop.lua after your own files.
 hl="$HOME/.config/hypr/hyprland.lua"
 if ! grep -q 'require("hypr.desktop")' "$hl"; then
@@ -233,12 +292,12 @@ if command -v grok >/dev/null || [[ -d $HOME/.grok ]]; then
   fi
 fi
 
-# --- 3 system ------------------------------------------------------------------
-step 3 "System setup (packages, rescue console)"
+# --- 4 system ------------------------------------------------------------------
+step 4 "System setup (packages, rescue console)"
 "$omarchy/setup-system" || warn "setup-system failed; run ~/.config/omarchy/setup-system"
 
-# --- 4 plugins -----------------------------------------------------------------
-step 4 "Hyprland plugins (title bars, window drag events)"
+# --- 5 plugins -----------------------------------------------------------------
+step 5 "Hyprland plugins (title bars, window drag events)"
 stamp="$(hyprctl version -j 2>/dev/null | jq -r .commit)-$(cat "$omarchy"/hyprland-plugins/{build,hyprbars-commit,hyprbars-fixes.patch} "$omarchy"/hyprland-plugins/dragevents/* 2>/dev/null | md5sum | cut -c1-12)"
 if [[ "$(cat "$state/plugins-built" 2>/dev/null)" == "$stamp" && -f $HOME/.local/lib/hyprland/libhyprdragevents.so ]]; then
   echo "  up to date"
@@ -248,8 +307,8 @@ else
   warn "plugin build failed (title bars fall back to off; window drops on workspaces don't work)"
 fi
 
-# --- 5 services ------------------------------------------------------------------
-step 5 "Background services"
+# --- 6 services ------------------------------------------------------------------
+step 6 "Background services"
 chmod +x "$HOME/.local/bin/rescue" 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
@@ -258,8 +317,8 @@ systemctl --user enable --now lock-guard.service >/dev/null 2>&1 || warn "couldn
 [[ "$(conf_get remote)" == on ]] && systemctl --user restart remote-screen.service 2>/dev/null
 echo "  config history (local undo), crash helper, backup lock guard"
 
-# --- 6 optional ------------------------------------------------------------------
-step 6 "Optional"
+# --- 7 optional ------------------------------------------------------------------
+step 7 "Optional"
 if [[ "$(conf_get remote)" == on ]]; then
   # Re-applied on a full install (only restarts RustDesk if something changed).
   $update || "$omarchy/setup-remote" || warn "setup-remote failed; run ~/.config/omarchy/setup-remote"
@@ -278,8 +337,8 @@ else
   fi
 fi
 
-# --- 7 reload ---------------------------------------------------------------------
-step 7 "Reloading"
+# --- 8 reload ---------------------------------------------------------------------
+step 8 "Reloading"
 if hyprctl version >/dev/null 2>&1; then
   hyprctl reload >/dev/null 2>&1 && echo "  Hyprland config reloaded"
   omarchy-restart-shell >/dev/null 2>&1 && echo "  shell restarted"
@@ -295,13 +354,18 @@ else
   echo "${bold}Done.${off}"
 fi
 $update && exit 0
+if [[ "$(conf_get keys)" == off ]]; then
+  keys_line="Keybindings: none added (omarchy-desktop keys new, for the Super menu and more)."
+else
+  keys_line="Double-tap Super: the Super menu. Super+K: every keybinding."
+fi
 cat <<EOF
 
 ${bold}Next${off}
   1. Log out and back in (loads the title bars and window drag plugins).
-  2. Double-tap Super: the Super menu. Super+K: every keybinding (the
-     desktop's own: README > Keybindings). Settings: Super+Alt+Space > Setup >
-     Taskbar & Desktop.
+  2. $keys_line
+     Settings: Super+Alt+Space > Setup > Taskbar & Desktop.
   3. Updates: omarchy-desktop update (or Super+Alt+Space > Update > Desktop).
-  4. Something off? omarchy-desktop check
+  4. Something off? omarchy-desktop check. To remove it all: omarchy-desktop uninstall
+  (What it printed is in ${log/#$HOME/\~}.)
 EOF

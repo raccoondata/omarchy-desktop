@@ -8,6 +8,10 @@ set -euo pipefail
 #   omarchy-desktop status           the installed version, and what's new
 #   omarchy-desktop check            is everything working? (selfcheck)
 #   omarchy-desktop remote on|off    remote access with RustDesk (setup-remote)
+#   omarchy-desktop keys [all|new|off]
+#                                    which keybindings: all, only the ones that
+#                                    don't change Omarchy's, or none
+#   omarchy-desktop uninstall        take it all out again (asks first)
 #
 # For the maintainer (a clone on the main branch):
 #   omarchy-desktop release "<what's new>"
@@ -65,6 +69,27 @@ case "${1:-status}" in
       off) exec "$omarchy/setup-remote" --off ;;
       *) echo "usage: omarchy-desktop remote on|off"; exit 2 ;;
     esac
+    ;;
+
+  keys)
+    conf="$omarchy/desktop.conf"
+    if [[ -z ${2:-} ]]; then
+      echo "keybindings: $(sed -n 's/^keys=//p' "$conf" 2>/dev/null | tail -1 || true)"
+      echo "  all  everything (README > Keybindings)"
+      echo "  new  only the ones that don't change any Omarchy key"
+      echo "  off  none (Omarchy's keys as they were)"
+      exit 0
+    fi
+    [[ $2 =~ ^(all|new|off)$ ]] || { echo "usage: omarchy-desktop keys all|new|off"; exit 2; }
+    tmp="$(mktemp)"
+    { [[ -f $conf ]] && grep -v '^keys=' "$conf"; echo "keys=$2"; } > "$tmp"
+    mv "$tmp" "$conf"
+    hyprctl reload >/dev/null 2>&1 || true
+    echo "keybindings: $2 (applied)"
+    ;;
+
+  uninstall)
+    exec "$repo/uninstall.sh"
     ;;
 
   release)
