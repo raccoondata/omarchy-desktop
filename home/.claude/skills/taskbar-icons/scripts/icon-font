@@ -43,7 +43,7 @@ from iconkit import BUILTIN_JS, GRID, HOME, parts  # noqa: E402
 
 FONT = HOME / ".local/share/fonts/omarchy-desktop-icons.otf"
 CODEPOINTS = HOME / ".config/omarchy/icon-codepoints.json"
-FAMILY = "omarchy-desktop-icons"
+FAMILY = "OmarchyDesktopIcons"
 UPM, ASCENT, DESCENT = 1000, 800, 200   # the 24-unit grid spans the em box
 FIRST = 0x100000
 

@@ -353,11 +353,7 @@ BarWidget {
     var binary = String(p["application.process.binary"] || "")
     var entry = DesktopEntries.heuristicLookup(binary || String(p["application.name"] || ""))
     if (lineIcons) {
-      var line = TaskbarMatch.forEntry(entry)
-      if (!line && binary) {
-        line = TaskbarMatch.forWindow(binary, binary)
-        if (line === "app" || line === "browser") line = ""
-      }
+      var line = TaskbarMatch.forApp(p["application.icon-name"], p["application.name"], binary, entry)
       if (line) return TaskbarIcons.svg(line, String(Color.popups.text))
     }
     var name = p["application.icon-name"] || (entry ? entry.icon : "")

@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Each line icon's brand colour, taken from the app's own icon, for the
+"App colours" and "On-theme" icon colour settings.
+
+  icon-colors            write bar/modules/icon-colors.json and report where
+                         each colour came from
+  icon-colors --check    exit 1 if an icon has no colour and no decision
+
+Maintainer only (the result ships). For every installed launcher it finds
+which line icon the desktop gives it (TaskbarMatch.js forEntry, run with
+node), reads the launcher's own icon file, and takes its dominant saturated
+colour: the most common hue among clearly coloured pixels, averaged. Logos
+that are black, white or grey get no colour (the theme's text colour is
+used). The coding agents' marks come from Omarchy's agent assets.
+Overrides, for apps not installed here or a better pick:
+<desktop repo>/icon-src/icon-colors.json, {"name": "#rrggbb" or null}
+(null: no colour, e.g. a generic icon).
+Exit status: 0 written / complete, 1 failed or incomplete, 2 usage.
+"""
+import colorsys
+import configparser
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+from iconkit import BUILTIN_JS, HOME, conf_value
+
+MODULES = BUILTIN_JS.parent
+OUT = MODULES / "icon-colors.json"
+AGENTS = pathlib.Path("/usr/share/omarchy/shell/plugins/agents/assets")
+APP_DIRS = [HOME / ".local/share/applications", pathlib.Path("/usr/share/applications"),
+            pathlib.Path("/usr/share/omarchy/applications")]
+ICON_DIRS = [HOME / ".local/share/icons", pathlib.Path("/usr/share/icons/hicolor"),
+             pathlib.Path("/usr/share/pixmaps"), pathlib.Path("/usr/share/icons")]
+
+
+def builtin_names():
+    return re.findall(r'^  "([a-z0-9_-]+)":', BUILTIN_JS.read_text(), re.M)
+
+
+def entries():
+    out, seen = [], set()
+    for d in APP_DIRS:
+        for f in sorted(d.glob("*.desktop")):
+            if f.name in seen:
+                continue
+            seen.add(f.name)
+            cp = configparser.RawConfigParser(strict=False, interpolation=None)
+            try:
+                cp.read(f, encoding="utf-8")
+                e = cp["Desktop Entry"]
+            except (configparser.Error, KeyError, UnicodeDecodeError):
+                continue
+            execs = e.get("Exec", "")
+            out.append({"id": f.name[:-8], "execString": execs, "command": execs.split(),
+                        "startupClass": e.get("StartupWMClass", ""), "icon": e.get("Icon", "")})
+    return out
+
+
+def match(ents):
+    """[icon name per entry] via TaskbarMatch.js forEntry."""
+    js = (MODULES / "TaskbarMatch.js").read_text().replace(".pragma library", "")
+    prog = js + "\nconst es = JSON.parse(require('fs').readFileSync(0, 'utf8'));\n" \
+                "console.log(JSON.stringify(es.map(e => forEntry(e))));"
+    res = subprocess.run(["node", "-e", prog], input=json.dumps(ents), capture_output=True, text=True)
+    if res.returncode != 0:
+        sys.exit(f"icon-colors: node failed: {res.stderr[-300:]}")
+    return json.loads(res.stdout)
+
+
+def icon_file(name):
+    """The best file for an icon name: a path as is, else scalable SVG, else the largest PNG."""
+    if not name:
+        return None
+    p = pathlib.Path(name)
+    if p.is_absolute():
+        return p if p.exists() else None
+    def rank(f):
+        if f.suffix == ".svg":
+            return 100000
+        m = re.search(r"/(\d+)x\d+/", str(f))
+        return int(m.group(1)) if m else 1
+    # The first folder that has it wins: the app's own icons (your icons,
+    # hicolor, pixmaps) before other icon themes, which reuse names for
+    # other things (a theme's "zoom" is a magnifier).
+    for d in ICON_DIRS:
+        if not d.exists():
+            continue
+        pattern = f"{name}.*"
+        found = [f for f in (d.rglob(pattern) if d.name != "icons" or d == ICON_DIRS[0] else
+                             (x for t in d.iterdir() if t.name != "hicolor" for x in t.rglob(pattern)))
+                 if f.suffix in (".svg", ".png")]
+        if found:
+            return max(found, key=rank)
+    return None
+
+
+def dominant(file):
+    """'#rrggbb', or None for a black / white / grey logo."""
+    raw = subprocess.run(["magick", "-background", "none", str(file), "-resize", "96x96", "-depth", "8", "RGBA:-"],
+                         capture_output=True).stdout
+    buckets, total = {}, 0
+    for i in range(0, len(raw) - 3, 4):
+        r, g, b, a = raw[i], raw[i + 1], raw[i + 2], raw[i + 3]
+        if a < 128:
+            continue
+        total += 1
+        h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+        if s < 0.3 or v < 0.25:
+            continue
+        k = int(h * 24) % 24
+        w = s * v
+        acc = buckets.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+        acc[0] += r * w
+        acc[1] += g * w
+        acc[2] += b * w
+        acc[3] += w
+    coloured = sum(v[3] for v in buckets.values())
+    if not total or coloured < total * 0.08:
+        return None
+    # The most common hue, with its neighbours (a gradient spans a few buckets).
+    best = max(buckets, key=lambda k: sum(buckets.get((k + d) % 24, [0, 0, 0, 0])[3] for d in (-1, 0, 1)))
+    acc = [0.0, 0.0, 0.0, 0.0]
+    for d in (-1, 0, 1):
+        v = buckets.get((best + d) % 24)
+        if v:
+            acc = [x + y for x, y in zip(acc, v)]
+    return "#%02x%02x%02x" % tuple(round(acc[i] / acc[3]) for i in range(3))
+
+
+def main():
+    args = sys.argv[1:]
+    if any(a not in ("--check",) for a in args):
+        print(__doc__)
+        sys.exit(2)
+    names = builtin_names()
+    repo = conf_value("repo")
+    overrides_file = pathlib.Path(repo) / "icon-src" / "icon-colors.json" if repo else None
+    try:
+        overrides = json.loads(overrides_file.read_text()) if overrides_file else {}
+    except (OSError, ValueError):
+        overrides = {}
+
+    sources = {}
+    for f in AGENTS.glob("*.svg"):
+        if f.stem in names:
+            sources.setdefault(f.stem, f)
+    ents = entries()
+    for e, name in zip(ents, match(ents)):
+        if name and name not in sources:
+            f = icon_file(e["icon"])
+            if f:
+                sources[name] = f
+
+    colors, report = {}, []
+    for name in names:
+        if name in overrides:
+            if overrides[name]:
+                colors[name] = overrides[name]
+            report.append((name, overrides[name] or "-", "override"))
+        elif name in sources:
+            c = dominant(sources[name])
+            if c:
+                colors[name] = c
+            report.append((name, c or "-", str(sources[name]).replace(str(HOME), "~")))
+        else:
+            report.append((name, "?", "no app icon found (add it to icon-src/icon-colors.json)"))
+    undecided = [r[0] for r in report if r[1] == "?"]
+    if "--check" in args:
+        if undecided:
+            print("no colour and no decision for: " + " ".join(undecided))
+            sys.exit(1)
+        print(f"{len(colors)} icons coloured, {len(names) - len(colors)} left to the theme")
+        return
+    OUT.write_text(json.dumps(dict(sorted(colors.items())), indent=2) + "\n")
+    for name, c, src in report:
+        print(f"{name:14} {c:8} {src}")
+    print(f"wrote {OUT}: {len(colors)} coloured; {len(undecided)} without a source: {' '.join(undecided)}")
+    sys.exit(1 if undecided else 0)
+
+
+main()
