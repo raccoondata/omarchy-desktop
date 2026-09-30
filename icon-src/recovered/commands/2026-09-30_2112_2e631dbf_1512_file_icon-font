@@ -1,0 +1,125 @@
+# written to: ~/.claude/skills/taskbar-icons/scripts/icon-font
+#!/usr/bin/env python3
+"""Build the icon font: every built-in icon as a glyph, for places that draw
+icons with text (Omarchy's menu, via "iconFont").
+
+  icon-font             build ~/.local/share/fonts/omarchy-desktop-icons.otf
+                        and ~/.config/omarchy/icon-codepoints.json
+  icon-font --check     exit 1 if the font is older than the icons
+
+Maintainer only (the font ships with the desktop, so others need nothing).
+Strokes are outlined (a font can't stroke), 1.75 or the element's weight,
+round caps and joins, then everything is merged into one shape per glyph.
+Codepoints are in Unicode's private-use plane 16 (U+100000 up), kept stable
+across builds: a new icon gets the next free one, a removed icon's stays
+reserved in icon-codepoints.json.
+Needs fontTools and skia-pathops: run through uv, which fetches them
+(releases at least 7 days old).
+Exit status: 0 built / current, 1 failed or out of date, 2 usage.
+"""
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+ARGS = sys.argv[1:]
+try:
+    import pathops
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.t2CharStringPen import T2CharStringPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.svgLib.path import parse_path
+except ImportError:
+    if os.environ.get("ICON_FONT_UV"):
+        sys.exit("icon-font: fontTools / skia-pathops unavailable even through uv")
+    os.environ["ICON_FONT_UV"] = "1"
+    os.execvp("uv", ["uv", "run", "--quiet", "--no-project", "--exclude-newer", "7 days",
+                     "--with", "fonttools", "--with", "skia-pathops",
+                     "python3", os.path.abspath(__file__), *ARGS])
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from iconkit import BUILTIN_JS, GRID, HOME, parts  # noqa: E402
+
+FONT = HOME / ".local/share/fonts/omarchy-desktop-icons.otf"
+CODEPOINTS = HOME / ".config/omarchy/icon-codepoints.json"
+FAMILY = "omarchy-desktop-icons"
+UPM, ASCENT, DESCENT = 1000, 800, 200   # the 24-unit grid spans the em box
+FIRST = 0x100000
+
+
+def builtin_icons():
+    js = BUILTIN_JS.read_text()
+    return {json.loads(a): json.loads(b) for a, b in re.findall(r'^  ("[a-z0-9_-]+"): (".*"),?$', js, re.M)}
+
+
+def outline(body):
+    """One merged pathops.Path for a body."""
+    shapes = []
+    for d, stroked, filled, weight in parts(body):
+        src = pathops.Path()
+        parse_path(d, src.getPen())
+        if filled:
+            shapes.append(src)
+        if stroked:
+            s = pathops.Path(src)
+            s.stroke(weight, pathops.LineCap.ROUND_CAP, pathops.LineJoin.ROUND_JOIN, 4)
+            shapes.append(s)
+    merged = pathops.Path()
+    for s in shapes:
+        merged = pathops.op(merged, s, pathops.PathOp.UNION)
+    return merged
+
+
+def main():
+    if any(a not in ("--check",) for a in ARGS):
+        print(__doc__)
+        sys.exit(2)
+    icons = builtin_icons()
+    if "--check" in ARGS:
+        ok = FONT.exists() and FONT.stat().st_mtime >= BUILTIN_JS.stat().st_mtime
+        print("font is current" if ok else "font is older than the icons: run icon-font")
+        sys.exit(0 if ok else 1)
+
+    try:
+        cps = json.loads(CODEPOINTS.read_text())
+    except (OSError, ValueError):
+        cps = {}
+    nxt = max([int(v, 16) for v in cps.values()] + [FIRST - 1]) + 1
+    for name in icons:
+        if name not in cps:
+            cps[name] = f"{nxt:X}"
+            nxt += 1
+
+    scale = UPM / GRID
+    glyphs, charstrings, cmap, metrics = [".notdef"], {}, {}, {".notdef": (UPM, 0)}
+    empty = T2CharStringPen(UPM, None)
+    charstrings[".notdef"] = empty.getCharString()
+    for name, body in icons.items():
+        pen = T2CharStringPen(UPM, None)
+        # grid (0,0 top-left, y down) -> font units (y up, top of the grid at the ascent)
+        outline(body).draw(TransformPen(pen, (scale, 0, 0, -scale, 0, ASCENT)))
+        glyph = f"icon-{name}"
+        glyphs.append(glyph)
+        charstrings[glyph] = pen.getCharString()
+        cmap[int(cps[name], 16)] = glyph
+        metrics[glyph] = (UPM, 0)
+
+    fb = FontBuilder(UPM, isTTF=False)
+    fb.setupGlyphOrder(glyphs)
+    fb.setupCharacterMap(cmap)
+    fb.setupCFF(FAMILY, {"FullName": FAMILY}, charstrings, {})
+    fb.setupHorizontalMetrics(metrics)
+    fb.setupHorizontalHeader(ascent=ASCENT, descent=-DESCENT)
+    fb.setupNameTable({"familyName": FAMILY, "styleName": "Regular"})
+    fb.setupOS2(sTypoAscender=ASCENT, sTypoDescender=-DESCENT, usWinAscent=ASCENT, usWinDescent=DESCENT)
+    fb.setupPost()
+    FONT.parent.mkdir(parents=True, exist_ok=True)
+    fb.save(str(FONT))
+    CODEPOINTS.write_text(json.dumps(dict(sorted(cps.items())), indent=2) + "\n")
+    subprocess.run(["fc-cache", "-f", str(FONT.parent)], capture_output=True)
+    print(f"built {len(icons)} glyphs into {FONT} (family {FAMILY}); codepoints in {CODEPOINTS}")
+
+
+main()
