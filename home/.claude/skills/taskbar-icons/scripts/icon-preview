@@ -1,44 +1,69 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""Render icons for review, one row each:
+  large | real taskbar size (enlarged, inactive colour) | same, accent colour
 
-# Render icon drafts for review, one row per body file:
-#   large | real taskbar size (enlarged) inactive | same, accent
-# Real size is 23px: taskbar.qml draws icons at 55% of the bar, and the bar is
-# 42px ([bar] size-horizontal = 36 at base-size 14). ICON_PX overrides it.
-# Colours come from the current Omarchy theme.
-#   icon-preview <out.png> <body-file> [<body-file> ...]
+  icon-preview <out.png> <file>...
 
-out="${1:?usage: icon-preview <out.png> <body-file> [<body-file> ...]}"
-shift
-(( $# > 0 )) || { echo "usage: icon-preview <out.png> <body-file> [<body-file> ...]" >&2; exit 2; }
+Files: icon scripts (.icon.py / .py) or drafts (.svgbody); an installed
+icon's script is <sources>/<name>.icon.py (icon-set --list names them).
+Real size is 23px (iconkit.REAL_PX: taskbar.qml draws icons at 55% of a
+42px bar); ICON_PX overrides it. Colours come from the current Omarchy theme.
+Spec problems are printed below each file's name.
+Exit status: 0 written, 1 a file failed, 2 usage.
+"""
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
 
-colors="$HOME/.local/state/omarchy/current/theme/colors.toml"
-pick() { sed -n "s/^$1 *= *\"\\(#[0-9a-fA-F]\\{6\\}\\)\"/\\1/p" "$colors" | head -1; }
-bg="$(pick background)"; fg="$(pick foreground)"; ac="$(pick accent)"
-bg="${bg:-#101315}"; fg="${fg:-#cacccc}"; ac="${ac:-#cacccc}"
+from iconkit import REAL_PX, lint, read_body, render
 
-px="${ICON_PX:-23}"
-work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
-rows=()
-n=0
-for body_file in "$@"; do
-  n=$((n + 1))
-  body="$(cat "$body_file")"
-  for variant in fg ac; do
-    color="$fg"; [[ $variant == ac ]] && color="$ac"
-    printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%s" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">%s</svg>' \
-      "$color" "${body//%C/$color}" > "$work/$n-$variant.svg"
-  done
-  rsvg-convert -w 96 -h 96 -b "$bg" "$work/$n-fg.svg" -o "$work/$n-big.png"
-  for variant in fg ac; do
-    rsvg-convert -w "$px" -h "$px" -b "$bg" "$work/$n-$variant.svg" -o "$work/$n-$variant-real.png"
-    magick "$work/$n-$variant-real.png" -filter point -resize 500% "$work/$n-$variant-x6.png"
-  done
-  magick "$work/$n-big.png" "$work/$n-fg-x6.png" "$work/$n-ac-x6.png" \
-    -background "$bg" -gravity center +append -bordercolor "$bg" -border 12 "$work/row-$n.png"
-  rows+=("$work/row-$n.png")
-done
 
-magick "${rows[@]}" -append "$out"
-echo "wrote $out ($n row(s): large | ${px}px inactive | ${px}px accent)"
+def theme():
+    colors = pathlib.Path.home() / ".local/state/omarchy/current/theme/colors.toml"
+    found = {}
+    try:
+        for key, value in re.findall(r'^(\w+)\s*=\s*"(#[0-9a-fA-F]{6})"', colors.read_text(), re.M):
+            found.setdefault(key, value)
+    except OSError:
+        pass
+    return found.get("background", "#101315"), found.get("foreground", "#cacccc"), found.get("accent", "#cacccc")
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) < 2 or args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(2)
+    out, files = args[0], args[1:]
+    bg, fg, ac = theme()
+    px = int(os.environ.get("ICON_PX", REAL_PX))
+    rows = []
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = pathlib.Path(tmp)
+        for i, f in enumerate(files):
+            try:
+                body = read_body(f)
+            except (OSError, RuntimeError) as e:
+                print(f"✗ {f}: {e}")
+                sys.exit(1)
+            for level, msg in lint(body):
+                print(f"{'✗' if level == 'error' else '!'} {pathlib.Path(f).name}: {msg}")
+            render(body, tmp / f"{i}-big.png", 96, fg, bg)
+            parts = [tmp / f"{i}-big.png"]
+            for tag, color in (("fg", fg), ("ac", ac)):
+                real = tmp / f"{i}-{tag}.png"
+                render(body, real, px, color, bg)
+                subprocess.run(["magick", str(real), "-filter", "point", "-resize", "500%", str(real)], check=True)
+                parts.append(real)
+            row = tmp / f"row-{i}.png"
+            subprocess.run(["magick", *map(str, parts), "-background", bg, "-gravity", "center", "+append",
+                            "-bordercolor", bg, "-border", "12", str(row)], check=True)
+            rows.append(str(row))
+        subprocess.run(["magick", *rows, "-append", out], check=True)
+    print(f"wrote {out} ({len(rows)} row(s): large | {px}px inactive | {px}px accent)")
+
+
+main()

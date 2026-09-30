@@ -1,0 +1,98 @@
+# Taskbar icon spec
+
+Every taskbar icon is a small script that draws a line icon to these rules.
+The rules that can be checked are in code (`scripts/iconkit.py`: its
+constants and `lint()`), and `icon-build` refuses
+an icon that breaks them. This page is the why and the how.
+
+## The drawing
+
+- **Grid**: 24×24 (`viewBox="0 0 24 24"`), centred on (12, 12).
+- **Live area**: everything drawn, stroke included, stays inside 2..22 on
+  both axes (error). Most icons fill it: the median icon is about 19×18.
+- **Balance**: the drawn area's centre is within 1 unit of (12, 12), and its
+  longer side is at least 14 (warnings). A bare letter or a thin mark gets
+  scaled up rather than left small (Neovim).
+- **Stroke**: 1.75, round caps and joins, from the wrapper. An element can
+  take another weight where it needs one (`weight=`, e.g. YouTube Music's
+  1.4 rings); 1..2.5 is normal, outside that is a warning.
+- **Colour**: never in the drawing. The wrapper strokes in the draw colour,
+  which the taskbar sets per theme and state (inactive, accent, minimized).
+  Fills are either none, or the draw colour as `%C`:
+  - `dot()`: a solid dot, radius 0.6 or more (smaller vanishes at 23px);
+  - `solid(d)`: a solid shape, no outline;
+  - `filled(d)`: a shape filled and outlined, so the round stroke makes a
+    small mark (a play triangle) read bolder.
+- **Elements**: `path`, `circle`, `rect`, `ellipse` only. No `transform`,
+  groups, classes or styles: a turned or moved shape is computed in the
+  script (`rotate()`, `capsule()`, `ellipse_path()`, `adjust()`).
+- **Numbers**: at most 2 decimals (`num()` writes them).
+- **Real size**: 23px (55% of the 42px bar). Judge it there, in both the
+  inactive and the accent colour (`icon-preview`), and on the bar
+  (`icon-test`). Fewer, bolder strokes beat detail.
+
+## Style
+
+- Outline icons in Omarchy's line style. A brand gets a simplified line
+  version of its real logo (look at the installed one first:
+  `find /usr/share/icons /usr/share/pixmaps -iname '*<app>*'`); a generic
+  tool gets a plain object (a screen, a page, a folder).
+- Families share a base: the terminal tools use the rounded screen
+  (`rect(3, 4.5, 18, 15, rx=3)`); the LibreOffice set uses one cut-corner
+  page with a different mark inside; circles are about r 8.5..9.
+- Distinct from its neighbours at 23px: a dedicated icon mustn't be mistaken
+  for a generic one (lazygit vs git, htop vs btop vs monitor).
+
+## The script
+
+One per icon, `<sources>/<name>.icon.py` (see *Where things live*; the `.icon.py` suffix keeps a
+script called `math` or `code` from shadowing Python's own modules):
+
+```python
+"""<name>: <what it depicts, one line>.
+<Optional: why it's drawn this way, what's generated.>"""
+from iconkit import *
+
+CONSTANTS = ...          # generated icons: the parameters, named
+
+icon(
+    rect(3, 4.5, 18, 15, rx=3),
+    path("M7.5 9.5l2.5 2.5-2.5 2.5M12.5 15h4"),
+)
+```
+
+- The docstring starts `<name>: `, then what it depicts: that's the
+  catalogue (`iconkit.depicts()`).
+- Only iconkit builders make elements: `path()`, `circle()`, `rect()`,
+  `ellipse()`, `dot()`, `solid()`, `filled()`.
+- Geometry comes from iconkit's helpers, angles in degrees clockwise from
+  12 o'clock: `polar()`, `rays()`, `arc()`, `scallop()`, `capsule()`,
+  `ellipse_path()`, `rotate()`, `poly()`, `adjust()` / `adjust_pt()`.
+  A generated icon names its parameters at the top (Claude's ray lengths,
+  Codex's lobes) so it can be tuned by changing a number.
+- Hand-placed coordinates are fine as path data; a correction to an old
+  drawing (re-centring, resizing) is an `adjust()` with a comment, not a
+  retyped path.
+- Deterministic, no arguments, no files: it prints the drawing and nothing
+  else (spec warnings go to stderr).
+
+## The tools (`scripts/`)
+
+| Tool | Does |
+|---|---|
+| `icon-new <name> "<depicts>"` | a new script from the template, in your scratch folder |
+| `icon-preview <out.png> <file>...` | large, 23px inactive, 23px accent; spec problems listed |
+| `icon-lint [<file>...]` | the spec check (all installed scripts by default) |
+| `icon-set <name> <file>` | check, install as the icon's script, keep drafts, build |
+| `icon-build [--check]` | all scripts → the icon file the taskbar reads |
+| `icon-test <out.png> <class>...` | throwaway windows, screenshot of the real bar |
+
+All Python, all on `iconkit`, all with `-h`; exit 0 ok, 1 refused or
+failed, 2 usage.
+
+Where things live: on the maintainer's PC the scripts are the
+omarchy-desktop repo's `icon-src/icons/`, drafts go to `icon-src/drafts/<name>/<date>/`, and the
+build writes the built-in set (`bar/modules/taskbar-icons.js`, generated:
+never edit its entries). Everywhere else they're
+`~/.config/omarchy/taskbar-icons-src/{icons,drafts}/`, built into
+`~/.config/omarchy/taskbar-icons.json`, which desktop updates never touch.
