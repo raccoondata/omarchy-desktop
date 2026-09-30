@@ -318,7 +318,7 @@ BarWidget {
   // Visualizer.qml) and the album art's effect ("off" or shaders/artfx.frag's
   // modes). Right-click / middle-click the art to step through them.
   property string cardVisual: "pixel"
-  // Per place (Taskbar & Desktop > Visualizers): "off", "same" (the
+  // Per place (Taskbar & Desktop > Equalizer): "off", "same" (the
   // taskbar's style) or a style. The bar one is off unless chosen.
   property string barEq: "off"
   property string headerEq: "same"
@@ -467,7 +467,7 @@ BarWidget {
     opacity: root.playing ? 1 : 0.55
     Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-    // A small visualizer by the song (Visualizers > Bar), off by default.
+    // A small visualizer by the song (Equalizer > Bar), off by default.
     Equalizer {
       anchors.verticalCenter: parent.verticalCenter
       visible: root.barEq !== "off" && root.hasMedia && !root.vertical
@@ -1335,7 +1335,8 @@ BarWidget {
                 playing: root.playing && root.popupOpen
                 silent: !root.playing
                 style: root.eqStyle(root.headerEq)
-                visible: root.headerEq !== "off"
+                // One per card: only when the card visualizer below is off.
+                visible: root.headerEq !== "off" && root.cardVisual === "off"
                 color: root.accent
               }
               Text {
