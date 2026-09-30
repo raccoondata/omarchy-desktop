@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Render icon drafts for review, one row per body file:
+#   large | real taskbar size (enlarged) inactive | same, accent
+# Real size is 23px: taskbar.qml draws icons at 55% of the bar, and the bar is
+# 42px ([bar] size-horizontal = 36 at base-size 14). ICON_PX overrides it.
+# Colours come from the current Omarchy theme.
+#   icon-preview <out.png> <body-file> [<body-file> ...]
+
+out="${1:?usage: icon-preview <out.png> <body-file> [<body-file> ...]}"
+shift
+(( $# > 0 )) || { echo "usage: icon-preview <out.png> <body-file> [<body-file> ...]" >&2; exit 2; }
+
+colors="$HOME/.local/state/omarchy/current/theme/colors.toml"
+pick() { sed -n "s/^$1 *= *\"\\(#[0-9a-fA-F]\\{6\\}\\)\"/\\1/p" "$colors" | head -1; }
+bg="$(pick background)"; fg="$(pick foreground)"; ac="$(pick accent)"
+bg="${bg:-#101315}"; fg="${fg:-#cacccc}"; ac="${ac:-#cacccc}"
+
+px="${ICON_PX:-23}"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+rows=()
+n=0
+for body_file in "$@"; do
+  n=$((n + 1))
+  body="$(cat "$body_file")"
+  for variant in fg ac; do
+    color="$fg"; [[ $variant == ac ]] && color="$ac"
+    printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%s" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">%s</svg>' \
+      "$color" "${body//%C/$color}" > "$work/$n-$variant.svg"
+  done
+  rsvg-convert -w 96 -h 96 -b "$bg" "$work/$n-fg.svg" -o "$work/$n-big.png"
+  for variant in fg ac; do
+    rsvg-convert -w "$px" -h "$px" -b "$bg" "$work/$n-$variant.svg" -o "$work/$n-$variant-real.png"
+    magick "$work/$n-$variant-real.png" -filter point -resize 500% "$work/$n-$variant-x6.png"
+  done
+  magick "$work/$n-big.png" "$work/$n-fg-x6.png" "$work/$n-ac-x6.png" \
+    -background "$bg" -gravity center +append -bordercolor "$bg" -border 12 "$work/row-$n.png"
+  rows+=("$work/row-$n.png")
+done
+
+magick "${rows[@]}" -append "$out"
+echo "wrote $out ($n row(s): large | ${px}px inactive | ${px}px accent)"

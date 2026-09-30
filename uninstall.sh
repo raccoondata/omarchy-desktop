@@ -86,6 +86,7 @@ fi
 rmdir "$HOME/.config/hypr/desktop" 2>/dev/null || true
 rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprland/libhyprbars-fixed.so" "$state/plugins-built"
 rm -f "$HOME/.local/bin/omarchy-desktop"
+[[ -L $HOME/.agents/skills/taskbar-icons ]] && rm -f "$HOME/.agents/skills/taskbar-icons"
 systemctl --user daemon-reload
 
 echo "- system files"

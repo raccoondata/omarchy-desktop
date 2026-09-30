@@ -70,6 +70,13 @@ back; your settings files stay).
   works after a reboot and with the monitor off.
 - **Restart into Windows**, on PCs that dual-boot Windows (hidden otherwise).
 
+- **Taskbar icons** for Omarchy's own apps and tools (LibreOffice, Obsidian,
+  btop, lazygit, the Wi-Fi / Bluetooth / audio tools, ...), coding agents and
+  common web apps, drawn to match. An app without one gets a generic icon:
+  ask Claude Code or Codex for "a taskbar icon for <app>" (the bundled
+  `taskbar-icons` skill draws one in the same style). Yours are kept in
+  `~/.config/omarchy/taskbar-icons.json`, which updates never touch.
+
 Settings: **Super+Alt+Space > Setup > Taskbar & Desktop**. Health check:
 `omarchy-desktop check`.
 

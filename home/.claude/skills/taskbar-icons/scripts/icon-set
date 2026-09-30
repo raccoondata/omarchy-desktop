@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Add or replace one taskbar icon, refusing to write a broken file.
+
+  icon-set <name> <body-file> [--program <prog>]... [--class <regex>]...
+      add or replace <name> with the SVG body in <body-file>, and (your own
+      icons) which windows get it: a terminal program's name, or a window
+      class regex (first match wins, before the built-in rules)
+  icon-set --list          list the icon names (built-in and your own)
+  icon-set --user ...      your own icon file even on the maintainer's PC
+
+Where it goes:
+  - your own icons: ~/.config/omarchy/taskbar-icons.json, which updates of
+    the desktop never touch (the taskbar merges it over the built-in set)
+  - on the maintainer's PC (maintainer=on in ~/.config/omarchy/desktop.conf):
+    the built-in set, bar/modules/taskbar-icons.js, which ships to everyone;
+    map it in taskbar.qml by hand (programIcons / classIcons)
+Then: omarchy restart shell
+"""
+import json
+import pathlib
+import re
+import sys
+
+HOME = pathlib.Path.home()
+BUILTIN = HOME / ".config/omarchy/bar/modules/taskbar-icons.js"
+USER = HOME / ".config/omarchy/taskbar-icons.json"
+CONF = HOME / ".config/omarchy/desktop.conf"
+ENTRY = re.compile(r'^  ("[a-z0-9_-]+"): (".*"),?$')
+
+
+def entries(lines):
+    return [i for i, line in enumerate(lines) if ENTRY.match(line)]
+
+
+def builtin_names(lines):
+    return [json.loads(ENTRY.match(lines[i]).group(1)) for i in entries(lines)]
+
+
+def builtin_ok(lines):
+    # Every entry is a JSON string pair, and the object still closes.
+    try:
+        for i in entries(lines):
+            m = ENTRY.match(lines[i])
+            json.loads(m.group(1)), json.loads(m.group(2))
+    except ValueError:
+        return False
+    idx = entries(lines)
+    return bool(idx) and lines[idx[0] - 1].rstrip().endswith("{") and lines[idx[-1] + 1].strip() == "}"
+
+
+def load_user():
+    try:
+        data = json.loads(USER.read_text())
+    except (OSError, ValueError):
+        data = {}
+    data.setdefault("icons", {})
+    data.setdefault("programs", {})
+    data.setdefault("classes", [])
+    return data
+
+
+def maintainer():
+    try:
+        return "maintainer=on" in CONF.read_text().split("\n")
+    except OSError:
+        return False
+
+
+def main():
+    args = sys.argv[1:]
+    if args == ["--list"]:
+        lines = BUILTIN.read_text().split("\n")
+        print("built-in:", " ".join(builtin_names(lines)))
+        own = load_user()["icons"]
+        if own:
+            print("yours:", " ".join(own))
+        return
+    force_user = "--user" in args
+    args = [a for a in args if a != "--user"]
+    programs, classes, rest = [], [], []
+    while args:
+        a = args.pop(0)
+        if a in ("--program", "--class") and args:
+            (programs if a == "--program" else classes).append(args.pop(0))
+        else:
+            rest.append(a)
+    if len(rest) != 2:
+        sys.exit(__doc__)
+    name, body = rest[0], pathlib.Path(rest[1]).read_text().strip()
+    if not re.fullmatch(r"[a-z0-9_-]+", name):
+        sys.exit("icon names are lowercase letters, digits, - or _")
+    if re.search(r'(stroke|fill)="#', body):
+        sys.exit("hardcoded colour found: use %C for fills, strokes come from the wrapper")
+    for c in classes:
+        try:
+            re.compile(c)
+        except re.error as e:
+            sys.exit(f"bad class regex {c!r}: {e}")
+
+    if maintainer() and not force_user:
+        if programs or classes:
+            sys.exit("maintainer: map built-in icons in taskbar.qml (programIcons / classIcons), not with flags")
+        lines = BUILTIN.read_text().split("\n")
+        idx = entries(lines)
+        line = f"  {json.dumps(name)}: {json.dumps(body)},"
+        existing = [i for i in idx if lines[i].startswith(f'  "{name}":')]
+        if existing:
+            lines[existing[0]] = line if lines[existing[0]].endswith(",") else line.rstrip(",")
+            action = "replaced"
+        else:
+            last = idx[-1]
+            if not lines[last].endswith(","):
+                lines[last] += ","
+            lines.insert(last + 1, line.rstrip(","))
+            action = "added"
+        if not builtin_ok(lines) or name not in builtin_names(lines):
+            sys.exit("refusing to write: the icon file would no longer parse")
+        BUILTIN.write_text("\n".join(lines))
+        print(f"{action} '{name}' in the built-in set ({len(builtin_names(lines))} icons). "
+              "Map it in taskbar.qml, then: omarchy restart shell")
+        return
+
+    data = load_user()
+    action = "replaced" if name in data["icons"] else "added"
+    data["icons"][name] = body
+    for p in programs:
+        data["programs"][p] = name
+    for c in classes:
+        data["classes"] = [x for x in data["classes"] if x[0] != c] + [[c, name]]
+    text = json.dumps(data, indent=2) + "\n"
+    json.loads(text)
+    tmp = USER.with_suffix(".json.tmp")
+    tmp.write_text(text)
+    tmp.replace(USER)
+    maps = ", ".join([f"program {p}" for p in programs] + [f"class /{c}/" for c in classes]) or "no windows yet (add --program or --class)"
+    print(f"{action} your icon '{name}' (~/.config/omarchy/taskbar-icons.json), for {maps}. Then: omarchy restart shell")
+
+
+main()

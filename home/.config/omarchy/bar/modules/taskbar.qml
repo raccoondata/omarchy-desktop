@@ -125,19 +125,48 @@ BarWidget {
     "cursor-agent": "cursor", crush: "crush", pi: "pi", omp: "omp",
     hermes: "hermes", muse: "muse", openclaw: "openclaw",
     nvim: "neovim", vim: "neovim",
-    btop: "monitor", htop: "monitor", top: "monitor",
-    docker: "docker", lazydocker: "docker",
-    lazygit: "git", git: "git",
+    btop: "btop", htop: "htop", top: "monitor",
+    docker: "docker", lazydocker: "lazydocker",
+    lazygit: "lazygit", git: "git",
+    // Omarchy's own terminal tools (audio, Wi-Fi, Bluetooth, About, disk use).
+    wiremix: "wiremix", impala: "impala", bluetui: "bluetui",
+    fastfetch: "fastfetch", dua: "dua", uuctl: "uuctl",
+    "limine-snapper-restore": "restore",
     python: "python", python3: "python", ipython: "python",
     node: "node", bun: "node", deno: "node",
     ssh: "server", mosh: "server",
     man: "document", less: "document", bat: "document",
     tmux: "tmux", zellij: "tmux",
     yazi: "folder", ranger: "folder", lf: "folder",
-    cliamp: "music", spotify_player: "music", ncspot: "music"
+    cliamp: "cliamp", spotify_player: "music", ncspot: "music"
   })
 
   // Window classes -> icon, first match wins. Anything unmatched shows "app".
+  // Your own icons and which windows get them, kept apart from the built-in
+  // set so updates don't touch them (the taskbar-icons skill's icon-set
+  // writes it): ~/.config/omarchy/taskbar-icons.json
+  //   {"icons": {"name": "<svg body>"}, "programs": {"htop": "name"},
+  //    "classes": [["^regex$", "name"]]}
+  // Checked before the built-in rules. Read once at startup: restart the
+  // shell after changing it.
+  property var userPrograms: ({})
+  property var userClasses: []
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/omarchy/taskbar-icons.json"
+    blockLoading: true
+    printErrors: false
+    onLoaded: {
+      try {
+        var data = JSON.parse(text()) || {}
+        if (data.icons) TaskbarIcons.addIcons(data.icons)
+        root.userPrograms = data.programs || {}
+        root.userClasses = (data.classes || []).map(function(c) {
+          try { return [new RegExp(c[0], "i"), String(c[1])] } catch (e) { return null }
+        }).filter(function(c) { return c !== null })
+      } catch (e) { }
+    }
+  }
+
   readonly property var classIcons: [
     // Super+C C / Super+V V agent windows (own classes, own Ghostty process).
     [/^org\.omarchy\.claude$/, "claude"],
@@ -169,6 +198,8 @@ BarWidget {
     [/^(chrome|msedge|brave)-teams\.(microsoft|live)\.com/i, "teams"],
     [/^(chrome|msedge|brave)-(launchpad\.37signals|3\.basecamp)\.com/i, "basecamp"],
     [/^(chrome|msedge|brave)-chatgpt\.com/i, "chatgpt"],
+    [/^(chrome|msedge|brave)-github\.com/i, "github"],
+    [/^(chrome|msedge|brave)-app\.zoom\.us/i, "zoom"],
     [/^(chrome|msedge|brave)-grok\.com/i, "grok"],
     [/^(chrome|msedge|brave)-app\.hey\.com__calendar/i, "calendar"],
     [/^(chrome|msedge|brave)-app\.hey\.com/i, "mail"],
@@ -188,12 +219,36 @@ BarWidget {
     [/^discord/i, "discord"],
     [/^(org\.telegram\.desktop|telegramdesktop)$/i, "telegram"],
     [/^(signal|slack)/i, "chat"],
-    [/^zoom/i, "video"],
-    [/^mpv$/i, "play"],
-    [/^imv/i, "image"],
-    [/(xournalpp|pinta)/i, "pen"],
-    [/^(libreoffice|soffice|obsidian|md\.obsidian|typora|org\.gnome\.(evince|papers))/i, "document"],
-    [/localsend/i, "send"],
+    [/^zoom/i, "zoom"],
+    [/^mpv$/i, "mpv"],
+    [/^imv/i, "imv"],
+    [/xournalpp/i, "xournal"],
+    [/pinta/i, "pinta"],
+    [/kdenlive/i, "kdenlive"],
+    [/^(obs|com\.obsproject\.studio)$/i, "obs"],
+    [/moonlight/i, "moonlight"],
+    // Omarchy's own apps and system tools.
+    [/^omacalc$/i, "omacalc"],
+    [/^omacut$/i, "omacut"],
+    [/aether/i, "aether"],
+    [/^(org\.gnome\.diskutility|gnome-disks)$/i, "disks"],
+    [/system-config-printer/i, "printer"],
+    [/fcitx/i, "keyboard"],
+    [/limine-snapper/i, "restore"],
+    [/^(avahi-discover|bssh|bvnc)/i, "network"],
+    [/uuctl/i, "uuctl"],
+    [/^omawrite$/i, "omawrite"],
+    [/libreoffice-writer/i, "writer"],
+    [/libreoffice-calc/i, "calc"],
+    [/libreoffice-impress/i, "impress"],
+    [/libreoffice-draw/i, "draw"],
+    [/libreoffice-math/i, "math"],
+    [/libreoffice-base/i, "base"],
+    [/(libreoffice|soffice)/i, "libreoffice"],
+    [/obsidian/i, "obsidian"],
+    [/^(org\.gnome\.(evince|papers)|evince|papers)$/i, "pdf"],
+    [/typora/i, "document"],
+    [/localsend/i, "localsend"],
     [/^spotify/i, "music"],
     // The Steam client, and games it launches (steam_app_<id> windows).
     [/^(steam|steam_app_\d+)$/i, "steam"]
@@ -1624,6 +1679,10 @@ BarWidget {
 
   function iconName(address, windowClass) {
     var program = programByAddress[address]
+    if (program && userPrograms[program]) return userPrograms[program]
+    for (var u = 0; u < userClasses.length; u++) {
+      if (userClasses[u][0].test(windowClass)) return userClasses[u][1]
+    }
     if (program && programIcons[program]) return programIcons[program]
     for (var i = 0; i < classIcons.length; i++) {
       if (classIcons[i][0].test(windowClass)) return classIcons[i][1]

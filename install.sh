@@ -115,6 +115,13 @@ mv "$list_new" "$state/installed-files"
 done
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$repo/bin/omarchy-desktop" "$HOME/.local/bin/omarchy-desktop"
+# The taskbar-icons skill for Codex and other agents too (~/.agents/skills;
+# Claude Code reads ~/.claude/skills).
+if [[ -d $HOME/.agents/skills ]] || command -v codex >/dev/null; then
+  mkdir -p "$HOME/.agents/skills"
+  [[ -e $HOME/.agents/skills/taskbar-icons ]] || ln -s "$HOME/.claude/skills/taskbar-icons" "$HOME/.agents/skills/taskbar-icons"
+fi
+gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 conf_set repo "$repo"
 if [[ -d $backup ]]; then
   echo "  done; files it replaced are in ${backup/#$HOME/\~}"
