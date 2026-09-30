@@ -27,7 +27,11 @@ SVG body into an icon file, and never edit `taskbar-icons.js` or
 
 The tools are in `scripts/` (all Python on `scripts/iconkit.py`, all `-h`):
 `icon-new`, `icon-preview`, `icon-lint`, `icon-set`, `icon-build`,
-`icon-test`, `icon-font` (maintainer: the font; `icon-build` runs it). `vmouse` is a separate helper: a virtual mouse for clicking the
+`icon-test`, and for the maintainer `icon-font` (the icons as a font, for
+Omarchy's menu) and `icon-colors` (each icon's brand colour, taken from the
+app's own icon, for the "App colours" / "On-theme" setting); `icon-build`
+runs both. A new built-in icon whose app isn't installed needs its colour
+decided in the repo's `icon-src/icon-colors.json` (a hex, or null for none). `vmouse` is a separate helper: a virtual mouse for clicking the
 taskbar in tests.
 
 ## Workflow

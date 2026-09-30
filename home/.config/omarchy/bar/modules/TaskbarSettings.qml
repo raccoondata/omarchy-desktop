@@ -1003,6 +1003,21 @@ Item {
         }
       }
       SettingRow {
+        label: "Line icon colours"
+        description: (icTab.prefs.iconColors || "mono") === "brand" ? "each app's own colour, taken from its icon"
+          : (icTab.prefs.iconColors || "mono") === "palette" ? "each app's colour, moved to the nearest one in your theme"
+          : "the theme's text and accent colours"
+        ButtonGroup {
+          options: [{ value: "mono", label: "Theme" }, { value: "brand", label: "App colours" }, { value: "palette", label: "On-theme" }]
+          value: ["brand", "palette"].indexOf(icTab.prefs.iconColors) !== -1 ? icTab.prefs.iconColors : "mono"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("iconColors", v) }
+        }
+      }
+      SettingRow {
         label: "Omarchy menu"
         description: "Super+Alt+Space: the entries that are apps (agents, browsers, editors, Install / Remove)"
         ButtonGroup {

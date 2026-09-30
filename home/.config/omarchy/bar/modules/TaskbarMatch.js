@@ -174,3 +174,26 @@ function forEntry(entry) {
   }
   return ""
 }
+
+// An app known only by the names an audio stream or media player gives
+// (now playing's mixer): its icon name, app name and process, e.g.
+// "microsoft-edge", "Microsoft Edge", "msedge". "" when only generic.
+var processAliases = { msedge: "edge", "microsoft-edge-stable": "edge", chrome: "chrome", "google-chrome": "chrome",
+  chromium: "chrome", "telegram-desktop": "telegram", spotify: "music", firefox: "browser" }
+function forApp(iconName, appName, binary, entry) {
+  // The stream's own identity first (its process, name and icon name): a
+  // launcher found by guessing can be the wrong one, e.g. a web app for the
+  // browser that hosts it ("msedge" -> YouTube Music).
+  var bin = String(binary || "").replace(/^.*\//, "")
+  if (userPrograms[bin]) return userPrograms[bin]
+  if (processAliases[bin] && processAliases[bin] !== "browser") return processAliases[bin]
+  if (programIcons[bin]) return programIcons[bin]
+  var slug = String(appName || "").toLowerCase().trim().replace(/\s+/g, "-")
+  var candidates = [String(iconName || ""), slug, bin]
+  for (var c = 0; c < candidates.length; c++) {
+    if (!candidates[c]) continue
+    var name = forWindow("", candidates[c])
+    if (name !== "app" && name !== "browser") return name
+  }
+  return forEntry(entry)
+}

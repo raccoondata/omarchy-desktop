@@ -79,7 +79,8 @@ back; your settings files stay).
   Taskbar & Desktop > Icons chooses where they're used: the taskbar and
   switcher (on), the Super menu, now playing and Omarchy's own menu (off:
   apps keep their own colour icons there), or each app's own icon on the
-  taskbar too.
+  taskbar too; and their colour: the theme's, each app's own colour, or
+  that colour matched to your theme.
 
 Settings: **Super+Alt+Space > Setup > Taskbar & Desktop**. Health check:
 `omarchy-desktop check`.

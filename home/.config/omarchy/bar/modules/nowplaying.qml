@@ -10,6 +10,7 @@ import qs.Ui
 import "MediaWindow.js" as MediaWindow
 import "taskbar-icons.js" as TaskbarIcons
 import "TaskbarMatch.js" as TaskbarMatch
+import "IconColors.js" as IconColors
 
 // Now playing, in place of Omarchy's Media widget (omarchy.media). Reads MPRIS
 // (any player: Edge/Chromium tabs, Spotify, mpv, ...) directly.
@@ -196,7 +197,22 @@ BarWidget {
     interval: 1500
     onTriggered: if (root.player && !root.player.trackArtUrl) root.artUrl = ""
   }
-  readonly property string appName: player ? String(player.identity || player.desktopEntry || "") : ""
+  // The window playing it, and, when that's a browser web app (it shares the
+  // browser's process and player), the web app's own launcher: so it's
+  // "YouTube Music", not "Microsoft Edge".
+  readonly property var playerWindow: player ? MediaWindow.bestWindow(player, Hyprland.toplevels.values) : null
+  readonly property var webApp: MediaWindow.webAppEntry(MediaWindow.webAppSite(playerWindow), DesktopEntries.applications.values)
+  readonly property string appName: webApp ? String(webApp.name)
+    : player ? String(player.identity || player.desktopEntry || "") : ""
+  // The playing app's icon in the mixer: the web app's when it is one.
+  function playerAppIcon() {
+    if (webApp) {
+      var line = lineIcons ? TaskbarMatch.forEntry(webApp) : ""
+      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text)))
+      if (webApp.icon) return Quickshell.iconPath(webApp.icon, true)
+    }
+    return root.playerStream ? root.streamIcon(root.playerStream) : ""
+  }
   readonly property real length: holding ? heldLength : rawLength
   readonly property real position: holding ? 0 : (player && player.positionSupported ? Number(player.position) || 0 : 0)
   readonly property real progress: length > 0 ? Math.max(0, Math.min(1, position / length)) : 0
@@ -297,6 +313,7 @@ BarWidget {
   // Taskbar & Desktop > Icons > Now playing: the apps' own icons, or the
   // desktop's line icons (where an app has one).
   property bool lineIcons: false
+  property string iconColorMode: "mono"
   FileView {
     path: root.omarchyDir + "/taskbar-settings.json"
     watchChanges: true
@@ -308,6 +325,7 @@ BarWidget {
       root.equalizerStyle = String(o.equalizerStyle || "spectrum")
       root.clickMode = o.nowPlayingClick === "play" ? "play" : "card"
       root.lineIcons = o.iconsNowPlaying === "line"
+      root.iconColorMode = String(o.iconColors || "mono")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
       root.mixerOpen = o.nowPlayingMixer === true || o.nowPlayingMixer === "true"
@@ -353,12 +371,8 @@ BarWidget {
     var binary = String(p["application.process.binary"] || "")
     var entry = DesktopEntries.heuristicLookup(binary || String(p["application.name"] || ""))
     if (lineIcons) {
-      var line = TaskbarMatch.forEntry(entry)
-      if (!line && binary) {
-        line = TaskbarMatch.forWindow(binary, binary)
-        if (line === "app" || line === "browser") line = ""
-      }
-      if (line) return TaskbarIcons.svg(line, String(Color.popups.text))
+      var line = TaskbarMatch.forApp(p["application.icon-name"], p["application.name"], binary, entry)
+      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text)))
     }
     var name = p["application.icon-name"] || (entry ? entry.icon : "")
     return name ? Quickshell.iconPath(name, true) : ""
@@ -1450,7 +1464,7 @@ BarWidget {
               fontFamily: root.fontFamily
               readonly property bool isApp: root.hasAppVolume
               name: isApp ? (root.appName || "This app") : "System"
-              icon: isApp ? (root.playerStream ? root.streamIcon(root.playerStream) : "") : ""
+              icon: isApp ? root.playerAppIcon() : ""
               glyph: isApp ? "󰝚" : "󰓃"
               level: isApp ? root.appVolume : (root.outputSink && root.outputSink.audio ? root.outputSink.audio.volume : 0)
               muted: isApp ? root.appMuted : (!!root.outputSink && !!root.outputSink.audio && root.outputSink.audio.muted)

@@ -163,6 +163,8 @@ case "${1:-status}" in
       || { echo "icons: run ~/.claude/skills/taskbar-icons/scripts/icon-build (or fix what icon-lint reports)"; exit 1; }
     "$HOME/.claude/skills/taskbar-icons/scripts/icon-font" --check >/dev/null \
       || { echo "icon font: run ~/.claude/skills/taskbar-icons/scripts/icon-font"; exit 1; }
+    "$HOME/.claude/skills/taskbar-icons/scripts/icon-colors" --check >/dev/null \
+      || { echo "icon colours: run ~/.claude/skills/taskbar-icons/scripts/icon-colors (decide the missing ones in icon-src/icon-colors.json)"; exit 1; }
     g fetch -q origin
     tree="$(g rev-parse 'main^{tree}')"
     if g rev-parse -q --verify origin/stable >/dev/null; then

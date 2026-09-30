@@ -60,3 +60,4 @@
 .config/omarchy/icon-codepoints.json
 .config/omarchy/menu-icons
 .config/omarchy/menu-icons.json
+.config/omarchy/hooks/post-update.d/desktop-menu-icons.hook

@@ -153,6 +153,7 @@ Item {
             selected: index === switcher.selected
             icon: info.icon
             appIcon: info.appIcon
+            iconColor: info.iconColor
             active: false
             minimized: info.minimized
             place: info.place
