@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "taskbar-icons.js" as TaskbarIcons
+import "TaskbarMatch.js" as TaskbarMatch
 
 // The ask layout, shared by the ask card (AskCard.qml: files, selected text)
 // and the screenshot panel (ScreenshotPreview.qml and EditorDock.qml when
@@ -66,9 +67,10 @@ Column {
     return list.concat(a.efforts.map(function(e) { return { value: e, label: e } }))
   }
 
-  // The agent's taskbar icon (taskbar-icons.js), else a terminal.
+  // The agent's taskbar icon, by the taskbar's own rules (TaskbarMatch.js:
+  // its program), else a terminal.
   function agentIcon(id) {
-    var name = id === "cursor-agent" ? "cursor" : id
+    var name = TaskbarMatch.programIcons[id] || id
     return TaskbarIcons.icons[name] ? name : "terminal"
   }
 
