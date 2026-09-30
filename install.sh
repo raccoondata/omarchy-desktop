@@ -122,6 +122,10 @@ if [[ -d $HOME/.agents/skills ]] || command -v codex >/dev/null; then
   [[ -e $HOME/.agents/skills/taskbar-icons ]] || ln -s "$HOME/.claude/skills/taskbar-icons" "$HOME/.agents/skills/taskbar-icons"
 fi
 gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || true   # the icon font
+# Omarchy's menu with our icons (Taskbar & Desktop > Icons): refresh it, as
+# the icons or their codepoints may have changed.
+[[ "$("$omarchy/menu-icons" status 2>/dev/null)" == on ]] && "$omarchy/menu-icons" on >/dev/null
 conf_set repo "$repo"
 if [[ -d $backup ]]; then
   echo "  done; files it replaced are in ${backup/#$HOME/\~}"
@@ -219,7 +223,7 @@ entries=(
   '"system.lock": {"icon": "", "label": "Lock", "action": "$HOME/.config/omarchy/lock"},'
   '"system.reboot-windows": {"when":"\"$HOME/.config/omarchy/reboot-to-windows\" --check","icon":"","label":"Reboot to Windows","description":"Boot Windows once, then back to Omarchy","action":"$HOME/.config/omarchy/reboot-to-windows"},'
   '"setup.hotcorners": {"icon": "", "label": "Hot Corners", "description": "what pushing the pointer into a screen corner does", "action": "omarchy-shell -q taskbar settings corners"},'
-  '"setup.taskbar": {"icon": "", "label": "Taskbar & Desktop", "description": "taskbar, windows, agents, effects, hot corners, title bars, now playing, screenshots, mouse", "action": "omarchy-shell -q taskbar settings taskbar"},'
+  '"setup.taskbar": {"icon": "", "label": "Taskbar & Desktop", "description": "taskbar, windows, agents, effects, hot corners, title bars, now playing, screenshots, icons, mouse", "action": "omarchy-shell -q taskbar settings taskbar"},'
   '"update.desktop": {"icon": "", "label": "Desktop", "description": "omarchy-desktop: taskbar, Super menu, windows", "action": "omarchy-launch-floating-terminal-with-presentation omarchy-desktop update"},'
 )
 added=0

@@ -29,6 +29,7 @@ for u in config-history.timer hyprland-safe-mode-agents.service lock-guard.servi
 done
 
 echo "- hooks into Omarchy"
+"$omarchy/menu-icons" off >/dev/null 2>&1 || true
 hl="$HOME/.config/hypr/hyprland.lua"
 sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hypr.desktop")$/d' "$hl"
 shell="$omarchy/shell.json"
