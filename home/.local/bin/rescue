@@ -7,13 +7,14 @@ set -uo pipefail
 # Back to the desktop: Ctrl+Alt+F1 (or "d" in the menu).
 #
 # It shows what went wrong on the last boot and offers the usual ways back:
-# an agent to investigate and fix it, undoing recent config changes, starting
-# without title bars, or booting Windows. System-level problems (a bad update,
+# one of your coding agents to investigate and fix it, undoing recent config
+# changes, starting without title bars, or booting Windows (if there is one). System-level problems (a bad update,
 # kernel or NVIDIA driver) are better fixed from the boot menu: Limine lists
 # "Snapshots" taken before each update; boot one, then run `omarchy snapshot
 # restore` to keep it.
 
 history="$HOME/.config/omarchy/config-history"
+agents="$HOME/.config/omarchy/agents"
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 
 context() {
@@ -42,12 +43,31 @@ Find out why and fix it. Useful places: journalctl -b -1 and -b 0 (SDDM, uwsm,
 wayland-wm@hyprland.desktop.service), ~/.cache/hyprland/hyprlandCrashReport*.txt,
 coredumpctl, ~/.local/state/omarchy/*.log. My desktop config has a git history:
 ~/.config/omarchy/config-history log / diff / restore <snapshot> (recent changes
-are the first suspect). Notes on my custom setup:
-~/.claude/projects/-home-user-Work/memory/. Pre-update system snapshots are in
-the Limine boot menu (omarchy snapshot). Explain what you find before changing
-anything big, and tell me exactly how to get back into the desktop.
+are the first suspect). The desktop on top of Omarchy is omarchy-desktop (its
+files: ~/.config/hypr/desktop/, ~/.config/omarchy/; its README is in the folder
+named by repo= in ~/.config/omarchy/desktop.conf). Pre-update system snapshots
+are in the Limine boot menu (omarchy snapshot). Explain what you find before
+changing anything big, and tell me exactly how to get back into the desktop.
 PROMPT
 }
+
+# Your two coding agents (~/.config/omarchy/agents primary), run right here in
+# the console with their usual flags.
+mapfile -t agent_ids < <("$agents" primary 2>/dev/null | tr ',' '\n' | sed '/^$/d')
+agent_name() {
+  "$agents" list 2>/dev/null | jq -r --arg id "$1" '.[] | select(.id == $id) | .name' 2>/dev/null | head -1
+}
+ask_agent() {  # ask_agent <id>
+  local cmd
+  mapfile -t cmd < <("$agents" command "$1" --prompt "$(prompt "$(ask_symptom)")")
+  if (( ${#cmd[@]} )) && command -v "${cmd[0]}" >/dev/null; then
+    "${cmd[@]}"
+  else
+    echo "$1 isn't installed."
+  fi
+}
+has_windows=false
+"$HOME/.config/omarchy/reboot-to-windows" --check 2>/dev/null && has_windows=true
 
 ask_symptom() {
   read -r -p "What happens? (e.g. black screen after login): " symptom
@@ -62,20 +82,31 @@ echo
 context
 
 while :; do
+  if (( ${#agent_ids[@]} )); then
+    for i in 0 1; do
+      [[ -n ${agent_ids[$i]:-} ]] && echo "${bold}$((i + 1))${off}  Ask $(agent_name "${agent_ids[$i]}" || echo "${agent_ids[$i]}") to find and fix it"
+    done
+  else
+    echo "${dim}1  (no coding agent installed: Omarchy menu > Install > AI)${off}"
+  fi
   cat <<MENU
-${bold}1${off}  Ask Claude Code to find and fix it
-${bold}2${off}  Ask Codex to find and fix it
 ${bold}3${off}  Undo recent config changes (pick a snapshot)
 ${bold}4${off}  Start without Hyprland plugins (title bars, window drops) next login
 ${bold}5${off}  Try the desktop again (restart the login screen)
-${bold}6${off}  Reboot            ${bold}7${off}  Reboot into Windows
+MENU
+  if $has_windows; then
+    echo "${bold}6${off}  Reboot            ${bold}7${off}  Reboot into Windows"
+  else
+    echo "${bold}6${off}  Reboot"
+  fi
+  cat <<MENU
 ${bold}d${off}  Back to the desktop (Ctrl+Alt+F1)
 ${bold}q${off}  Quit to the shell
 MENU
   read -r -p "> " choice
   case "$choice" in
-    1) claude --dangerously-skip-permissions --effort max "$(prompt "$(ask_symptom)")" ;;
-    2) codex --approve-for-me -c model_reasoning_effort=max "$(prompt "$(ask_symptom)")" ;;
+    1) [[ -n ${agent_ids[0]:-} ]] && ask_agent "${agent_ids[0]}" ;;
+    2) [[ -n ${agent_ids[1]:-} ]] && ask_agent "${agent_ids[1]}" ;;
     3)
       "$history" log 12
       read -r -p "Snapshot to restore (the yellow id; blank = cancel): " id
@@ -87,7 +118,7 @@ MENU
       ;;
     5) sudo systemctl restart sddm ;;
     6) systemctl reboot ;;
-    7) "$HOME/.config/omarchy/reboot-to-windows" ;;
+    7) $has_windows && "$HOME/.config/omarchy/reboot-to-windows" ;;
     d | D) sudo -n /usr/bin/chvt 1 || echo "Press Ctrl+Alt+F1" ;;
     q | Q | "")
       echo "Plain shell. Type rescue for the menu; Ctrl+Alt+F1 goes back to the desktop."
