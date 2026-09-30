@@ -207,7 +207,7 @@ fi
 if command -v codex >/dev/null || [[ -d $HOME/.codex ]]; then
   cc="$HOME/.codex/config.toml"
   mkdir -p "$HOME/.codex"
-  touch "$cc"
+  [[ -f $cc ]] || : > "$cc"
   if ! grep -q '^notify' "$cc"; then
     # A top-level key: before the first [table].
     tmp="$(mktemp)"
@@ -226,7 +226,7 @@ if command -v grok >/dev/null || [[ -d $HOME/.grok ]]; then
   # Grok runs Claude Code's hooks (above); its own notifications would double them.
   gc="$HOME/.grok/config.toml"
   mkdir -p "$HOME/.grok"
-  touch "$gc"
+  [[ -f $gc ]] || : > "$gc"
   if ! grep -q '^\[ui.notifications\]' "$gc"; then
     printf '\n[ui.notifications]\ncondition = "never"\n' >> "$gc"
     echo "  Grok: notifications through the taskbar"
