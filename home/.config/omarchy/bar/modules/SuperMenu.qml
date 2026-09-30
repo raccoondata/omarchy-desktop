@@ -9,6 +9,7 @@ import qs.Commons
 import qs.Ui
 import qs.services
 import "MediaWindow.js" as MediaWindow
+import "AudioLevels.js" as AudioLevels
 import "taskbar-icons.js" as TaskbarIcons
 
 // Super menu: double-tap Super (or Caps Lock, which is Super here) for your
@@ -927,12 +928,19 @@ Item {
               property real tick: 0
               readonly property real mode: Math.max(0, nowPlaying.fxModes.indexOf(nowPlaying.fxChoice))
               readonly property real aspect: 1
+              property real live: 0
+              property real beatLevel: 0
               fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
               Timer {
                 running: npFx.visible && menu.opened && nowPlaying.p !== null && nowPlaying.p.isPlaying
                 interval: 66
                 repeat: true
-                onTriggered: npFx.tick += 1
+                onTriggered: {
+                  AudioLevels.want()
+                  npFx.live = AudioLevels.live() ? 1 : 0
+                  npFx.beatLevel = AudioLevels.beat
+                  npFx.tick += 1
+                }
               }
             }
             Text {

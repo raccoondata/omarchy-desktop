@@ -20,11 +20,34 @@ layout(std140, binding = 0) uniform buf {
     float gapPx;     // gap between pixels
     float mute;      // 1: muted, one flat row
     vec4 ink;
+    // The music (AudioLevels.js, from cava): 16 bands low to high, packed in
+    // fours; live is 0 without it (the generated motion then).
+    vec4 bandsA;
+    vec4 bandsB;
+    vec4 bandsC;
+    vec4 bandsD;
+    float live;
+    float loudness;
+    float bass;
 };
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
+
+float bandAt(int i) {
+    vec4 v = i < 4 ? bandsA : (i < 8 ? bandsB : (i < 12 ? bandsC : bandsD));
+    int k = i - (i / 4) * 4;
+    return k == 0 ? v.x : (k == 1 ? v.y : (k == 2 ? v.z : v.w));
+}
+// The music at a column: the 16 bands stretched across the columns.
+float band(float c) {
+    float x = cols > 1.0 ? c / (cols - 1.0) * 15.0 : 0.0;
+    // Floats for min(): older GLSL (which Qt may translate to) has no int min.
+    float fi = floor(x);
+    return mix(bandAt(int(fi)), bandAt(int(min(fi + 1.0, 15.0))), fract(x));
+}
+bool isLive() { return live > 0.5; }
 
 // How tall a column may get: tallest in the middle.
 float reach(float c) {
@@ -53,6 +76,8 @@ float waveAt(float c, float t) {
 float scopeRow(float c, float t) {
     float mid = (rowCount - 1.0) / 2.0;
     float v = 0.6 * sin(t * 0.35 + c * 0.8) + 0.4 * sin(t * 0.6 - c * 0.45);
+    // Live: the line swings as far as the music at that column is loud.
+    if (live > 0.5) v *= clamp(band(c) * 1.8, 0.05, 1.0);
     return clamp(floor(mid + v * mid + 0.5), 0.0, rowCount - 1.0);
 }
 
@@ -70,8 +95,9 @@ float radarBeam(float c, float r, float a) {
 
 float brightness(float c, float r, float t, int s) {
     float mid = (cols - 1.0) / 2.0;
-    if (s == 1) {  // wave
-        float h = 1.0 + floor((waveAt(c, t) * 0.5 + 0.5) * (reach(c) - 1.0) + 0.5);
+    if (s == 1) {  // wave (its height follows the loudness)
+        float amp = isLive() ? clamp(loudness * 1.6, 0.15, 1.0) : 1.0;
+        float h = 1.0 + floor((waveAt(c, t) * 0.5 + 0.5) * amp * (reach(c) - 1.0) + 0.5);
         return bar(r, h);
     }
     if (s == 2) {  // embers: sparks born along the bottom, rising a row a tick
@@ -79,7 +105,7 @@ float brightness(float c, float r, float t, int s) {
         for (int k = 0; k < 16; k++) {
             if (float(k) >= rowCount) break;
             float born = floor(t) - float(k);
-            float chance = 0.08 + 0.18 * reach(c) / rowCount;
+            float chance = isLive() ? 0.04 + 0.5 * band(c) : 0.08 + 0.18 * reach(c) / rowCount;
             if (hash(vec2(c, born)) < chance) {
                 float top = 2.0 + floor(hash(vec2(born, c + 7.0)) * (rowCount - 1.0));
                 if (float(k) < top && r == float(k)) b = max(b, 1.0 - r / rowCount);
@@ -91,7 +117,8 @@ float brightness(float c, float r, float t, int s) {
         float d = sqrt((c - mid) * (c - mid) * 0.55 + r * r);
         float period = rowCount * 0.9;
         float front = mod(d - t * 0.5, period);
-        return front < 1.0 ? max(0.0, 1.0 - d / (rowCount * 1.3)) : 0.0;
+        float glow = isLive() ? 0.35 + bass : 1.0;
+        return front < 1.0 ? clamp(glow * (1.0 - d / (rowCount * 1.3)), 0.0, 1.0) : 0.0;
     }
     if (s == 4) {  // scope, with a faint trail
         float b = 0.0;
@@ -110,32 +137,35 @@ float brightness(float c, float r, float t, int s) {
         float d = r >= ceil(m) ? r - ceil(m) : floor(m) - r;
         float b = 0.0;
         for (int k = 0; k < 2; k++) {
-            float h = level(c, t - float(k), most, 3.0);
+            float h = isLive() ? ceil(band(c) * halfRows) * (k == 0 ? 1.0 : 0.0) : level(c, t - float(k), most, 3.0);
             if (d < h) b = max(b, (1.0 - 0.5 * d / halfRows) * (k == 0 ? 1.0 : 0.5));
         }
         return b;
     }
     if (s == 6) {  // fire: uneven tongues that flicker and cool upward
         float base = 0.45 + 0.55 * reach(c) / rowCount;
-        float height = rowCount * base * (0.55 + 0.45 * mix(hash(vec2(c, floor(t / 2.0))), hash(vec2(c, floor(t / 2.0) + 1.0)), fract(t / 2.0)));
+        float height = isLive() ? rowCount * (0.2 + 0.95 * band(c))
+            : rowCount * base * (0.55 + 0.45 * mix(hash(vec2(c, floor(t / 2.0))), hash(vec2(c, floor(t / 2.0) + 1.0)), fract(t / 2.0)));
         float heat = 1.0 - r / max(1.0, height) - 0.25 * hash(vec2(c * 3.0 + r, floor(t)));
         return heat > 0.12 ? min(1.0, heat * 1.25) : 0.0;
     }
     if (s == 7) {  // radar, with an afterglow
         float b = 0.0;
         for (int k = 0; k < 3; k++) b = max(b, radarBeam(c, r, (t - float(k)) * 0.4) * pow(0.6, float(k)));
-        return b;
+        return isLive() ? b * (0.4 + 1.2 * bass) : b;
     }
     if (s == 8) {  // swirl
         float cx = mid, cy = (rowCount - 1.0) / 2.0;
         float dx = c - cx, dy = (r - cy) * 1.4;
         float d = sqrt(dx * dx + dy * dy);
         float v = cos(2.0 * atan(dy, dx) - d * 0.9 + t * 0.28);
-        return v > 0.3 ? v * max(0.25, 1.0 - d / (max(cx, cy) * 1.6)) : 0.0;
+        float swirlGlow = isLive() ? 0.35 + loudness * 1.4 : 1.0;
+        return v > 0.3 ? min(1.0, swirlGlow * v * max(0.25, 1.0 - d / (max(cx, cy) * 1.6))) : 0.0;
     }
     if (s == 9) {  // plasma, in four steps
         float p = t * 0.18;
         float v = sin(c * 0.55 + p) + sin(r * 0.8 - p * 1.3) + sin((c + r) * 0.4 + p * 0.7) + sin(sqrt(c * c + r * r) * 0.6 - p);
+        if (isLive()) v += (loudness - 0.35) * 3.0;
         float l = floor((v + 4.0) / 8.0 * 4.0) / 3.0;
         return l > 0.34 ? l : 0.0;
     }
@@ -144,7 +174,7 @@ float brightness(float c, float r, float t, int s) {
         for (int k = 0; k < 16; k++) {
             if (float(k) >= rowCount) break;
             float born = floor(t) - float(k);
-            if (hash(vec2(c, born)) < 0.12) {
+            if (hash(vec2(c, born)) < (isLive() ? 0.03 + 0.4 * band(c) : 0.12)) {
                 float y = rowCount - 1.0 - float(k);
                 if (r == y) b = max(b, 1.0);
                 else if (r == y + 1.0) b = max(b, 0.45);
@@ -152,7 +182,8 @@ float brightness(float c, float r, float t, int s) {
         }
         return b;
     }
-    // spectrum
+    // spectrum: the music's bands, or random heights without it
+    if (isLive()) return bar(r, ceil(band(c) * rowCount));
     return bar(r, level(c, t, reach(c), 3.0));
 }
 

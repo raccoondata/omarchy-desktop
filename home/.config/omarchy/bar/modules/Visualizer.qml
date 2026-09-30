@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import "AudioLevels.js" as AudioLevels
 
 // The now-playing card's visualizer scenes, after Windows Media Player's,
 // drawn on the GPU by shaders/visualizer.frag. The CPU only advances `tick`
@@ -24,6 +25,9 @@ ShaderEffect {
   readonly property real grainPx: Math.max(1, grain)
   readonly property color inkA: colorA
   readonly property color inkB: colorB
+  // The music's beat (AudioLevels.js), when cava is sending.
+  property real live: 0
+  property real beatLevel: 0
 
   fragmentShader: Qt.resolvedUrl("shaders/visualizer.frag.qsb")
 
@@ -31,6 +35,12 @@ ShaderEffect {
     running: vis.playing && vis.visible
     interval: 66
     repeat: true
-    onTriggered: vis.tick += 1
+    onTriggered: {
+      AudioLevels.want()
+      vis.live = AudioLevels.live() ? 1 : 0
+      vis.beatLevel = AudioLevels.beat
+      // Faster when louder.
+      vis.tick += vis.live ? 0.5 + 1.5 * AudioLevels.level : 1
+    }
   }
 }

@@ -8,7 +8,8 @@ set -euo pipefail
 #   packages   what the desktop's scripts use on top of Omarchy: the title-bar
 #              plugin (hyprland-plugin-hyprbars, AUR) and the backup lock
 #              screen (hyprlock), plus socat, jq, efibootmgr, nautilus-python
-#              (the Files menu), tensaku (the screenshot editor)
+#              (the Files menu), tensaku (the screenshot editor), cava (the
+#              music's spectrum, for the equalizers)
 #   consoles   Ctrl+Alt+Delete -> text console 3 (passwordless `chvt`), with a
 #              "Ctrl+Alt+F1 = back to the desktop" banner and the rescue menu
 #   Windows    on a PC that dual-boots Windows: passwordless
@@ -22,7 +23,7 @@ echo "${bold}System setup for the desktop${off}"
 sudo -v
 
 # --- packages ---------------------------------------------------------------
-pkgs=(hyprland-plugin-hyprbars hyprlock socat jq efibootmgr nautilus-python tensaku
+pkgs=(hyprland-plugin-hyprbars hyprlock socat jq efibootmgr nautilus-python tensaku cava
   inotify-tools rsync git make gcc)
 mapfile -t missing < <(comm -23 <(printf '%s\n' "${pkgs[@]}" | sort -u) <(pacman -Qq | sort))
 if (( ${#missing[@]} )); then
