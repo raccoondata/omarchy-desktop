@@ -12,6 +12,8 @@ set -euo pipefail
 #                                    which keybindings: all, only the ones that
 #                                    don't change Omarchy's, or none
 #   omarchy-desktop uninstall        take it all out again (asks first)
+#   omarchy-desktop privacy          check the repo has no names, emails or
+#                                    home paths in it (AGENTS.md)
 #
 # For the maintainer (a clone on the main branch):
 #   omarchy-desktop release "<what's new>"
@@ -26,7 +28,59 @@ omarchy="$HOME/.config/omarchy"
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 g() { git -C "$repo" "$@"; }
 
+# No personal information in the repo (AGENTS.md): home paths, email
+# addresses, and the names this machine knows (the login, the global git
+# name and email, and ~/.config/omarchy/privacy-names, one per line, kept out
+# of the repo), in tracked files and in the commits made since the last
+# release (their messages and author identities).
+privacy_check() {
+  local names=() n pattern hits found=0
+  names+=("$USER")
+  n="$(git config --global user.name 2>/dev/null || true)"
+  [[ -n $n ]] && names+=("$n" $n)
+  n="$(git config --global user.email 2>/dev/null || true)"
+  [[ -n $n ]] && names+=("$n" "${n%@*}")
+  if [[ -f $omarchy/privacy-names ]]; then
+    while read -r n; do [[ -n $n ]] && names+=("$n"); done < "$omarchy/privacy-names"
+  fi
+  pattern="$(printf '%s\n' "${names[@]}" | awk 'length >= 3' | sort -u | sed 's/[][\.*^$+?(){}|/]/\\&/g' | paste -sd'|')"
+  # Addresses that are fine: the project's own and the AI co-author line's.
+  local allow='users\.noreply\.github\.com|@localhost\b|noreply@anthropic\.com'
+  # A real mail domain: systemd names like getty@tty3.service aren't emails.
+  local email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|org|net|io|dev|app|co|me|ai|de|uk|us|ca|au|fr|nl|se|no|info|xyz|tech|email|mail|edu|gov)\b'
+  hits="$(
+    { g grep -I -n -P '/home/(?!user/)[a-z_][a-z0-9_-]*/' -- . || true
+      g grep -I -n -o -P "$email" -- . | grep -vP "$allow" || true
+      [[ -n $pattern ]] && { g grep -I -n -i -P "\\b($pattern)\\b" -- . || true; }
+    } | sort -u)"
+  if [[ -n $hits ]]; then
+    echo "Personal information in the repo (AGENTS.md: no names, emails or home paths):"
+    printf '%s\n' "$hits" | cut -c1-160 | head -30
+    found=1
+  fi
+  if g rev-parse -q --verify origin/stable >/dev/null; then
+    # Releases are fresh commits on stable, so "since the last one" is by date.
+    local since
+    since="$(g log -1 --format=%cI origin/stable)"
+    hits="$(
+      { g log --since="$since" --format='%h author: %an <%ae>' main | grep -vP "$allow" || true
+        g log --since="$since" --format='%h %B' main | grep -v '^Co-Authored-By: Claude' \
+          | grep -i -P "${pattern:+\\b($pattern)\\b|}$email" || true
+      } | sort -u)"
+    if [[ -n $hits ]]; then
+      echo "Personal information in commits since the last release:"
+      printf '%s\n' "$hits" | cut -c1-160 | head -10
+      found=1
+    fi
+  fi
+  return $found
+}
+
 case "${1:-status}" in
+  privacy)
+    privacy_check && echo "No names, emails or home paths in the repo."
+    ;;
+
   update)
     echo "${bold}Checking for updates${off}"
     branch="$(g branch --show-current)"
@@ -102,6 +156,7 @@ case "${1:-status}" in
       g status --short
       exit 1
     fi
+    privacy_check || { echo "Fix those first (then: omarchy-desktop privacy)."; exit 1; }
     "$omarchy/selfcheck" --quiet || { echo "selfcheck isn't clean; fix that first (omarchy-desktop check)"; exit 1; }
     # The icons: every script meets the spec, and the built file is current.
     "$HOME/.claude/skills/taskbar-icons/scripts/icon-build" --check >/dev/null \

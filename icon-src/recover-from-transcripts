@@ -32,6 +32,18 @@ DRAFT_SUFFIX = re.compile(r"([-_](v\d+|alt\w*|[a-z]|\d+|old|new|final|f\d+|draft
 NAME_FROM_FILE = re.compile(r"([a-z0-9_-]+?)(?:[-_](?:v\d+|alt\w*|[a-z]))?\.svgbody$")
 
 
+USER = HOME.name
+
+
+def scrub(text):
+    """No personal names or home paths in what's recovered (the repo is
+    shared): ~ for the home folder, "user" for the username elsewhere."""
+    text = text.replace(str(HOME), "~")
+    text = re.sub(rf"\b{re.escape(USER)}\b", "user", text)
+    text = re.sub(rf"(?i)\b{re.escape(USER)}'s\b", "the maintainer's", text)
+    return re.sub(rf"(?i)\b{re.escape(USER)}\b", "the maintainer", text)
+
+
 def tool_uses(path):
     session = path.stem[:8] if "subagents" not in path.parts else f"{path.parent.parent.name[:8]}-{path.stem[-6:]}"
     with path.open(errors="replace") as fh:
@@ -168,7 +180,7 @@ def main():
         if key in seen:
             return
         seen.add(key)
-        (d / f"{stamp}_{session}_{pathlib.Path(filename).name}").write_text(body.strip() + "\n")
+        (d / f"{stamp}_{session}_{pathlib.Path(filename).name}").write_text(scrub(body.strip()) + "\n")
         rows.append((stamp, session, "drawing", f"by-icon/{name}/{stamp}_{session}_{pathlib.Path(filename).name}", src, [name]))
 
     for path in sorted(PROJECTS.rglob("*.jsonl")):
@@ -196,6 +208,7 @@ def main():
             if key in seen:
                 continue
             seen.add(key)
+            content = scrub(content)
             fname = f"commands/{stamp}_{session}_{n:04d}_{kind}_{name}"
             (OUT / fname).write_text(content)
             icons = names_in(fp + "\n" + content, known)
@@ -243,7 +256,7 @@ def main():
                   "that computed a drawing, bash = a command that drew, generated or added icons.\n\n")
         idx.write("| when | session | kind | icons | file | from |\n|---|---|---|---|---|---|\n")
         for stamp, session, kind, fname, what, icons in rows:
-            what = what.replace("|", "\\|").replace("\n", " ")
+            what = scrub(what).replace("|", "\\|").replace("\n", " ")
             idx.write(f"| {stamp} | {session} | {kind} | {', '.join(icons)} | {fname} | {what} |\n")
     print(f"{len(rows)} items -> {OUT}")
 
