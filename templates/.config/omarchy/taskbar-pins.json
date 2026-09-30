@@ -1,0 +1,20 @@
+[
+  {
+    "key": "folder",
+    "icon": "folder",
+    "name": "Files",
+    "desktop": "org.gnome.Nautilus.desktop"
+  },
+  {
+    "key": "chrome",
+    "icon": "chrome",
+    "name": "Chromium",
+    "desktop": "chromium.desktop"
+  },
+  {
+    "key": "ghostty",
+    "icon": "ghostty",
+    "name": "Terminal",
+    "desktop": "com.mitchellh.ghostty.desktop"
+  }
+]

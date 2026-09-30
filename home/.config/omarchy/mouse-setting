@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Mouse wheel scroll speed for every app (Hyprland's input:scroll_factor; the
+# touchpad has its own). Kept in ~/.config/hypr/mouse.lua (loaded by
+# hypr/desktop.lua) and applied live. Used by the taskbar settings window's
+# Mouse tab.
+#   mouse-setting scroll              -> current factor
+#   mouse-setting scroll <0.5-4>      set it
+#   mouse-setting terminal            -> Ghostty's lines per wheel notch
+#   mouse-setting terminal <0.5-10>   set it (touchpad scrolling unchanged)
+
+file="$HOME/.config/hypr/mouse.lua"
+ghostty="$HOME/.config/ghostty/config"
+
+current() {
+  sed -n 's/.*scroll_factor *= *\([0-9.]*\).*/\1/p' "$file" 2>/dev/null | head -1
+}
+
+case "${1:-}" in
+  scroll)
+    if [[ -z ${2:-} ]]; then
+      echo "$(current || true)"
+      exit 0
+    fi
+    v="$2"
+    [[ $v =~ ^[0-9]+(\.[0-9]+)?$ ]] && awk -v v="$v" 'BEGIN { exit !(v >= 0.5 && v <= 4) }' || { echo "0.5-4 only" >&2; exit 2; }
+    cat > "$file" <<LUA
+-- Mouse wheel scroll speed for every app (1 = Hyprland's default step).
+-- Set from Super+Space > Setup > Taskbar & Desktop > Mouse, or:
+--   ~/.config/omarchy/mouse-setting scroll <0.5-4>
+hl.config({ input = { scroll_factor = $v } })
+LUA
+    # Apply now (the same live hl.config Omarchy's screenshot script uses).
+    hyprctl eval "hl.config({ input = { scroll_factor = $v } })" >/dev/null 2>&1 || true
+    ;;
+  terminal)
+    line="$(grep -E '^mouse-scroll-multiplier' "$ghostty" 2>/dev/null | tail -1)"
+    if [[ -z ${2:-} ]]; then
+      v="$(sed -n 's/.*discrete:\([0-9.]*\).*/\1/p' <<<"$line")"
+      echo "${v:-3}"
+      exit 0
+    fi
+    v="$2"
+    [[ $v =~ ^[0-9]+(\.[0-9]+)?$ ]] && awk -v v="$v" 'BEGIN { exit !(v >= 0.5 && v <= 10) }' || { echo "0.5-10 only" >&2; exit 2; }
+    precision="$(sed -n 's/.*precision:\([0-9.]*\).*/\1/p' <<<"$line")"
+    new_line="mouse-scroll-multiplier = precision:${precision:-0.95},discrete:$v"
+    if [[ -n $line ]]; then
+      sed -i "s/^mouse-scroll-multiplier.*/$new_line/" "$ghostty"
+    else
+      printf '\n%s\n' "$new_line" >> "$ghostty"
+    fi
+    # Open Ghostty windows reload their config (as `omarchy restart terminal`).
+    pgrep -x ghostty >/dev/null && killall -SIGUSR2 ghostty 2>/dev/null || true
+    ;;
+  *) sed -n '3,12p' "$0"; exit 2 ;;
+esac

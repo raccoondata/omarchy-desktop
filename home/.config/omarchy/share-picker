@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# The screen-share picker (xdg-desktop-portal-hyprland runs it: custom_picker_binary
+# in ~/.config/hypr/xdph.conf). Normally Omarchy's picker, as before. But it
+# answers by itself, sharing the whole screen (the focused one), when nobody
+# can be at the PC to click it:
+#   - no real monitor is connected (switched off; ./remote-screen then keeps
+#     the virtual REMOTE screen), or
+#   - a RustDesk connection is starting (its `rustdesk --cm` process)
+# so remoting in never gets stuck on "select the screen to be shared". (On
+# Hyprland any program can capture the screen without asking anyway, so the
+# picker was a convenience, not a lock.) Log: ~/.local/state/omarchy/share-picker.log
+
+log="$HOME/.local/state/omarchy/share-picker.log"
+mkdir -p "$(dirname "$log")"
+
+monitors="$(hyprctl monitors -j 2>/dev/null || echo '[]')"
+physical="$(jq '[.[] | select(.name != "FALLBACK" and .name != "REMOTE" and (.name | startswith("HEADLESS") | not))] | length' <<<"$monitors")"
+
+why=""
+if [[ $physical == 0 ]]; then
+  why="no monitor connected"
+else
+  # RustDesk starts its connection window as the connection comes in; give it
+  # a moment if it isn't up yet.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -u "$USER" -f 'rustdesk --cm' >/dev/null && { why="RustDesk connection"; break; }
+    sleep 0.15
+  done
+fi
+
+if [[ -n $why ]]; then
+  screen="$(jq -r '(map(select(.focused)) + .)[0].name // empty' <<<"$monitors")"
+  if [[ -n $screen ]]; then
+    echo "$(date '+%F %T') shared $screen by itself ($why)" >> "$log"
+    echo "[SELECTION]r/screen:$screen"
+    exit 0
+  fi
+fi
+
+exec hyprland-preview-share-picker "$@"

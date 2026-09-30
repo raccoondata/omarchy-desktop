@@ -1,0 +1,9 @@
+[Unit]
+Description=Snapshot the desktop config at login and every 20 minutes
+
+[Timer]
+OnStartupSec=30s
+OnUnitActiveSec=20min
+
+[Install]
+WantedBy=timers.target

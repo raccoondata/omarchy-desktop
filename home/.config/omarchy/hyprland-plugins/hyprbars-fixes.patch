@@ -1,0 +1,28 @@
+--- barDeco.cpp.orig	2026-09-29 21:53:40.013480851 -0400
++++ barDeco.cpp	2026-09-29 22:25:47.463248559 -0400
+@@ -123,6 +123,14 @@
+ }
+ 
+ void CHyprBar::onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEvent e) {
++    // Local patch: a drag must end wherever the button comes up. inputIsValid()
++    // rejects the cursor over a layer surface (e.g. a top bar), which left the
++    // window stuck to the pointer when dropped there.
++    if (e.state != WL_POINTER_BUTTON_STATE_PRESSED && m_bDraggingThis) {
++        handleUpEvent(info);
++        return;
++    }
++
+     if (!inputIsValid())
+         return;
+ 
+@@ -247,7 +255,9 @@
+ }
+ 
+ void CHyprBar::handleUpEvent(Event::SCallbackInfo& info) {
+-    if (m_pWindow.lock() != Desktop::focusState()->window())
++    // Local patch: the window being dragged may have lost focus on the way
++    // (follow_mouse); its drag still ends here.
++    if (!m_bDraggingThis && m_pWindow.lock() != Desktop::focusState()->window())
+         return;
+ 
+     if (m_bCancelledDown)

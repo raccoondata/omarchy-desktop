@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hand something to a coding agent (./agents: Claude Code, Codex, or any other
+# installed one), in a new session or one that's already open.
+#
+#   ask-agent <agent> <image> [app] [window title] [question]
+#   ask-agent paste <window address> <image> [app] [window title] [question]
+#       a screenshot (the screenshot bar/preview). Uses the newest version:
+#       what you've annotated in the screenshot editor, if any
+#   ask-agent files <agent|window address> <question> <path>...
+#       files or folders (Files' right-click, the ask card). No question and
+#       an open session: just adds the paths to what you're typing there
+#   ask-agent prompt <agent|window address> <question>
+#       just a question (the Super menu's Ask)
+#   ask-agent text <agent|window address> <question> <text> [app] [window title]
+#       selected text (Super+Alt+A)
+#
+#   --effort <level> first: the effort level for a new session (./agents
+#   effort; the agent's remembered one when left out).
+#
+# A new session opens in a new terminal (./agents launch; for files, in their
+# folder). Into an open session it switches to its window and pastes into its
+# input without pressing Enter (it might be showing a permission prompt).
+
+omarchy="$HOME/.config/omarchy"
+agents="$omarchy/agents"
+effort=""
+if [[ ${1:-} == --effort ]]; then
+  effort="${2:-}"
+  shift 2
+fi
+
+is_address() { [[ $1 == 0x* ]]; }
+quote() { [[ $1 == *[[:space:]\'\"]* ]] && printf "'%s'" "${1//\'/\'\\\'\'}" || printf '%s' "$1"; }
+is_image() { [[ ${1,,} =~ \.(png|jpe?g|webp|gif|bmp)$ ]]; }
+
+# send <agent|address> <prompt> [cwd] [image...]
+send() {
+  local to="$1" prompt="$2" cwd="${3:-}"
+  shift 3 || shift $#
+  if is_address "$to"; then
+    "$agents" paste "$to" "$prompt"
+  else
+    local args=(launch "$to" --prompt "$prompt")
+    [[ -n $cwd ]] && args+=(--cwd "$cwd")
+    [[ -n $effort ]] && args+=(--effort "$effort")
+    local img
+    for img in "$@"; do args+=(--image "$img"); done
+    exec "$agents" "${args[@]}"
+  fi
+}
+
+where_from() {  # where_from <app> <title>
+  [[ -n $1 ]] && printf ' It was taken while %s was focused%s.' "$1" "${2:+ (window: \"$2\")}"
+  return 0
+}
+
+case "${1:?agent, paste, files, prompt or text}" in
+  prompt)
+    to="${2:?agent or window address}"
+    question="${3:?question}"
+    send "$to" "$question" ""
+    ;;
+
+  files)
+    to="${2:?agent or window address}"
+    question="${3:-}"
+    shift 3
+    (( $# )) || { echo "no files" >&2; exit 2; }
+    list=() images=()
+    for f in "$@"; do
+      list+=("$(quote "$f")")
+      is_image "$f" && images+=("$f")
+    done
+    if [[ -z $question ]] && is_address "$to"; then
+      # Just attach: the paths, then carry on typing.
+      send "$to" "${list[*]} "
+      exit 0
+    fi
+    if [[ -z $question ]]; then
+      if (( $# == 1 )) && [[ -d $1 ]]; then
+        question="Have a look at this folder: what's in it, what it's for, and anything worth knowing."
+      else
+        question="Have a look at $( (( $# == 1 )) && echo "this file" || echo "these files"): what it is, and anything worth knowing."
+      fi
+    fi
+    first="$1"
+    [[ -d $first ]] && cwd="$first" || cwd="$(dirname "$first")"
+    prompt="$question
+
+$( (( $# == 1 )) && echo "File" || echo "Files"): ${list[*]}"
+    send "$to" "$prompt" "$cwd" "${images[@]}"
+    ;;
+
+  text)
+    to="${2:?agent or window address}"
+    question="${3:-}"
+    text="${4:?text}"
+    app="${5:-}"
+    title="${6:-}"
+    [[ -n $question ]] || question="Explain this. If it's an error or something's wrong, tell me what it means and how to fix it."
+    from=""
+    [[ -n $app ]] && from=" (selected in $app${title:+, window \"$title\"})"
+    prompt="$question
+
+Text$from:
+
+$text"
+    send "$to" "$prompt" ""
+    ;;
+
+  *)
+    # A screenshot: ask-agent <agent> <image> ... or ask-agent paste <address> <image> ...
+    to="$1"
+    if [[ $to == paste ]]; then
+      to="${2:?window address}"
+      shift
+    fi
+    image="${2:?image path}"
+    # The newest version: what you've annotated in the screenshot editor, if any.
+    image="$("$omarchy/screenshot-editor" latest "$image" 2>/dev/null || echo "$image")"
+    question="${5:-}"
+    [[ -n $question ]] || question="What am I looking at here? If something's wrong (an error, a warning, something broken or confusing), tell me what it means and how to fix it."
+    prompt="$question
+
+Screenshot: $image.$(where_from "${3:-}" "${4:-}") Look at the image first."
+    if is_address "$to"; then
+      send "$to" "$prompt"
+      # The screenshot goes back on the clipboard afterwards.
+      wl-copy --type image/png < "$image"
+    else
+      send "$to" "$prompt" "" "$image"
+    fi
+    ;;
+esac

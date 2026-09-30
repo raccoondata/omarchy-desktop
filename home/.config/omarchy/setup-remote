@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Optional: reach this PC from another device with RustDesk, even after a
+# reboot and with the monitor off. Asked about by omarchy-desktop's install.sh
+# (off by default); safe to run again.
+#
+#   setup-remote          set it up
+#   setup-remote --off    undo it (RustDesk stays installed; remove it with
+#                         yay -R rustdesk-bin)
+#
+#   RustDesk    rustdesk-bin (AUR) as a system service, with a drop-in that
+#               keeps it on the Wayland path (with DISPLAY it takes the X11
+#               path and crash-loops)
+#   portals     xdg-desktop-portal-luminous for remote input (Hyprland's own
+#               portal has only the screen); no "allow remote control?" dialog,
+#               since nobody may be at the PC (RustDesk's password still guards it)
+#   screen      remote-screen: a virtual screen while no monitor is connected
+#               (switched off); share-picker answers "which screen?" itself
+#               then, and while a RustDesk connection starts
+#   login       SDDM autologin, so RustDesk can reach the desktop after a
+#               reboot; the session locks itself at once (lock-on-autologin),
+#               so the PC still needs your password
+#
+# By hand afterwards: set RustDesk's permanent password in its window, then
+# connect once from the other device and pick the screen (remembered).
+
+omarchy="$HOME/.config/omarchy"
+bold=$'\e[1m' off=$'\e[0m'
+state="$omarchy/desktop.conf"
+
+set_state() {  # set_state <key> <value>  (desktop.conf, read by selfcheck/update)
+  local tmp
+  tmp="$(mktemp)"
+  { [[ -f $state ]] && grep -v "^$1=" "$state"; echo "$1=$2"; } > "$tmp"
+  mv "$tmp" "$state"
+}
+
+xdph="$HOME/.config/hypr/xdph.conf"
+portals="$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
+luminous="$HOME/.config/xdg-desktop-portal-luminous/config.toml"
+
+if [[ ${1:-} == --off ]]; then
+  echo "${bold}Turning remote access off${off}"
+  sudo -v
+  sudo systemctl disable --now rustdesk.service 2>/dev/null || true
+  sudo rm -f /etc/sddm.conf.d/50-autologin.conf /etc/systemd/system/rustdesk.service.d/wayland-session.conf
+  sudo systemctl daemon-reload
+  systemctl --user disable --now remote-screen.service 2>/dev/null || true
+  rm -f "$portals" "$luminous"
+  [[ -f $xdph ]] && sed -i "s|custom_picker_binary = .*share-picker|custom_picker_binary = hyprland-preview-share-picker|" "$xdph"
+  systemctl --user restart xdg-desktop-portal 2>/dev/null || true
+  set_state remote off
+  echo "Done. Log out and back in."
+  exit 0
+fi
+
+echo "${bold}Setting up remote access (RustDesk)${off}"
+sudo -v
+
+# --- packages ---------------------------------------------------------------
+pkgs=(xdg-desktop-portal-luminous)
+pacman -Q rustdesk &>/dev/null || pkgs+=(rustdesk-bin)
+yay -S --needed --noconfirm "${pkgs[@]}"
+
+# --- RustDesk service ----------------------------------------------------------
+put() {  # put <path> < content
+  local tmp
+  tmp="$(mktemp)"
+  cat > "$tmp"
+  if ! sudo cmp -s "$tmp" "$1" 2>/dev/null; then
+    sudo install -D -m 644 "$tmp" "$1"
+    echo "  installed $1"
+    changed=true
+  fi
+  rm -f "$tmp"
+}
+changed=false
+uid="$(id -u)"
+put /etc/systemd/system/rustdesk.service.d/wayland-session.conf <<EOF
+# Session environment for the RustDesk service on Hyprland (Wayland).
+# No DISPLAY: with DISPLAY=:0 the server's X11 path crashed on start
+# (BadAtom from Xwayland) and the service respawned it every 5 s.
+[Service]
+Environment=WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-1} XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus
+UnsetEnvironment=DISPLAY XAUTHORITY
+EOF
+
+# --- login -------------------------------------------------------------------
+put /etc/sddm.conf.d/50-autologin.conf <<EOF
+[Autologin]
+User=$USER
+Session=hyprland-uwsm
+Relogin=false
+EOF
+
+# --- portals -----------------------------------------------------------------
+mkdir -p "$(dirname "$portals")" "$(dirname "$luminous")"
+before="$(cat "$portals" "$luminous" 2>/dev/null | md5sum)"
+cat > "$portals" <<'EOF'
+# Hyprland's portal for everything, including the screen video (it remembers
+# the chosen screen through restore tokens: allow_token_by_default in
+# ~/.config/hypr/xdph.conf, so RustDesk asks only once). luminous only adds
+# RemoteDesktop, which Hyprland's portal lacks and which RustDesk checks for
+# (~/.config/omarchy/setup-remote). Delete this file to undo.
+[preferred]
+default=hyprland;gtk
+org.freedesktop.impl.portal.RemoteDesktop=luminous
+EOF
+cat > "$luminous" <<'EOF'
+# No "allow remote control?" dialog when there's one screen, so RustDesk works
+# unattended (from the phone with nobody at the desk). RustDesk's own password
+# still guards access.
+color_scheme = "dark"
+remote_permission_check = false
+screenshot_permission_check = true
+usb_permission_check = true
+EOF
+[[ "$(cat "$portals" "$luminous" | md5sum)" == "$before" ]] || changed=true
+
+# --- screen picker -------------------------------------------------------------
+[[ -f $xdph ]] || cp /usr/share/omarchy/config/hypr/xdph.conf "$xdph"
+if ! grep -q 'share-picker' "$xdph"; then
+  sed -i "s|custom_picker_binary = .*|# Omarchy's picker, except when nobody can be at the PC to click it\n    # (monitor off, or a RustDesk connection starting): ~/.config/omarchy/share-picker\n    custom_picker_binary = $omarchy/share-picker|" "$xdph"
+  grep -q 'share-picker' "$xdph" || printf '\nscreencopy {\n    allow_token_by_default = true\n    custom_picker_binary = %s/share-picker\n}\n' "$omarchy" >> "$xdph"
+fi
+grep -q 'allow_token_by_default' "$xdph" || sed -i 's|^screencopy {|screencopy {\n    allow_token_by_default = true|' "$xdph"
+
+# --- services ------------------------------------------------------------------
+# Only restarted when something changed: a restart drops a remote session.
+sudo systemctl daemon-reload
+sudo systemctl enable --now rustdesk.service
+$changed && sudo systemctl try-restart rustdesk.service
+systemctl --user daemon-reload
+systemctl --user enable --now remote-screen.service
+$changed && { systemctl --user restart xdg-desktop-portal 2>/dev/null || true; }
+set_state remote on
+
+echo
+echo "${bold}Done.${off} Now: set RustDesk's permanent password in its window, log out"
+echo "and back in (for the screen picker), then connect once from the other"
+echo "device and pick the screen (remembered after that)."
+[[ -n ${OMARCHY_DESKTOP_INSTALL:-} ]] || read -r -p "Press Enter to close." _

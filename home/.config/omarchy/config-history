@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# History of the desktop config (Hyprland, the Omarchy shell/taskbar and its
+# scripts, Ghostty, user services, launchers, default apps), so a change that
+# breaks the desktop can be seen and undone, by you or an agent, even from the
+# rescue console (Ctrl+Alt+Delete).
+#
+#   config-history snapshot [message]   copy the live files in and commit
+#                                       (timer every 20 min + at login)
+#   config-history log [n]              recent snapshots and the files they touched
+#   config-history diff [snapshot]      what changed since a snapshot (default: last)
+#   config-history restore <snapshot>   put the files back as they were
+#                                       (snapshots the current state first)
+#   config-history push                 push to the repo's remote now
+#
+# By default the history is a local git repo, ~/.local/share/omarchy-desktop/history,
+# mirroring home-relative paths (its .config/hypr/ is ~/.config/hypr/). The
+# optional ~/.config/omarchy/config-history.conf (bash) can change that:
+#   repo=<dir>              another repo (e.g. a clone of your own GitHub repo)
+#   paths+=(<path>...)      more home-relative files or folders
+#   system_files+=(<file>)  read-only copies of system files (under system/)
+#   push=1                  push after each snapshot
+#   desktop_repo=<dir>      (omarchy-desktop's maintainer) keep the desktop's
+#                           own files (its manifest) in that clone's home/
+#                           instead, committed there
+#   extra_sync_in() {...}   anything else to write into the repo first
+
+repo="$HOME/.local/share/omarchy-desktop/history"
+paths=(.config/hypr .config/omarchy .config/ghostty .config/systemd/user .bashrc
+  .local/bin/rescue .local/share/applications .local/share/nautilus-python/extensions
+  .config/mimeapps.list .config/xdg-desktop-portal .config/xdg-desktop-portal-luminous)
+system_files=()
+push=0
+desktop_repo=""
+extra_sync_in() { :; }
+# Backup copies and machine-local state that shouldn't travel.
+excludes=(--exclude '*.bak' --exclude '*.bak.*' --exclude '*.bak-*' --exclude '*.orig' --exclude '*.tmp'
+  --exclude mimeinfo.cache --exclude __pycache__)
+conf="$HOME/.config/omarchy/config-history.conf"
+# shellcheck source=/dev/null
+[[ -f $conf ]] && source "$conf"
+
+# The desktop's own files (maintainer only): its manifest, one path per line.
+desktop=()
+if [[ -n $desktop_repo && -f $desktop_repo/manifest ]]; then
+  mapfile -t desktop < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$desktop_repo/manifest")
+fi
+
+# A local history starts itself; a configured repo must be cloned first.
+if [[ ! -d $repo/.git ]]; then
+  if [[ $repo == "$HOME/.local/share/omarchy-desktop/history" ]]; then
+    mkdir -p "$repo"
+    git -C "$repo" init -q -b main
+    git -C "$repo" config user.name "config-history"
+    git -C "$repo" config user.email "config-history@localhost"
+  else
+    echo "no repo at $repo" >&2
+    exit 1
+  fi
+fi
+
+# copy <from-root> <to-root> <path> [--delete] [rsync options...]
+copy() {
+  local from="$1" to="$2" p="$3"
+  shift 3
+  if [[ -d $from/$p ]]; then
+    mkdir -p "$to/$p"
+    rsync -a "$@" "${excludes[@]}" "$from/$p/" "$to/$p/"
+  elif [[ -e $from/$p ]]; then
+    mkdir -p "$(dirname "$to/$p")"
+    rsync -a "$from/$p" "$to/$p"
+  fi
+}
+
+# Excludes (anchored to <path>) for the desktop's files inside it.
+desktop_excludes() {  # desktop_excludes <path>
+  local d
+  for d in "${desktop[@]}"; do
+    [[ $d == "$1"/* ]] && printf '%s\n' "--exclude=/${d#"$1"/}"
+  done
+  return 0
+}
+
+# Live files -> repo working tree (deleting what's gone from a tracked folder).
+sync_in() {
+  local p ex
+  for p in "${paths[@]}"; do
+    printf '%s\n' "${desktop[@]%/}" | grep -qxF -- "$p" && continue
+    mapfile -t ex < <(desktop_excludes "$p")
+    copy "$HOME" "$repo" "$p" --delete --delete-excluded "${ex[@]}"
+  done
+  for p in "${desktop[@]}"; do
+    copy "$HOME" "$desktop_repo/home" "${p%/}" --delete
+  done
+  local f
+  for f in "${system_files[@]}"; do
+    [[ -r $f ]] || continue
+    mkdir -p "$repo/system$(dirname "$f")"
+    cp -p "$f" "$repo/system$f"
+  done
+  extra_sync_in
+}
+
+# Repo working tree -> live files (overwrite, but never delete live files).
+sync_out() {  # sync_out <root> <path>...
+  local root="$1" p
+  shift
+  for p in "$@"; do copy "$root" "$HOME" "${p%/}"; done
+}
+
+push_repo() {  # push_repo <repo> [branch]
+  [[ $push == 1 ]] || return 0
+  git -C "$1" remote get-url origin >/dev/null 2>&1 || return 0
+  timeout 60 git -C "$1" push -q origin "HEAD:${2:-$(git -C "$1" branch --show-current)}" 2>/dev/null \
+    || echo "push failed (offline?); will retry next snapshot" >&2
+}
+unpushed() {  # unpushed <repo>: anything not on the remote yet
+  [[ -n "$(git -C "$1" log --oneline '@{u}..HEAD' 2>/dev/null)" ]] || ! git -C "$1" rev-parse -q --verify '@{u}' >/dev/null 2>&1
+}
+
+commit_repo() {  # commit_repo <repo> <message> [pathspec...]
+  local r="$1" msg="$2"
+  shift 2
+  git -C "$r" add -A -- "${@:-.}"
+  if ! git -C "$r" diff --cached --quiet; then
+    git -C "$r" commit -q -m "$msg" && echo "saved: $(basename "$r") $(git -C "$r" log -1 --format='%h %s')"
+  fi
+  unpushed "$r" && push_repo "$r"
+  return 0
+}
+
+snapshot() {
+  local msg="${1:-snapshot $(date '+%F %T')}"
+  sync_in
+  commit_repo "$repo" "$msg"
+  # Only the desktop's files there: the maintainer's other work in that
+  # clone is left for them to commit.
+  if [[ -n $desktop_repo ]]; then
+    commit_repo "$desktop_repo" "$msg" home
+  fi
+}
+
+# The repos a snapshot can be in: name, root of the home files, paths.
+repos() {
+  printf '%s\t%s\n' "$repo" ""
+  [[ -n $desktop_repo ]] && printf '%s\t%s\n' "$desktop_repo" "home/"
+  return 0
+}
+
+case "${1:-log}" in
+  snapshot) snapshot "${2:-}" ;;
+  log)
+    while IFS=$'\t' read -r r _; do
+      echo "== $(basename "$r")"
+      git -C "$r" log --date=format:'%a %F %H:%M' --format='%C(yellow)%h%Creset  %ad  %s' --stat=100 -n "${2:-15}"
+      echo
+    done < <(repos)
+    ;;
+  diff)
+    sync_in
+    while IFS=$'\t' read -r r root; do
+      git -C "$r" rev-parse -q --verify "${2:-HEAD}^{commit}" >/dev/null 2>&1 || continue
+      if [[ -z $root ]]; then git -C "$r" diff "${2:-HEAD}" -- "${paths[@]}"; else git -C "$r" diff "${2:-HEAD}" -- home; fi
+    done < <(repos)
+    ;;
+  restore)
+    target="${2:?usage: config-history restore <snapshot>  (see: config-history log)}"
+    found=""
+    while IFS=$'\t' read -r r root; do
+      git -C "$r" rev-parse -q --verify "$target^{commit}" >/dev/null 2>&1 && { found="$r"; froot="$root"; break; }
+    done < <(repos)
+    [[ -n $found ]] || { echo "no snapshot $target (see: config-history log)" >&2; exit 1; }
+    snapshot "before restoring $target"
+    if [[ -z $froot ]]; then list=("${paths[@]}"); else list=("${desktop[@]}"); fi
+    # Only the paths that snapshot has (older ones track fewer files).
+    mapfile -t have < <(for p in "${list[@]}"; do [[ -n "$(git -C "$found" ls-tree "$target" -- "$froot${p%/}")" ]] && echo "${p%/}"; done)
+    (( ${#have[@]} )) || { echo "that snapshot has none of these files" >&2; exit 1; }
+    specs=("${have[@]/#/$froot}")
+    git -C "$found" checkout "$target" -- "${specs[@]}"
+    sync_out "$found/${froot%/}" "${have[@]}"
+    git -C "$found" checkout HEAD -- "${specs[@]}"
+    snapshot "restored $target"
+    echo "Restored the config from $target. Log out and back in (or reboot) to load it."
+    ;;
+  push)
+    while IFS=$'\t' read -r r _; do push=1 push_repo "$r"; done < <(repos)
+    ;;
+  *) sed -n '3,30p' "$0"; exit 1 ;;
+esac

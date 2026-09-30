@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# selfcheck: is the customised desktop healthy? Run it after updates or after
+# an agent has been changing things. (Also run by the post-update hook.)
+#
+#   selfcheck            print every check (✓ ok, ! warning, ✗ problem)
+#   selfcheck --quiet    print only warnings/problems; notify if there are any
+#
+# Exit status: 0 all good, 1 warnings only, 2 problems.
+
+quiet=false
+[[ "${1:-}" == "--quiet" ]] && quiet=true
+
+omarchy="$HOME/.config/omarchy"
+problems=0
+warnings=0
+report=()
+
+ok() { $quiet || echo "✓ $*"; }
+warn() { warnings=$((warnings + 1)); report+=("! $*"); echo "! $*"; }
+bad() { problems=$((problems + 1)); report+=("✗ $*"); echo "✗ $*"; }
+
+# --- Hyprland config -------------------------------------------------------
+if ! hyprctl version >/dev/null 2>&1; then
+  bad "Hyprland isn't answering (hyprctl version)"
+else
+  errors="$(hyprctl configerrors 2>/dev/null | sed '/^\s*$/d')"
+  if [[ -n $errors ]]; then
+    bad "Hyprland config errors: $(head -1 <<<"$errors")"
+  else
+    ok "Hyprland config loads without errors"
+  fi
+
+  # --- plugins -------------------------------------------------------------
+  plugins="$(hyprctl plugin list 2>/dev/null)"
+  if [[ -e $omarchy/plugins-off ]]; then
+    warn "plugins-off is set: no title bars, no window drops (rm $omarchy/plugins-off)"
+  else
+    grep -q "^Plugin dragevents " <<<"$plugins" && ok "dragevents plugin loaded" \
+      || bad "dragevents plugin not loaded: window drops and snapping are off (see ~/.local/state/omarchy/titlebars.log)"
+    if [[ -e $omarchy/titlebars-off ]]; then
+      ok "title bars switched off (titlebars-off)"
+    else
+      grep -q "^Plugin hyprbars " <<<"$plugins" && ok "hyprbars (title bars) loaded" \
+        || bad "hyprbars not loaded (see ~/.local/state/omarchy/titlebars.log)"
+    fi
+  fi
+
+  # The local plugin builds must match the running Hyprland.
+  running="$(hyprctl version -j 2>/dev/null | jq -r '.tag // empty' | sed 's/^v//')"
+  built="$(awk '{v=$1} END {print v}' "$omarchy/hyprland-plugins/hyprbars-commit" 2>/dev/null)"
+  if [[ -n $running && -n $built && $running != "$built" ]]; then
+    warn "local plugins were built for Hyprland $built, running $running: run $omarchy/hyprland-plugins/build"
+  elif [[ -n $running ]]; then
+    ok "local plugins built for this Hyprland ($running)"
+  fi
+
+  # --- keybindings -----------------------------------------------------------
+  # Two binds on one key combo: the later silently wins. (Omarchy itself binds
+  # a few pairs on purpose, e.g. ALT+TAB with and without SHIFT handled apart.)
+  # Some binds (the number row) are listed with no key at all; those are skipped.
+  # Omarchy's own ALT+TAB and SHIFT+ALT+TAB pairs (modmask 8/9) are on purpose.
+  dupes="$(hyprctl binds -j 2>/dev/null | jq -r '
+    map(select(.key != "" or .keycode != 0))
+    | group_by([.modmask, .key, .keycode, .release, .submap])[] | select(length > 1)
+    | select(((.[0].modmask == 8 or .[0].modmask == 9) and (.[0].key | ascii_upcase) == "TAB") | not)
+    | "\(.[0].modmask)+\(.[0].key)\(.[0].keycode): " + (map(.description) | join(" / "))' || true)"
+  if [[ -n $dupes ]]; then
+    warn "keys bound twice: $(tr '\n' ';' <<<"$dupes")"
+  else
+    ok "no keys bound twice"
+  fi
+fi
+
+# --- Omarchy code we mirror ---------------------------------------------------
+# ~/.config/omarchy/screenshot repeats omarchy-capture-screenshot's capture
+# steps (to know the selected area); flag when Omarchy changes its version.
+upstream="/usr/share/omarchy/bin/omarchy-capture-screenshot"
+if [[ -f $omarchy/screenshot.upstream && -f $upstream ]]; then
+  if [[ "$(sha256sum "$upstream" | awk '{print $1}')" == "$(cat "$omarchy/screenshot.upstream")" ]]; then
+    ok "screenshot capture matches Omarchy's"
+  else
+    warn "Omarchy's screenshot script changed: compare it with $omarchy/screenshot, then: sha256sum $upstream | awk '{print \$1}' > $omarchy/screenshot.upstream"
+  fi
+fi
+
+# --- scripts and data files ------------------------------------------------
+broken=()
+for f in "$omarchy"/* "$HOME/.local/bin/rescue"; do
+  [[ -f $f && -x $f ]] || continue
+  head -1 "$f" | grep -qE '^#!.*\b(bash|sh)\b' || continue
+  bash -n "$f" 2>/dev/null || broken+=("$(basename "$f")")
+done
+if (( ${#broken[@]} )); then bad "scripts with syntax errors: ${broken[*]}"; else ok "all scripts parse"; fi
+
+bad_json=()
+for f in "$omarchy"/shell.json "$omarchy"/taskbar-*.json "$omarchy"/titlebar-off.json "$omarchy"/supermenu.json; do
+  [[ -f $f ]] || continue
+  jq empty "$f" >/dev/null 2>&1 || bad_json+=("$(basename "$f")")
+done
+if (( ${#bad_json[@]} )); then bad "unreadable JSON: ${bad_json[*]}"; else ok "settings files are valid JSON"; fi
+
+# --- shell and services ------------------------------------------------------
+if [[ "$(omarchy-shell taskbar isDragging 2>/dev/null)" =~ ^(true|false)$ ]]; then
+  ok "taskbar is running"
+else
+  bad "taskbar isn't answering (omarchy restart shell; check: qs log)"
+fi
+
+# Remote access is optional (setup-remote); desktop.conf says whether it's on.
+remote=false
+grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null && remote=true
+units=(hyprland-safe-mode-agents.service config-history.timer lock-guard.service)
+$remote && units+=(remote-screen.service)
+for unit in "${units[@]}"; do
+  systemctl --user is-active --quiet "$unit" && ok "$unit active" || warn "$unit not active"
+done
+if $remote; then
+  systemctl is-active --quiet rustdesk.service && ok "rustdesk service active" || warn "rustdesk service not active"
+fi
+
+# --- backup lock, remote screen sharing -------------------------------------
+command -v hyprlock >/dev/null && ok "backup lock screen (hyprlock) installed" \
+  || warn "hyprlock missing: no backup lock screen (run setup-system)"
+if $remote; then
+  grep -q 'share-picker' "$HOME/.config/hypr/xdph.conf" 2>/dev/null && ok "screen-share picker answers for RustDesk" \
+    || warn "xdph.conf doesn't use ~/.config/omarchy/share-picker: RustDesk may get stuck on 'select the screen' (run setup-remote)"
+fi
+grep -q 'require("hypr.desktop")' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null && ok "hyprland.lua loads the desktop (hypr/desktop.lua)" \
+  || bad "hyprland.lua doesn't load hypr/desktop.lua: no desktop keybindings (run omarchy-desktop update)"
+
+# --- agents -----------------------------------------------------------------------
+agents_json="$("$HOME/.config/omarchy/agents" list 2>/dev/null)"
+if [[ "$(jq 'length' <<<"$agents_json" 2>/dev/null || echo 0)" -gt 0 ]]; then
+  ok "agents: $(jq -r 'map(.name) | join(", ")' <<<"$agents_json")"
+else
+  warn "no coding agents found (~/.config/omarchy/agents list)"
+fi
+if command -v claude >/dev/null || [[ -d $HOME/.claude ]]; then
+  grep -q 'agent-notify' "$HOME/.claude/settings.json" 2>/dev/null && ok "Claude Code hooks call agent-notify" \
+    || warn "Claude Code's hooks don't call ~/.config/omarchy/agent-notify (no finished/needs-you notifications; run omarchy-desktop update)"
+fi
+[[ -f $HOME/.local/share/nautilus-python/extensions/omarchy_agents.py ]] && ok "Files right-click agent menu installed" \
+  || warn "Files agent menu missing (~/.local/share/nautilus-python/extensions/omarchy_agents.py)"
+if hyprctl binds -j 2>/dev/null | jq -e '[.[] | select((.key|ascii_downcase)=="escape" and .modmask==0)] | length > 0' >/dev/null \
+   && ! hyprctl clients -j | jq -e 'any(.[]; .class == "dev.tensaku.Tensaku")' >/dev/null; then
+  warn "Esc is still bound with no screenshot editor open (hyprctl eval 'hl.unbind(\"ESCAPE\")')"
+fi
+
+# --- summary -------------------------------------------------------------------
+if (( problems )); then
+  status=2
+elif (( warnings )); then
+  status=1
+else
+  status=0
+fi
+$quiet || echo "--- $problems problem(s), $warnings warning(s)"
+
+if $quiet && (( status > 0 )); then
+  omarchy-notification-send -u "$( (( problems )) && echo critical || echo normal)" \
+    "Desktop self-check: $problems problem(s), $warnings warning(s)" \
+    "$(printf '%s\n' "${report[@]}" | head -4)" >/dev/null 2>&1 || true
+fi
+exit $status

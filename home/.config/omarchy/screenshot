@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Print Screen. Same capture as Omarchy's omarchy-capture-screenshot (its
+# region picker with the screen frozen, hardware cursor forced so it isn't
+# baked in, saved to ~/Pictures, copied to the clipboard), done here so we
+# know exactly what was selected. Then (Taskbar & Desktop > Screenshots) it
+# either opens in the screenshot editor (./screenshot-editor, Tensaku by
+# default) with the taskbar's Ask Claude / Ask Codex bar attached to it
+# (bar/modules/EditorDock.qml), the capture flying into the editor; or it
+# opens in the taskbar's own preview window (Ask Claude, Ask Codex, Edit, Open
+# folder; bar/modules/ScreenshotPreview.qml), which is also the fallback when
+# the editor doesn't open.
+#
+#   screenshot [smart|region|windows|fullscreen]
+#
+# Mirrors /usr/share/omarchy/bin/omarchy-capture-screenshot (its checksum is in
+# ~/.config/omarchy/screenshot.upstream; `selfcheck` warns when Omarchy's
+# changes, so this can be brought in line).
+
+mode="${1:-smart}"
+
+[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
+out_dir="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+mkdir -p "$out_dir"
+
+# A second Print Screen while picking cancels, as in Omarchy.
+pkill slurp && exit 0
+
+# What you were looking at, for the agent's context.
+active="$(hyprctl activewindow -j 2>/dev/null || echo '{}')"
+app="$(jq -r '.class // ""' <<<"$active")"
+title="$(jq -r '.title // ""' <<<"$active")"
+
+no_hw_cursors="$(hyprctl getoption cursor:no_hardware_cursors -j | jq '.int')"
+set_no_hw_cursors() {
+  hyprctl eval "hl.config({ cursor = { no_hardware_cursors = $1 } })" &>/dev/null ||
+    hyprctl keyword cursor:no_hardware_cursors "$1" &>/dev/null
+}
+freeze_pid=""
+cleanup() {
+  [[ -n $freeze_pid ]] && kill "$freeze_pid" 2>/dev/null
+  set_no_hw_cursors "$no_hw_cursors"
+}
+trap cleanup EXIT
+
+set_no_hw_cursors 0
+{ read -r freeze_pid; read -r selection; } < <(omarchy-capture-region "$mode" --keep-freeze)
+[[ -n ${selection:-} ]] || exit 0
+
+path="$out_dir/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
+grim -g "$selection" "$path" || exit 1
+cleanup
+freeze_pid=""
+trap - EXIT
+echo "$path"
+wl-copy --type image/png <"$path"
+
+# selection is "X,Y WxH" in layout coordinates; the pointer is where you let go.
+read -r sx sy sw sh <<<"$(sed -E 's/^(-?[0-9]+),(-?[0-9]+) ([0-9]+)x([0-9]+)$/\1 \2 \3 \4/' <<<"$selection")"
+cursor="$(hyprctl cursorpos -j 2>/dev/null || echo '{}')"
+cx="$(jq -r '.x // -1 | floor' <<<"$cursor")"
+cy="$(jq -r '.y // -1 | floor' <<<"$cursor")"
+
+if ! omarchy-shell taskbar screenshotRegion "$path" "$app" "$title" "${sx:-0}" "${sy:-0}" "${sw:-0}" "${sh:-0}" "$cx" "$cy" >/dev/null 2>&1; then
+  omarchy-notification-send "Screenshot saved to clipboard and file" "Edit with Super + Alt + , (or click this)" \
+    --image "$path" --exec "${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}" "$path" || true
+fi

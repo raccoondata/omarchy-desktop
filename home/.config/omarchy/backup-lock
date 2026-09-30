@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# The backup lock screen: Hyprland's own hyprlock, used only when Omarchy's
+# lock screen (part of the Omarchy shell) can't do the job:
+#   - ~/.config/omarchy/lock asked the shell to lock and nothing locked, or
+#   - the shell died while the screen was locked (lock-guard), which otherwise
+#     leaves Hyprland's red "lockscreen died" screen and no way to type a
+#     password short of a reboot.
+# Same password as always. Styled from the current Omarchy theme each time.
+#
+#   backup-lock          lock now with hyprlock (does nothing if already running)
+
+pgrep -xu "$USER" hyprlock >/dev/null && exit 0
+command -v hyprlock >/dev/null || { echo "hyprlock isn't installed (run setup-system)" >&2; exit 1; }
+
+theme="$HOME/.local/state/omarchy/current/theme"
+color() {  # color <key> <fallback>  ->  rrggbb
+  local v
+  v="$(sed -n "s/^$1 *= *\"#\?\([0-9a-fA-F]\{6\}\)\".*/\1/p" "$theme/colors.toml" 2>/dev/null | head -1)"
+  echo "${v:-$2}"
+}
+accent="$(color accent cacccc)"
+bg="$(color background 101315)"
+fg="$(color foreground cacccc)"
+muted="$(color light_foreground 707880)"
+urgent="$(color red a55555)"
+wallpaper="$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null)"
+font="$(omarchy-font-current 2>/dev/null || echo 'JetBrainsMono Nerd Font')"
+
+conf="${XDG_RUNTIME_DIR:-/tmp}/omarchy-backup-lock.conf"
+cat > "$conf" <<EOF
+general {
+  hide_cursor = false
+  ignore_empty_input = true
+}
+
+background {
+  monitor =
+  color = rgb($bg)
+  $( [[ -f $wallpaper ]] && echo "path = $wallpaper" )
+  blur_passes = 3
+  blur_size = 8
+  brightness = 0.55
+}
+
+label {
+  monitor =
+  text = cmd[update:1000] date +'%-I:%M'
+  color = rgb($fg)
+  font_family = $font
+  font_size = 72
+  position = 0, 140
+  halign = center
+  valign = center
+}
+
+input-field {
+  monitor =
+  size = 420, 56
+  outline_thickness = 2
+  rounding = 0
+  outer_color = rgb($accent)
+  inner_color = rgba(${bg}e6)
+  font_color = rgb($fg)
+  check_color = rgb($accent)
+  fail_color = rgb($urgent)
+  font_family = $font
+  placeholder_text = Password
+  fail_text = Wrong password
+  dots_center = true
+  fade_on_empty = false
+  position = 0, 0
+  halign = center
+  valign = center
+}
+
+label {
+  monitor =
+  text = Backup lock screen: the usual one didn't respond
+  color = rgb($muted)
+  font_family = $font
+  font_size = 12
+  position = 0, -70
+  halign = center
+  valign = center
+}
+EOF
+
+# From Hyprland, so it runs with the session's environment even when called
+# from a service.
+if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && [[ ${1:-} != --direct ]]; then
+  hyprctl dispatch "hl.dsp.exec_cmd(\"$0 --direct\")" >/dev/null && exit 0
+fi
+exec hyprlock --config "$conf"

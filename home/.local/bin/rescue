@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# rescue: for when the desktop won't come up (black screen, login loop, crash
+# at start). Ctrl+Alt+Delete (or Ctrl+Alt+F3) opens text console 3; log in
+# there and this starts by itself (~/.bashrc). Anywhere else, type: rescue
+# Back to the desktop: Ctrl+Alt+F1 (or "d" in the menu).
+#
+# It shows what went wrong on the last boot and offers the usual ways back:
+# an agent to investigate and fix it, undoing recent config changes, starting
+# without title bars, or booting Windows. System-level problems (a bad update,
+# kernel or NVIDIA driver) are better fixed from the boot menu: Limine lists
+# "Snapshots" taken before each update; boot one, then run `omarchy snapshot
+# restore` to keep it.
+
+history="$HOME/.config/omarchy/config-history"
+bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
+
+context() {
+  echo "${bold}Last boot's errors${off} ${dim}(journalctl -b -1 -p err)${off}"
+  journalctl -b -1 -p err --no-pager -q 2>/dev/null | tail -n 12 | cut -c1-160
+  echo
+  echo "${bold}This boot's errors${off}"
+  journalctl -b 0 -p err --no-pager -q 2>/dev/null | tail -n 8 | cut -c1-160
+  echo
+  local crash
+  crash="$(ls -t "$HOME"/.cache/hyprland/hyprlandCrashReport*.txt 2>/dev/null | head -1)"
+  [[ -n $crash ]] && echo "${bold}Newest Hyprland crash report:${off} $crash ($(date -r "$crash" '+%F %H:%M'))"
+  echo "${bold}Recent crashes:${off}"
+  coredumpctl list --since=-2d --no-pager --no-legend 2>/dev/null | tail -n 5 | cut -c1-160
+  echo
+  echo "${bold}Recent config changes${off} ${dim}(config-history log)${off}"
+  "$history" log 3 2>/dev/null | grep -E '^[0-9a-f]{7}' || true
+  echo
+}
+
+prompt() {
+  cat <<PROMPT
+I'm at a Linux text console (TTY) because my Omarchy/Hyprland desktop won't come up: $1
+
+Find out why and fix it. Useful places: journalctl -b -1 and -b 0 (SDDM, uwsm,
+wayland-wm@hyprland.desktop.service), ~/.cache/hyprland/hyprlandCrashReport*.txt,
+coredumpctl, ~/.local/state/omarchy/*.log. My desktop config has a git history:
+~/.config/omarchy/config-history log / diff / restore <snapshot> (recent changes
+are the first suspect). Notes on my custom setup:
+~/.claude/projects/-home-user-Work/memory/. Pre-update system snapshots are in
+the Limine boot menu (omarchy snapshot). Explain what you find before changing
+anything big, and tell me exactly how to get back into the desktop.
+PROMPT
+}
+
+ask_symptom() {
+  read -r -p "What happens? (e.g. black screen after login): " symptom
+  [[ -n $symptom ]] || symptom="the desktop does not start"
+  echo "$symptom"
+}
+
+cd "$HOME/Work" 2>/dev/null || cd "$HOME"
+clear
+echo "${bold}rescue${off}: getting back into the desktop    ${dim}(Ctrl+Alt+F1 = back to the desktop)${off}"
+echo
+context
+
+while :; do
+  cat <<MENU
+${bold}1${off}  Ask Claude Code to find and fix it
+${bold}2${off}  Ask Codex to find and fix it
+${bold}3${off}  Undo recent config changes (pick a snapshot)
+${bold}4${off}  Start without Hyprland plugins (title bars, window drops) next login
+${bold}5${off}  Try the desktop again (restart the login screen)
+${bold}6${off}  Reboot            ${bold}7${off}  Reboot into Windows
+${bold}d${off}  Back to the desktop (Ctrl+Alt+F1)
+${bold}q${off}  Quit to the shell
+MENU
+  read -r -p "> " choice
+  case "$choice" in
+    1) claude --dangerously-skip-permissions --effort max "$(prompt "$(ask_symptom)")" ;;
+    2) codex --approve-for-me -c model_reasoning_effort=max "$(prompt "$(ask_symptom)")" ;;
+    3)
+      "$history" log 12
+      read -r -p "Snapshot to restore (the yellow id; blank = cancel): " id
+      [[ -n $id ]] && "$history" restore "$id"
+      ;;
+    4)
+      touch "$HOME/.config/omarchy/plugins-off"
+      echo "No plugins from the next login. Undo: rm ~/.config/omarchy/plugins-off"
+      ;;
+    5) sudo systemctl restart sddm ;;
+    6) systemctl reboot ;;
+    7) "$HOME/.config/omarchy/reboot-to-windows" ;;
+    d | D) sudo -n /usr/bin/chvt 1 || echo "Press Ctrl+Alt+F1" ;;
+    q | Q | "")
+      echo "Plain shell. Type rescue for the menu; Ctrl+Alt+F1 goes back to the desktop."
+      exit 0
+      ;;
+  esac
+  echo
+done

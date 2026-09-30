@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+side="${1:?usage: window-dock left|right}"
+[[ "$side" == "left" || "$side" == "right" ]] || exit 2
+
+window="$(hyprctl activewindow -j)"
+[[ -n "$(jq -r '.address // empty' <<<"$window")" ]] || exit 0
+
+# A maximized window drops back to a tile first, then docks like any other.
+if (( "$(jq -r '.fullscreen // 0' <<<"$window")" > 0 )); then
+  hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })' >/dev/null
+  sleep 0.05
+fi
+
+# A dock command is a tiled layout operation, including for a floating window.
+if [[ "$(jq -r '.floating // false' <<<"$window")" == "true" ]]; then
+  hyprctl dispatch 'hl.dsp.window.float({ action = "toggle" })' >/dev/null
+fi
+
+monitor_id="$(jq -r '.monitor' <<<"$window")"
+monitor="$(hyprctl monitors -j | jq -c --argjson id "$monitor_id" '.[] | select(.id == $id)')"
+monitor_x="$(jq -r '.x' <<<"$monitor")"
+# Layout coordinates are logical: divide the mode's pixels by the scale.
+monitor_width="$(jq -r '(.width / .scale) | floor' <<<"$monitor")"
+monitor_center=$((monitor_x + monitor_width / 2))
+
+# Promote the focused tile to one child of the root split. Its sibling remains
+# the complete tree containing every other tile on this workspace.
+hyprctl dispatch 'hl.dsp.layout("movetoroot active")' >/dev/null
+sleep 0.05
+
+window="$(hyprctl activewindow -j)"
+window_x="$(jq -r '.at[0]' <<<"$window")"
+window_width="$(jq -r '.size[0]' <<<"$window")"
+window_center=$((window_x + window_width / 2))
+
+if { [[ "$side" == "left" ]] && (( window_center > monitor_center )); } \
+  || { [[ "$side" == "right" ]] && (( window_center < monitor_center )); }; then
+  hyprctl dispatch 'hl.dsp.layout("swapsplit")' >/dev/null
+fi

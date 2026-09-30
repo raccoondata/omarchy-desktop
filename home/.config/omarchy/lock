@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Lock the screen, with a "Locked, type your password" card drawn first.
+# Screen sharing (RustDesk) freezes on its last frame while locked (Hyprland
+# hides the lock screen from capture), so a remote viewer sees that card
+# rather than your desktop, and knows typing goes to the password box. The
+# taskbar removes the card on unlock. Used by Super+Ctrl+L, the system menu's
+# Lock, the super menu, the lock hot corner and the auto-lock after autologin.
+#
+# If Omarchy's lock screen doesn't lock within a few seconds (the shell is
+# hung or gone), the backup lock screen (hyprlock, ./backup-lock) locks instead.
+
+dir="$(dirname "$(readlink -f "$0")")"
+
+OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell -q taskbar lockCard
+sleep 0.3
+timeout 5 omarchy-system-lock "$@"
+# Locked within 2 s, or the shell still answers that it's locking (it waits
+# for the screens after a boot or wake): leave it be, for up to 30 s.
+for (( i = 0; i < 300; i++ )); do
+  omarchy-hyprland-session-locked && exit 0
+  if (( i >= 20 && i % 5 == 0 )); then
+    requested="$(OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell lock status 2>/dev/null | jq -r '.requested // false' 2>/dev/null)"
+    [[ $requested == true ]] || break
+  fi
+  sleep 0.1
+done
+exec "$dir/backup-lock"

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Watches for a locked screen whose lock screen has died: Hyprland still holds
+# the lock but the Omarchy shell (which draws the lock screen) crashed or came
+# back without it. Hyprland then shows its red "lockscreen died" screen and
+# there's no password box; normally only a reboot gets you out. When that
+# lasts two checks in a row, this starts the backup lock screen (hyprlock,
+# ./backup-lock), which takes the lock over so you can type your password.
+# Runs as the user service lock-guard.service; costs one hyprctl call every
+# 3 seconds.
+
+dir="$(dirname "$(readlink -f "$0")")"
+strikes=0
+
+while sleep 3; do
+  if ! omarchy-hyprland-session-locked; then
+    strikes=0
+    continue
+  fi
+  pgrep -xu "$USER" hyprlock >/dev/null && { strikes=0; continue; }
+  status="$(OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell lock status 2>/dev/null)"
+  if [[ "$(jq -r '(.secure == true) or (.requested == true)' <<<"$status" 2>/dev/null)" == true ]]; then
+    strikes=0
+    continue
+  fi
+  (( ++strikes < 2 )) && continue
+  echo "session locked with no lock screen; starting the backup lock"
+  "$dir/backup-lock"
+  strikes=0
+  sleep 20
+done

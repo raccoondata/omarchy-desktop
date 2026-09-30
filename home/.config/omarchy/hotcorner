@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Hot corners (hypr/desktop/hotcorners.lua detects them; settings in
+# ~/.config/omarchy/hotcorners.conf, also Super+Space > Setup > Hot Corners).
+#
+#   hotcorner <top-left|top-right|bottom-left|bottom-right>   run that corner
+#   hotcorner get <corner>                                     its action
+#   hotcorner set <corner> <action>                            change it
+#   hotcorner effect [on|off]                                  the ripple
+
+conf="$HOME/.config/omarchy/hotcorners.conf"
+scripts="$HOME/.config/omarchy"
+
+value() { sed -n "s/^$1=//p" "$conf" 2>/dev/null | tail -1; }
+
+set_value() {
+  local key="$1" val="$2" tmp
+  tmp="$(mktemp "$conf.XXXXXX")"
+  if grep -q "^$key=" "$conf" 2>/dev/null; then
+    sed "s/^$key=.*/$key=$val/" "$conf" > "$tmp"
+  else
+    { cat "$conf" 2>/dev/null; echo "$key=$val"; } > "$tmp"
+  fi
+  mv "$tmp" "$conf"
+}
+
+corner_ok() { [[ "$1" =~ ^(top|bottom)-(left|right)$ ]]; }
+
+case "${1:-}" in
+  get)
+    corner_ok "${2:-}" || exit 2
+    echo "$(value "$2")"
+    exit 0
+    ;;
+  set)
+    corner_ok "${2:-}" || exit 2
+    [[ "${3:-}" =~ ^(none|desktop|minimize|restore|switcher|menu|lock)$ ]] || exit 2
+    set_value "$2" "$3"
+    exit 0
+    ;;
+  effect)
+    case "${2:-}" in
+      on | off) set_value effect "$2" ;;
+      "") value effect ;;
+      *) exit 2 ;;
+    esac
+    exit 0
+    ;;
+esac
+
+corner="${1:-}"
+corner_ok "$corner" || { sed -n '3,11p' "$0"; exit 2; }
+action="$(value "$corner")"
+[[ -z $action || $action == none ]] && exit 0
+
+# Reaching a corner while dragging a window isn't asking for the corner.
+[[ "$(omarchy-shell taskbar isDragging 2>/dev/null)" == true ]] && exit 0
+
+[[ "$(value effect)" != off ]] && omarchy-shell -q taskbar hotCorner "$corner"
+
+case "$action" in
+  desktop)
+    # Anything still showing here? Minimize it; otherwise bring things back.
+    here="$(hyprctl activeworkspace -j | jq -r .id)"
+    if hyprctl clients -j | jq -e --argjson ws "$here" 'any(.[]; .workspace.id == $ws)' >/dev/null; then
+      "$scripts/window-minimize-all"
+    else
+      "$scripts/window-restore-all"
+    fi
+    ;;
+  minimize) "$scripts/window-minimize-all" ;;
+  restore) "$scripts/window-restore-all" ;;
+  switcher) omarchy-shell -q taskbar switcherNext ;;
+  menu) omarchy-menu toggle ;;
+  lock) "$scripts/lock" ;;
+esac

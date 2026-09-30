@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Restore one minimized window as a normal tile and focus it.
+#
+#   window-restore [preferred-workspace-id]
+#   window-restore --address <window-address>
+#
+# Picks the most recently minimized window, preferring ones minimized from the
+# given workspace, or restores exactly the given window (taskbar clicks). The
+# restored window becomes the restore anchor: while it stays focused, Super+Up
+# keeps restoring instead of maximizing.
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
+state_file="$state_dir/minimized-windows.json"
+anchor_file="$state_dir/restore-anchor"
+mkdir -p "$state_dir"
+[[ -f "$state_file" ]] || printf '[]\n' > "$state_file"
+
+preferred=""
+requested=""
+if [[ "${1:-}" == "--address" ]]; then
+  requested="${2:?usage: window-restore --address <window-address>}"
+  [[ "$requested" == 0x* ]] || requested="0x$requested"
+else
+  preferred="${1:-}"
+fi
+
+clients="$(hyprctl clients -j)"
+active_window="$(hyprctl activewindow -j)"
+
+# Drop entries for windows that were closed or moved out of the scratchpad.
+hidden="$(jq '[.[] | select(.workspace.name == "special:scratchpad") | .address]' <<<"$clients")"
+temporary_file="$(mktemp "$state_dir/minimized-windows.XXXXXX")"
+jq --argjson hidden "$hidden" '[.[] | select(.address as $a | $hidden | index($a))]' \
+  "$state_file" > "$temporary_file"
+mv "$temporary_file" "$state_file"
+
+address=""
+if [[ -n "$requested" ]]; then
+  # Only a hidden window needs restoring; anything else just gets focus.
+  if jq -e --arg a "$requested" 'index($a)' <<<"$hidden" >/dev/null; then
+    address="$requested"
+  else
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$requested\" })" >/dev/null
+    exit 0
+  fi
+else
+  # When the scratchpad is open, restore the window being looked at.
+  address="$(jq -r 'select(.workspace.name == "special:scratchpad") | .address // empty' <<<"$active_window")"
+fi
+
+if [[ -z "$address" && -n "$preferred" ]]; then
+  address="$(jq -r --argjson ws "$preferred" \
+    '[.[] | select(.workspace == $ws)] | sort_by(.savedAt) | last | .address // empty' "$state_file")"
+fi
+if [[ -z "$address" ]]; then
+  address="$(jq -r 'sort_by(.savedAt) | last | .address // empty' "$state_file")"
+fi
+[[ -n "$address" ]] || exit 0
+
+workspace="$(jq -r --arg address "$address" '[.[] | select(.address == $address)] | last | .workspace // empty' "$state_file")"
+if [[ -z "$workspace" || "$workspace" == -* ]]; then
+  workspace="$(hyprctl activeworkspace -j | jq -r '.id')"
+fi
+
+hyprctl dispatch "hl.dsp.window.move({ workspace = \"$workspace\", follow = false, window = \"address:$address\" })" >/dev/null
+hyprctl dispatch "hl.dsp.focus({ window = \"address:$address\" })" >/dev/null
+
+temporary_file="$(mktemp "$state_dir/minimized-windows.XXXXXX")"
+jq --arg address "$address" '[.[] | select(.address != $address)]' "$state_file" > "$temporary_file"
+mv "$temporary_file" "$state_file"
+
+printf '%s\n' "$address" > "$anchor_file"
