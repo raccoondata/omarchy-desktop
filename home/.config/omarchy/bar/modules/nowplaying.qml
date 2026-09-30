@@ -313,6 +313,7 @@ BarWidget {
   // Taskbar & Desktop > Icons > Now playing: the apps' own icons, or the
   // desktop's line icons (where an app has one).
   property bool lineIcons: false
+  property bool cardVisualizer: true
   property string iconColorMode: "mono"
   FileView {
     path: root.omarchyDir + "/taskbar-settings.json"
@@ -325,6 +326,7 @@ BarWidget {
       root.equalizerStyle = String(o.equalizerStyle || "spectrum")
       root.clickMode = o.nowPlayingClick === "play" ? "play" : "card"
       root.lineIcons = o.iconsNowPlaying === "line"
+      root.cardVisualizer = o.nowPlayingVisualizer !== false
       root.iconColorMode = String(o.iconColorsNowPlaying || o.iconColors || "mono")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
@@ -623,48 +625,78 @@ BarWidget {
         }
       }
 
+      // The cycle: title, (scroll), artist, (scroll), back. A Timer waits
+      // between the steps and each movement is its own short animation: a
+      // running animation makes the bar redraw every frame, pauses and all,
+      // which at a high refresh rate is real CPU for a still picture.
+      property int stage: 0
+      readonly property bool shouldRun: marquee.visible && !root.popupOpen && !root.showingVolume && (marquee.alternate || marquee.titleOverflow > 0)
+      onShouldRunChanged: marquee.reset()
+      Component.onCompleted: marquee.reset()
+
       function reset() {
-        cycle.stop()
+        stageTimer.stop()
+        scrollAnim.stop()
+        fadeOut.stop()
+        fadeIn.stop()
         showingArtist = false
         label.x = 0
         label.opacity = 1
         lift.y = 0
-        if (cycle.shouldRun) cycle.start()
+        stage = 0
+        if (shouldRun) wait(5000)
       }
-      Connections {
-        target: root
-        function onTitleChanged() { marquee.reset() }
-        function onArtistChanged() { marquee.reset() }
+      function wait(ms) {
+        stageTimer.interval = ms
+        stageTimer.restart()
       }
-
-      SequentialAnimation {
-        id: cycle
-        readonly property bool shouldRun: marquee.visible && !root.popupOpen && !root.showingVolume && (marquee.alternate || marquee.titleOverflow > 0)
-        onShouldRunChanged: marquee.reset()
-        Component.onCompleted: if (shouldRun) start()
-        loops: Animation.Infinite
-
-        // The title.
-        PauseAnimation { duration: 5000 }
-        NumberAnimation { target: label; property: "x"; to: -marquee.titleOverflow; duration: marquee.titleOverflow > 0 ? Math.max(1200, marquee.titleOverflow * 28) : 0; easing.type: Easing.InOutSine }
-        PauseAnimation { duration: marquee.titleOverflow > 0 ? 1600 : 0 }
-        NumberAnimation { target: label; property: "opacity"; to: 0; duration: 240; easing.type: Easing.InQuad }
-        ScriptAction { script: { label.x = 0; marquee.showingArtist = marquee.alternate } }
-        ParallelAnimation {
-          NumberAnimation { target: label; property: "opacity"; to: 1; duration: 300; easing.type: Easing.OutCubic }
-          NumberAnimation { target: lift; property: "y"; from: Style.space(3); to: 0; duration: 300; easing.type: Easing.OutCubic }
+      // One step on. Stages: 0 title shown, 1 title scrolled, 2 switched to
+      // the artist, 3 artist shown, 4 artist scrolled, then back to 0.
+      function advance() {
+        if (!shouldRun) return
+        var artist = stage >= 3
+        var overflow = artist ? marquee.artistOverflow : marquee.titleOverflow
+        if (stage === 0 || stage === 3) {
+          if (artist && !marquee.alternate) { stage = 0; wait(5000); return }
+          stage += 1
+          if (overflow > 0) {
+            scrollAnim.to = -overflow
+            scrollAnim.duration = Math.max(1200, overflow * 28)
+            scrollAnim.restart()  // then a pause (scrollAnim.onFinished)
+          } else advance()
+        } else if (stage === 1 || stage === 4) {
+          stage = stage === 1 ? 2 : 5
+          fadeOut.restart()  // then swap and fade in (fadeOut.onFinished)
         }
-
-        // The artist (skipped when there's none).
-        PauseAnimation { duration: marquee.alternate ? 3500 : 0 }
-        NumberAnimation { target: label; property: "x"; to: -marquee.artistOverflow; duration: marquee.alternate && marquee.artistOverflow > 0 ? Math.max(1200, marquee.artistOverflow * 28) : 0; easing.type: Easing.InOutSine }
-        PauseAnimation { duration: marquee.alternate && marquee.artistOverflow > 0 ? 1600 : 0 }
-        NumberAnimation { target: label; property: "opacity"; to: marquee.alternate ? 0 : 1; duration: marquee.alternate ? 240 : 0; easing.type: Easing.InQuad }
-        ScriptAction { script: { label.x = 0; marquee.showingArtist = false } }
-        ParallelAnimation {
-          NumberAnimation { target: label; property: "opacity"; to: 1; duration: marquee.alternate ? 300 : 0; easing.type: Easing.OutCubic }
-          NumberAnimation { target: lift; property: "y"; from: marquee.alternate ? Style.space(3) : 0; to: 0; duration: marquee.alternate ? 300 : 0; easing.type: Easing.OutCubic }
+      }
+      Timer { id: stageTimer; onTriggered: marquee.advance() }
+      NumberAnimation {
+        id: scrollAnim
+        target: label
+        property: "x"
+        easing.type: Easing.InOutSine
+        onFinished: marquee.wait(1600)
+      }
+      NumberAnimation {
+        id: fadeOut
+        target: label
+        property: "opacity"
+        to: 0
+        duration: 240
+        easing.type: Easing.InQuad
+        onFinished: {
+          label.x = 0
+          // Stage 2: the artist next (when alternating); 5: the title again.
+          marquee.showingArtist = marquee.stage === 2 && marquee.alternate
+          marquee.stage = marquee.showingArtist ? 3 : 0
+          fadeIn.restart()
         }
+      }
+      ParallelAnimation {
+        id: fadeIn
+        NumberAnimation { target: label; property: "opacity"; to: 1; duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { target: lift; property: "y"; from: Style.space(3); to: 0; duration: 300; easing.type: Easing.OutCubic }
+        onFinished: marquee.wait(marquee.stage === 3 ? 3500 : 5000)
       }
     }
   }
@@ -692,7 +724,9 @@ BarWidget {
       height: parent.height
       color: root.accent
       opacity: root.playing ? 0.9 : 0.5
-      Behavior on width { NumberAnimation { duration: 950; easing.type: Easing.Linear } }
+      // No smoothing: the position moves once a second by well under a
+      // pixel, and a width animation would keep the bar redrawing every
+      // frame, all the time.
     }
   }
 
@@ -1263,6 +1297,30 @@ BarWidget {
               elide: Text.ElideRight
               lineHeight: 1.1
             }
+          }
+        }
+
+        // The visualizer: the equalizer style, card-wide (Taskbar & Desktop >
+        // Now Playing > Visualizer). Big pixels keep it to ~300 cells, and it
+        // only runs while the card is open and playing.
+        Item {
+          id: visualizer
+          visible: root.cardVisualizer
+          width: parent.width
+          height: visible ? vis.height : 0
+          opacity: card.enter * 0.85
+          Equalizer {
+            id: vis
+            anchors.horizontalCenter: parent.horizontalCenter
+            readonly property int cell: Math.max(6, Style.space(6))
+            pixel: cell
+            gap: 2
+            columns: Math.max(8, Math.floor((visualizer.width + gap) / (cell + gap)))
+            rows: 5
+            playing: root.playing && root.popupOpen && visualizer.visible
+            silent: !root.playing
+            style: root.equalizerStyle
+            color: root.accent
           }
         }
 

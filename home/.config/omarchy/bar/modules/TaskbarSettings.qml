@@ -1081,6 +1081,19 @@ Item {
         }
       }
       SettingRow {
+        label: "Visualizer in the card"
+        description: "the equalizer style, card-wide; runs only while the card is open"
+        ButtonGroup {
+          options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }]
+          value: npTab.prefs.nowPlayingVisualizer === false ? "false" : "true"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("nowPlayingVisualizer", v) }
+        }
+      }
+      SettingRow {
         label: "Volume while scrolling"
         description: (npTab.prefs.nowPlayingVolume || "center") === "side" ? "a bar, the percent at the right" : "the percent in the middle, the level growing out both sides"
         ButtonGroup {

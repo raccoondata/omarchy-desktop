@@ -1778,6 +1778,9 @@ BarWidget {
     onTriggered: programScan.running = true
   }
 
+  // Each window's title without its leading symbols (see windowtitlev2).
+  property var titleWords: ({})
+
   Timer {
     id: programScanThrottle
     interval: 3000
@@ -1818,8 +1821,20 @@ BarWidget {
         root.forget("0x" + data)
       } else if (name === "windowtitlev2") {
         var comma = data.indexOf(",")
-        if (comma > 0) root.noteTitle("0x" + data.slice(0, comma), data.slice(comma + 1))
-        if (!programScanThrottle.running) programScanThrottle.start()
+        if (comma > 0) {
+          var address = "0x" + data.slice(0, comma)
+          var title = data.slice(comma + 1)
+          root.noteTitle(address, title)
+          // A new program in a terminal retitles it; a spinner only changes
+          // the symbols in front. Rescan (a process list, a few ms of CPU)
+          // only when the words change, not a few times a second while an
+          // agent works.
+          var words = title.replace(/^[^A-Za-z0-9]+/, "")
+          if (root.titleWords[address] !== words) {
+            root.titleWords[address] = words
+            if (!programScanThrottle.running) programScanThrottle.start()
+          }
+        }
       }
     }
   }
