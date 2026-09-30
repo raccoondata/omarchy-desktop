@@ -1,0 +1,1 @@
+cd ~/.claude/skills/taskbar-icons/scripts; ./icon-set --list | tr '\n' ' '; echo; grep -o '"chrome": *"[^"]*"' ~/.config/omarchy/bar/modules/taskbar-icons.js | head -2; grep -o '"browser": *"[^"]*"' ~/.config/omarchy/bar/modules/taskbar-icons.js

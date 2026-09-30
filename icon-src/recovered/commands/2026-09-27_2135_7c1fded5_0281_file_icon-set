@@ -1,0 +1,65 @@
+# written to: ~/.claude/skills/taskbar-icons/scripts/icon-set
+#!/usr/bin/env python3
+"""Add or replace one icon in the taskbar icon set, refusing to write a broken file.
+
+  icon-set <name> <body-file>   add or replace <name> with the SVG body in <body-file>
+  icon-set --list               list the icon names already in the set
+"""
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+ICONS = pathlib.Path.home() / ".config/omarchy/bar/modules/taskbar-icons.js"
+ENTRY = re.compile(r'^  ("[a-z0-9_-]+"): ".*",?$')
+
+
+def entries(lines):
+    return [i for i, line in enumerate(lines) if ENTRY.match(line)]
+
+
+def parses(text):
+    # Evaluate the module the way QML would (minus the pragma) and list its icons.
+    check = "const icons_src = require('fs').readFileSync(0, 'utf8').replace('.pragma library', '');" \
+            "const icons = new Function(icons_src + '; return icons')();" \
+            "console.log(JSON.stringify(Object.keys(icons)))"
+    result = subprocess.run(["node", "-e", check], input=text, capture_output=True, text=True)
+    return json.loads(result.stdout) if result.returncode == 0 else None
+
+
+def main():
+    lines = ICONS.read_text().split("\n")
+    if sys.argv[1:] == ["--list"]:
+        print(" ".join(json.loads(ENTRY.match(lines[i]).group(1)) for i in entries(lines)))
+        return
+    if len(sys.argv) != 3:
+        sys.exit(__doc__)
+    name, body = sys.argv[1], pathlib.Path(sys.argv[2]).read_text().strip()
+    if not re.fullmatch(r"[a-z0-9_-]+", name):
+        sys.exit("icon names are lowercase letters, digits, - or _")
+    if re.search(r'(stroke|fill)="#', body):
+        sys.exit("hardcoded colour found: use %C for fills, strokes come from the wrapper")
+
+    idx = entries(lines)
+    line = f"  {json.dumps(name)}: {json.dumps(body)},"
+    existing = [i for i in idx if lines[i].startswith(f'  "{name}":')]
+    if existing:
+        lines[existing[0]] = line if lines[existing[0]].endswith(",") else line.rstrip(",")
+        action = "replaced"
+    else:
+        last = idx[-1]
+        if not lines[last].endswith(","):
+            lines[last] += ","
+        lines.insert(last + 1, line.rstrip(","))
+        action = "added"
+
+    text = "\n".join(lines)
+    names = parses(text)
+    if not names or name not in names:
+        sys.exit("refusing to write: the icon file would no longer parse")
+    ICONS.write_text(text)
+    print(f"{action} '{name}' ({len(names)} icons). Now map it in taskbar.qml and run: omarchy restart shell")
+
+
+main()
