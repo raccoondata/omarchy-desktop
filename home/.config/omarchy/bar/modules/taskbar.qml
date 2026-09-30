@@ -565,6 +565,9 @@ BarWidget {
     function hotCorner(corner: string): void { desktopFx.ripple(corner) }
     // Double-tap Super / Caps Lock (hypr/desktop/bindings.lua): the super menu.
     function superMenu(): void { superMenu.toggle() }
+    // The same without keyboard focus, for a look (screenshots, tests).
+    function superMenuPreview(text: string): void { superMenu.preview(text) }
+    function superMenuClose(): void { superMenu.close() }
     // Super+Space > Setup > Taskbar / Hot Corners: the settings window, on a
     // tab (taskbar | windows | desktop | icons | media |
     // screenshots | agents; older names like corners still work).

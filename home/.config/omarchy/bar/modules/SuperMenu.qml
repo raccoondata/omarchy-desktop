@@ -200,6 +200,123 @@ Item {
     dropIndex = -1
   }
 
+  // Resting the pointer on a tile: its description in the hint line.
+  property string hoverDetail: ""
+
+  // ------------------------------------------------------- search extras
+  //
+  // Besides apps, a search also offers (rows under the app results, in this
+  // order): a calculation ("24*7"), the desktop's settings tabs, Omarchy's
+  // menu actions ("theme", "restart wifi"; those shown only on a condition
+  // are left out), asking an agent, and the web.
+  property var menuActions: []
+  FileView {
+    id: omarchyMenuDefaults
+    path: (Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy") + "/default/omarchy/omarchy-menu.jsonc"
+    printErrors: false
+    onLoaded: menu.loadMenuActions()
+  }
+  FileView {
+    id: omarchyMenuUser
+    path: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: menu.loadMenuActions()
+  }
+  function parseJsonc(text) {
+    try {
+      var v = JSON.parse(String(text || "").replace(/^\s*\/\/[^\n]*(\n|$)/gm, "").replace(/,(\s*[}\]])/g, "$1"))
+      return v && v.items ? v.items : (v || {})
+    } catch (e) { return {} }
+  }
+  // Lower case, letters and digits only, so "wi-fi" matches "wifi".
+  function searchable(text) {
+    return String(text).toLowerCase().replace(/[^a-z0-9 ]+/g, "")
+  }
+  function loadMenuActions() {
+    var items = {}
+    var base = parseJsonc(omarchyMenuDefaults.text())
+    var mine = parseJsonc(omarchyMenuUser.text())
+    for (var k in base) items[k] = base[k]
+    for (var k2 in mine) {
+      var merged = {}
+      for (var a in (items[k2] || {})) merged[a] = items[k2][a]
+      for (var b in mine[k2]) merged[b] = mine[k2][b]
+      items[k2] = merged
+    }
+    var out = []
+    for (var id in items) {
+      var it = items[id]
+      if (!it || !it.action || it.when || it.provider) continue
+      var parts = id.split(".")
+      var trail = []
+      var titles = []
+      for (var i = 1; i < parts.length; i++) {
+        var parent = items[parts.slice(0, i).join(".")]
+        if (parent && parent.label) trail.push(String(parent.label))
+        // A submenu's heading, e.g. Update > Hardware says "Restart".
+        if (parent && parent.title) titles.push(String(parent.title))
+      }
+      var aliases = Array.isArray(it.aliases) ? it.aliases.join(" ") : String(it.aliases || "")
+      out.push({ label: String(it.label || id), glyph: String(it.icon || ""), font: String(it.iconFont || ""),
+                 detail: trail.join(" › ") || "Omarchy menu", action: String(it.action),
+                 words: menu.searchable(trail.join(" ") + " " + titles.join(" ") + " " + (it.label || "") + " " + (it.description || "") + " " + aliases) })
+    }
+    menuActions = out
+  }
+
+  readonly property var settingsTargets: [
+    { tab: "taskbar", label: "Taskbar settings", words: "taskbar icons group grouping click previews thumbnails dots badges order" },
+    { tab: "windows", label: "Window settings", words: "windows gather placing title bars titlebars come to you" },
+    { tab: "desktop", label: "Desktop settings", words: "desktop hot corners bar height motion effects snap mouse scroll speed super menu folders" },
+    { tab: "icons", label: "Icon settings", words: "icons line coloured colored colours colors launcher original" },
+    { tab: "media", label: "Media settings", words: "media now playing music equalizer visualizer album art effect glitch" },
+    { tab: "screenshots", label: "Screenshot settings", words: "screenshots screenshot print screen editor tensaku" },
+    { tab: "agents", label: "Agent settings", words: "agents agent claude codex ai" }
+  ]
+
+  // "24*7", "2^10", "(3+4)/2": the result, else null.
+  function calc(q) {
+    var s = String(q).trim()
+    if (!/^[\d\s.+\-*\/%^()x×÷,]+$/.test(s) || !/\d/.test(s) || !/[+\-*\/%^x×÷]/.test(s.replace(/^\s*-/, ""))) return null
+    s = s.replace(/[x×]/g, "*").replace(/÷/g, "/").replace(/\^/g, "**").replace(/,/g, "")
+    try {
+      var v = Function('"use strict"; return (' + s + ")")()
+      return typeof v === "number" && isFinite(v) ? Number(v.toPrecision(12)) : null
+    } catch (e) { return null }
+  }
+
+  readonly property var extraResults: {
+    var q = query.trim()
+    if (!q) return []
+    var out = []
+    var words = searchable(q).split(/\s+/).filter(function(w) { return w !== "" })
+    var matches = function(text) { return words.every(function(w) { return text.indexOf(w) !== -1 }) }
+    var value = calc(q)
+    if (value !== null) out.push({ kind: "calc", glyph: "=", label: String(value), detail: "Enter copies it" })
+    if (q.length >= 2) {
+      settingsTargets.filter(function(t) { return matches(searchable(t.label + " " + t.words)) }).slice(0, 2)
+        .forEach(function(t) { out.push({ kind: "settings", glyph: "\uf013", label: t.label, detail: "Taskbar & Desktop", tab: t.tab }) })
+      menuActions.filter(function(a) { return matches(a.words) }).slice(0, 4)
+        .forEach(function(a) { out.push({ kind: "action", glyph: a.glyph, font: a.font, label: a.label, detail: a.detail, action: a.action }) })
+    }
+    if (askAgents.length > 0) out.push({ kind: "ask", glyph: "\uf27a", label: "Ask " + askAgents[0].name, detail: "\u201c" + q + "\u201d", agent: askAgents[0].id })
+    out.push({ kind: "web", glyph: "\uf002", label: "Search the web", detail: "\u201c" + q + "\u201d" })
+    return out
+  }
+
+  function runExtra(r) {
+    if (!r) return
+    var q = query.trim()
+    if (r.kind === "ask") { ask(r.agent); return }
+    if (r.kind === "calc") Util.execArgv(["wl-copy", r.label])
+    else if (r.kind === "settings") Util.execArgv(["omarchy-shell", "-q", "taskbar", "settings", r.tab])
+    else if (r.kind === "action") Util.execDetached(r.action)
+    else if (r.kind === "web") Qt.openUrlExternally("https://www.google.com/search?q=" + encodeURIComponent(q))
+    close()
+  }
+
   // ----------------------------------------------------------------- ask
   readonly property var askAgents: taskbar.agents.length <= 5 ? taskbar.agents : taskbar.agents.slice(0, 5)
   function agentIcon(id) {
@@ -311,7 +428,17 @@ Item {
     opened = true
   }
 
+  // Opened for a look only (superMenuPreview IPC, for screenshots and
+  // tests): no keyboard focus, so it can't take anyone's typing.
+  property bool previewOnly: false
+  function preview(text) {
+    previewOnly = true
+    open()
+    query = text || ""
+  }
+
   function close() {
+    previewOnly = false
     opened = false
     query = ""
     armedAction = ""
@@ -361,6 +488,15 @@ Item {
 
   function moveSelection(dx, dy) {
     var count = tiles.length
+    var extras = query.length > 0 ? extraResults.length : 0
+    // In the rows under the results: up/down (or left/right) one at a time;
+    // up from the first goes back to the results.
+    if (extras > 0 && (selected >= count || (dy > 0 && selected + dy * columns >= count && Math.floor(selected / columns) === Math.floor((count - 1) / columns)))) {
+      var n = selected >= count ? selected + (dy !== 0 ? dy : dx) : count
+      if (n < count) n = Math.max(0, count - 1)
+      selected = Math.max(0, Math.min(count + extras - 1, n))
+      return
+    }
     if (count === 0) return
     var next = selected + dx + dy * columns
     // Up/down between the pinned and frequent grids: keep the column.
@@ -471,7 +607,44 @@ Item {
     for (var j = 0; j < systemActions.length; j++) {
       if (systemActions[j].label === hoveredAction) return systemActions[j].label
     }
-    return userName + (hostName ? "  ·  " + hostName : "")
+    return ""
+  }
+
+  // Folders in the footer (Desktop settings > Super menu), opened in Files;
+  // "settings" is this desktop's settings window.
+  readonly property var folderChoices: [
+    { key: "home", label: "Home", glyph: "\uf015", dir: "" },
+    { key: "downloads", label: "Downloads", glyph: "\uf019", dir: "XDG_DOWNLOAD_DIR" },
+    { key: "documents", label: "Documents", glyph: "\uf15c", dir: "XDG_DOCUMENTS_DIR" },
+    { key: "pictures", label: "Pictures", glyph: "\uf03e", dir: "XDG_PICTURES_DIR" },
+    { key: "music", label: "Music", glyph: "\uf001", dir: "XDG_MUSIC_DIR" },
+    { key: "videos", label: "Videos", glyph: "\uf008", dir: "XDG_VIDEOS_DIR" },
+    { key: "settings", label: "Taskbar & Desktop settings", glyph: "\uf013", dir: "" }
+  ]
+  readonly property var footerFolders: {
+    var keys = menu.taskbar.pref("superMenuFolders", ["home", "downloads", "documents", "pictures", "settings"])
+    if (!Array.isArray(keys)) keys = []
+    return folderChoices.filter(function(f) { return keys.indexOf(f.key) !== -1 })
+  }
+  property var userDirs: ({})
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/user-dirs.dirs"
+    printErrors: false
+    onLoaded: {
+      var dirs = {}
+      var re = /^(XDG_\w+_DIR)="(.*)"$/gm
+      var m
+      while ((m = re.exec(text())) !== null) dirs[m[1]] = m[2].replace("$HOME", Quickshell.env("HOME"))
+      menu.userDirs = dirs
+    }
+  }
+  function openFolder(f) {
+    if (f.key === "settings") Util.execArgv(["omarchy-shell", "-q", "taskbar", "settings", "taskbar"])
+    else {
+      var path = f.dir ? (userDirs[f.dir] || Quickshell.env("HOME")) : Quickshell.env("HOME")
+      Util.execArgv(["uwsm-app", "--", "nautilus", "--new-window", path])
+    }
+    close()
   }
 
   // ------------------------------------------------------------------- ui
@@ -486,7 +659,7 @@ Item {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "omarchy-super-menu"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: menu.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: menu.opened && !menu.previewOnly ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Rectangle {
       anchors.fill: parent
@@ -546,12 +719,12 @@ Item {
             menu.selected = Math.max(0, Math.min(menu.selected, menu.tiles.length - 1))
           } else if (event.key === Qt.Key_Escape) {
             menu.close()
-          } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                     && menu.query.trim() !== "" && (ctrl || menu.searchEntries.length === 0)) {
-            // Ctrl+Enter, or Enter with no app matching: ask the first agent.
+          } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && menu.query.trim() !== "") {
+            // Ctrl+Enter: ask the first agent.
             menu.ask("")
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            menu.launch(menu.tiles[menu.selected], (event.modifiers & Qt.ShiftModifier) !== 0)
+            if (menu.selected >= menu.tiles.length) menu.runExtra(menu.extraResults[menu.selected - menu.tiles.length])
+            else menu.launch(menu.tiles[menu.selected], (event.modifiers & Qt.ShiftModifier) !== 0)
           } else if (event.key === Qt.Key_Left) {
             menu.moveSelection(-1, 0)
           } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Tab) {
@@ -612,7 +785,7 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: menu.query.trim() === "" ? "type a question, or click for a new session"
-              : menu.searchEntries.length === 0 ? "Enter to ask" : "Ctrl+Enter to ask"
+              : "Ctrl+Enter to ask"
             color: Color.menu.text
             opacity: 0.45
             font.family: Style.font.menuFamily
@@ -633,7 +806,77 @@ Item {
           entries: menu.query.length > 0 ? menu.searchEntries : menu.pinnedEntries
           offset: 0
           reorderable: menu.query.length === 0
-          empty: menu.query.length > 0 ? "No apps match" : "Right-click an app below to pin it"
+          empty: menu.query.length > 0 ? (menu.extraResults.length > 0 ? "" : "No apps match") : "Right-click an app below to pin it"
+        }
+
+        // Besides apps: calculation, settings, Omarchy's actions, ask, web.
+        Column {
+          visible: menu.query.length > 0 && menu.extraResults.length > 0
+          width: parent.width
+          spacing: Style.space(2)
+          Repeater {
+            model: menu.query.length > 0 ? menu.extraResults : []
+            Rectangle {
+              id: extraRow
+              required property var modelData
+              required property int index
+              readonly property bool current: menu.selected === menu.tiles.length + index
+              width: parent.width
+              height: Style.space(34)
+              radius: Style.cornerRadius
+              color: current ? Color.menu.selectedBackground : (extraMouse.containsMouse ? Util.alpha(Color.menu.text, 0.05) : "transparent")
+              Text {
+                id: extraGlyph
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                width: Style.space(26)
+                horizontalAlignment: Text.AlignHCenter
+                text: extraRow.modelData.glyph
+                color: extraRow.current ? Color.menu.selectedText : Color.menu.text
+                opacity: 0.85
+                font.family: extraRow.modelData.font || Style.font.menuFamily
+                font.pixelSize: Style.font.body + 2
+              }
+              Text {
+                id: extraLabel
+                anchors.left: extraGlyph.right
+                anchors.leftMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, parent.width * 0.5)
+                text: extraRow.modelData.label
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: extraRow.current ? Color.menu.selectedText : Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.body
+                font.bold: extraRow.modelData.kind === "calc"
+              }
+              Text {
+                anchors.left: extraLabel.right
+                anchors.leftMargin: Style.space(10)
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                text: extraRow.modelData.detail
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                horizontalAlignment: Text.AlignRight
+                color: Color.menu.text
+                opacity: 0.45
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+              }
+              MouseArea {
+                id: extraMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onEntered: menu.selected = menu.tiles.length + extraRow.index
+                onClicked: menu.runExtra(extraRow.modelData)
+              }
+            }
+          }
         }
 
         SuperMenuSection {
@@ -674,6 +917,23 @@ Item {
               sourceSize.height: 104
               fillMode: Image.PreserveAspectCrop
               asynchronous: true
+              opacity: npFx.visible ? 0 : 1
+            }
+            ShaderEffect {
+              id: npFx
+              anchors.fill: npImage
+              visible: nowPlaying.fxChoice !== "off" && npImage.status === Image.Ready
+              property variant source: npImage
+              property real tick: 0
+              readonly property real mode: Math.max(0, nowPlaying.fxModes.indexOf(nowPlaying.fxChoice))
+              readonly property real aspect: 1
+              fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
+              Timer {
+                running: npFx.visible && menu.opened && nowPlaying.p !== null && nowPlaying.p.isPlaying
+                interval: 66
+                repeat: true
+                onTriggered: npFx.tick += 1
+              }
             }
             Text {
               anchors.centerIn: parent
@@ -685,10 +945,29 @@ Item {
               font.pixelSize: Style.font.title
             }
           }
+          // Media settings > Super menu: an equalizer and an art effect here
+          // (GPU, only while the menu is open and it's playing).
+          readonly property string eqChoice: String(menu.taskbar.pref("superMenuEq", "same"))
+          readonly property string fxChoice: String(menu.taskbar.pref("superMenuArtFx", "off"))
+          readonly property var fxModes: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar"]
+          Equalizer {
+            id: npEq
+            anchors.right: npControls.left
+            anchors.rightMargin: Style.space(14)
+            anchors.verticalCenter: parent.verticalCenter
+            visible: nowPlaying.eqChoice !== "off"
+            columns: 8
+            rows: 5
+            pixel: Math.max(3, Style.space(3))
+            gap: 1
+            playing: menu.opened && nowPlaying.p !== null && nowPlaying.p.isPlaying && visible
+            silent: !(nowPlaying.p && nowPlaying.p.isPlaying)
+            style: nowPlaying.eqChoice === "same" ? menu.taskbar.equalizerStyle : nowPlaying.eqChoice
+          }
           Column {
             anchors.left: npArt.right
             anchors.leftMargin: Style.space(12)
-            anchors.right: npControls.left
+            anchors.right: npEq.visible ? npEq.left : npControls.left
             anchors.rightMargin: Style.space(14)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(4)
@@ -809,12 +1088,53 @@ Item {
           width: parent.width
           height: Style.space(38)
 
-          Text {
+          // Folders (and settings), as square buttons like the system ones.
+          Row {
+            id: folderButtons
             anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(6)
+            Repeater {
+              model: menu.footerFolders
+              Rectangle {
+                id: folderButton
+                required property var modelData
+                readonly property bool hovered: folderMouse.containsMouse
+                width: Style.space(34)
+                height: width
+                radius: Style.cornerRadius
+                color: hovered ? Color.menu.selectedBackground : "transparent"
+                border.width: 1
+                border.color: Util.alpha(Color.menu.text, hovered ? 0.35 : 0.14)
+                Text {
+                  anchors.centerIn: parent
+                  text: folderButton.modelData.glyph
+                  color: folderButton.hovered ? Color.menu.selectedText : Color.menu.text
+                  opacity: folderButton.hovered ? 1 : 0.8
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body + 2
+                }
+                MouseArea {
+                  id: folderMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onEntered: menu.hoveredAction = folderButton.modelData.label
+                  onExited: if (menu.hoveredAction === folderButton.modelData.label) menu.hoveredAction = ""
+                  onClicked: menu.openFolder(folderButton.modelData)
+                }
+              }
+            }
+          }
+
+          Text {
+            anchors.left: folderButtons.right
+            anchors.leftMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: actionButtons.left
             anchors.rightMargin: Style.space(12)
-            text: menu.footerText
+            text: menu.hoveredAction !== "" && menu.armedAction === "" && menu.systemActions.every(function(a) { return a.label !== menu.hoveredAction })
+              ? menu.hoveredAction : menu.footerText
             textFormat: Text.PlainText
             elide: Text.ElideRight
             color: menu.armedAction !== "" ? Color.urgent : Color.menu.text
@@ -893,7 +1213,8 @@ Item {
 
         Text {
           width: parent.width
-          text: menu.query.length > 0
+          text: menu.hoverDetail !== "" ? menu.hoverDetail
+            : menu.query.length > 0
             ? "Enter opens (Shift: new window) · Ctrl+Enter asks an agent · + or Ctrl+P pins · Esc closes"
             : "Drag or Ctrl+Arrows to rearrange · +/− or Ctrl+P to pin · Shift: new window · type to find more"
           textFormat: Text.PlainText
