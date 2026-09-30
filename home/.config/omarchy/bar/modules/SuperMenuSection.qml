@@ -60,6 +60,7 @@ Column {
         readonly property int flatIndex: section.offset + index
         readonly property bool current: section.owner.selected === flatIndex
         readonly property bool pinned: section.owner.isPinned(modelData)
+        readonly property bool running: section.owner.opened && section.owner.windowsOf(modelData).length > 0
         readonly property bool dragging: section.reorderable && section.owner.dragIndex === index
         readonly property bool dropTarget: section.reorderable && section.owner.dragIndex >= 0
           && section.owner.dropIndex === index && section.owner.dragIndex !== index
@@ -107,6 +108,17 @@ Column {
           Text {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
+            // A dot under apps that are open, like the taskbar's.
+            Rectangle {
+              visible: tile.running
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.top: parent.bottom
+              anchors.topMargin: Style.space(3)
+              width: Style.space(4)
+              height: width
+              radius: width / 2
+              color: Color.accent
+            }
             text: section.owner.library ? section.owner.library.entryName(tile.modelData) : tile.modelData.name
             textFormat: Text.PlainText
             elide: Text.ElideRight
@@ -122,10 +134,29 @@ Column {
           hoverEnabled: true
           acceptedButtons: Qt.LeftButton | Qt.RightButton
           cursorShape: section.owner.dragIndex >= 0 ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-          onEntered: if (section.owner.dragIndex < 0) section.owner.selected = tile.flatIndex
+          onEntered: {
+            if (section.owner.dragIndex < 0) section.owner.selected = tile.flatIndex
+            detailDelay.restart()
+          }
+          onExited: {
+            detailDelay.stop()
+            section.owner.hoverDetail = ""
+          }
           onClicked: function(event) {
             if (event.button === Qt.RightButton) section.owner.togglePin(tile.modelData)
             else section.owner.launch(tile.modelData, (event.modifiers & Qt.ShiftModifier) !== 0)
+          }
+        }
+
+        // After a moment's rest: what the app is, in the hint line.
+        Timer {
+          id: detailDelay
+          interval: 500
+          onTriggered: {
+            var e = tile.modelData
+            var name = section.owner.library ? section.owner.library.entryName(e) : String(e.name || "")
+            var about = String(e.comment || e.genericName || "")
+            section.owner.hoverDetail = about ? name + "  —  " + about : ""
           }
         }
 

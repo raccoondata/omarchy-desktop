@@ -421,6 +421,68 @@ Item {
           }
         }
       }
+      Column {
+        width: (settings.cardWidth - settings.columnGap) / 2
+        spacing: Style.space(6)
+        Section { title: "Super menu" }
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "Buttons in its footer, beside the power ones"
+          color: Color.menu.text
+          opacity: 0.55
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.caption
+        }
+        Flow {
+          id: folderChips
+          width: parent.width
+          spacing: Style.space(6)
+          readonly property var chosen: {
+            var v = (settings.taskbar.prefs || {}).superMenuFolders
+            return Array.isArray(v) ? v : ["home", "downloads", "documents", "pictures", "settings"]
+          }
+          Repeater {
+            model: [{ key: "home", label: "Home" }, { key: "downloads", label: "Downloads" }, { key: "documents", label: "Documents" },
+                    { key: "pictures", label: "Pictures" }, { key: "music", label: "Music" }, { key: "videos", label: "Videos" },
+                    { key: "settings", label: "Settings" }]
+            Rectangle {
+              id: folderChip
+              required property var modelData
+              readonly property bool on: folderChips.chosen.indexOf(modelData.key) !== -1
+              width: chipText.implicitWidth + Style.space(18)
+              height: Style.space(26)
+              radius: Style.cornerRadius
+              color: on ? Util.alpha(Color.accent, 0.18) : (chipMouse.containsMouse ? Util.alpha(Color.menu.text, 0.06) : "transparent")
+              border.width: 1
+              border.color: on ? Color.accent : Util.alpha(Color.menu.text, 0.2)
+              Text {
+                id: chipText
+                anchors.centerIn: parent
+                text: folderChip.modelData.label
+                color: folderChip.on ? Color.accent : Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+              }
+              MouseArea {
+                id: chipMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  var all = ["home", "downloads", "documents", "pictures", "music", "videos", "settings"]
+                  var next = folderChips.chosen.slice()
+                  var at = next.indexOf(folderChip.modelData.key)
+                  if (at === -1) next.push(folderChip.modelData.key)
+                  else next.splice(at, 1)
+                  next.sort(function(a, b) { return all.indexOf(a) - all.indexOf(b) })
+                  settings.set("superMenuFolders", JSON.stringify(next))
+                }
+              }
+            }
+          }
+        }
+      }
       Loader { width: parent.width; sourceComponent: cornersTab }
       Loader { width: parent.width; sourceComponent: effectsTab }
       Loader { width: parent.width; sourceComponent: mouseTab }
@@ -1114,6 +1176,31 @@ Item {
           onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
         }
       }
+        SettingRow {
+          label: "Super menu equalizer"
+          description: "by the song in the Super menu"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
+            value: visTab.prefs.superMenuEq || "same"
+            onChanged: function(v) { settings.set("superMenuEq", v) }
+          }
+        }
+        SettingRow {
+          label: "Super menu art effect"
+          description: "on the song's art in the Super menu"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
+                      { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
+            value: visTab.prefs.superMenuArtFx || "off"
+            onChanged: function(v) { settings.set("superMenuArtFx", v) }
+          }
+        }
       }
 
       Column {
