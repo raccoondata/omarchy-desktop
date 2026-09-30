@@ -42,6 +42,13 @@ Item {
   function set(key, value) {
     Util.execArgv([dir + "/taskbar-setting", "set", key, String(value)])
   }
+  // Several settings in one write (one click that changes two keys; two
+  // separate writes could undo each other).
+  function setMany(pairs) {
+    var args = [dir + "/taskbar-setting", "set"]
+    for (var k in pairs) args.push(k, String(pairs[k]))
+    Util.execArgv(args)
+  }
 
   // ------------------------------------------------------- outside state
 
@@ -996,12 +1003,14 @@ Item {
             fontFamily: Style.font.menuFamily
             fontSize: Style.font.bodySmall
             onChanged: function(v) {
+              var pairs = {}
               if (v === "app") {
-                settings.set(placeRow.modelData.style, "app")
+                pairs[placeRow.modelData.style] = "app"
               } else {
-                settings.set("iconColors" + placeRow.modelData.place, v)
-                settings.set(placeRow.modelData.style, "line")
+                pairs["iconColors" + placeRow.modelData.place] = v
+                pairs[placeRow.modelData.style] = "line"
               }
+              settings.setMany(pairs)
             }
           }
         }
