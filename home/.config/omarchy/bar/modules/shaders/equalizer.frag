@@ -5,7 +5,7 @@
 // deterministic: "random" motion is hashed from (column, tick), so no state.
 // Compile: shaders/build (qsb). Styles, by index:
 //   0 spectrum  1 wave  2 embers  3 ripple  4 scope  5 mist
-//   6 fire      7 radar 8 swirl   9 plasma  10 rain
+//   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 flashlights
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -168,6 +168,28 @@ float brightness(float c, float r, float t, int s) {
         if (isLive()) v += (loudness - 0.35) * 3.0;
         float l = floor((v + 4.0) / 8.0 * 4.0) / 3.0;
         return l > 0.34 ? l : 0.0;
+    }
+    if (s == 11) {  // flashlights: two beams sweeping the dark from the lower corners
+        float b = 0.0;
+        float reachLen = isLive() ? 0.45 + 0.9 * loudness : 0.9;
+        for (int k = 0; k < 2; k++) {
+            float side = k == 0 ? -1.0 : 1.0;
+            vec2 origin = vec2(k == 0 ? -0.5 : cols - 0.5, -0.5);
+            // Sweeping, each at its own pace; aimed up and inwards.
+            float aim = radians(90.0 + side * (32.0 + 22.0 * sin(t * (0.09 + 0.03 * float(k)) + float(k) * 2.1)));
+            vec2 d = vec2(c, r) - origin;
+            d.y *= cols / max(1.0, rowCount) * 0.55;   // the grid is wide: widen the cone's look
+            float dist = length(d) / max(cols, 1.0);
+            float off = abs(atan(d.y, d.x) - aim);
+            float cone = smoothstep(radians(13.0), radians(4.0), off);
+            float fall = clamp(1.0 - dist / reachLen, 0.0, 1.0);
+            b = max(b, cone * fall);
+            // Dust in the beam.
+            if (cone > 0.3 && hash(vec2(c * 7.0 + r, floor(t * 0.7) + float(k))) > 0.93) b = max(b, 0.9 * fall + 0.1);
+        }
+        // Now and then one flickers, like a torch with a loose battery.
+        float flick = hash(vec2(floor(t * 0.5), 3.0)) > 0.94 ? 0.35 : 1.0;
+        return b * flick * (isLive() ? 0.55 + 0.9 * bass : 1.0);
     }
     if (s == 10) {  // rain: drops falling a row a tick, with a short trail
         float b = 0.0;

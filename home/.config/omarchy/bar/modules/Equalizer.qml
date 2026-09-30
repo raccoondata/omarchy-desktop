@@ -22,6 +22,7 @@ import "AudioLevels.js" as AudioLevels
 //   swirl     two spiral arms turning ("Ambience")
 //   plasma    a slow interference pattern in four steps ("Alchemy")
 //   rain      drops falling a row at a time
+//   flashlights  two beams sweeping the dark from the lower corners
 //   shuffle   a different one every 20 seconds, the same for every equalizer
 ShaderEffect {
   id: eq
@@ -35,7 +36,7 @@ ShaderEffect {
   property string style: "spectrum"
   property color color: Color.accent
 
-  readonly property var styles: ["spectrum", "wave", "embers", "ripple", "scope", "mist", "fire", "radar", "swirl", "plasma", "rain"]
+  readonly property var styles: ["spectrum", "wave", "embers", "ripple", "scope", "mist", "fire", "radar", "swirl", "plasma", "rain", "flashlights"]
   // Shuffle: the same style everywhere at once, by the clock.
   property string shown: style === "shuffle" ? styles[Math.floor(Date.now() / 20000) % styles.length] : style
 

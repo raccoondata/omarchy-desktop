@@ -327,10 +327,10 @@ BarWidget {
   function eqStyle(choice) { return choice === "same" || !choice ? root.equalizerStyle : choice }
   property string artEffect: "off"
   readonly property var visuals: ["pixel", "tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "off"]
-  readonly property var artEffects: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar"]
+  readonly property var artEffects: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar", "night", "torch"]
   readonly property var visualNames: ({ pixel: "Pixel equalizer", tunnel: "Tunnel", kaleido: "Kaleidoscope", starfield: "Starfield",
     battery: "Battery", lava: "Lava", lissajous: "Lissajous", aurora: "Aurora", off: "No visualizer" })
-  readonly property var artEffectNames: ({ off: "No art effect", glitch: "Glitch", chroma: "Chroma", pixel: "Pixelate", crt: "CRT", melt: "Melt", solar: "Solar" })
+  readonly property var artEffectNames: ({ off: "No art effect", glitch: "Glitch", chroma: "Chroma", pixel: "Pixelate", crt: "CRT", melt: "Melt", solar: "Solar", night: "Night vision", torch: "Flashlight" })
   function stepSetting(key, list, current) {
     var next = list[(list.indexOf(current) + 1) % list.length]
     Util.execArgv([root.omarchyDir + "/taskbar-setting", "set", key, next])
