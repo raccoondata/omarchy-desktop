@@ -18,6 +18,8 @@ layout(std140, binding = 0) uniform buf {
     float tick;
     float mode;
     float aspect;   // width / height
+    float live;     // 1: beatLevel is the music's (AudioLevels.js)
+    float beatLevel;
 };
 layout(binding = 1) uniform sampler2D source;
 
@@ -36,7 +38,7 @@ vec4 tex(vec2 uv) { return texture(source, clamp(uv, 0.0, 1.0)); }
 void main() {
     vec2 uv = qt_TexCoord0;
     float t = tick;
-    float b = beat(t);
+    float b = live > 0.5 ? beatLevel : beat(t);
     int m = int(mode + 0.5);
     vec4 c;
 

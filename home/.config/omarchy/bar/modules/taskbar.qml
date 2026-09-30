@@ -10,6 +10,7 @@ import "taskbar-icons.js" as TaskbarIcons
 import "TaskbarMatch.js" as TaskbarMatch
 import "IconColors.js" as IconColors
 import "MediaWindow.js" as MediaWindow
+import "AudioLevels.js" as AudioLevels
 import "TaskbarStatus.js" as TaskbarStatus
 
 // Taskbar built from Hyprland's own window list, so each entry knows its
@@ -971,6 +972,28 @@ BarWidget {
         root.rebuildAudio()
         if (root.audioPids === "") audioSnapshot.restart()
       }
+    }
+  }
+
+  // The music's spectrum for the equalizers and visualizers (AudioLevels.js):
+  // cava runs while something plays and a visualizer asked for it in the last
+  // two seconds, and stops otherwise (checked once a second). No cava
+  // installed: the visualizers keep their generated motion.
+  Process {
+    id: cava
+    command: ["stdbuf", "-oL", "cava", "-p", root.omarchyDir + "/cava.conf"]
+    stdout: SplitParser {
+      onRead: function(line) { AudioLevels.set(line) }
+    }
+  }
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.playbackStreams.length > 0 || cava.running
+    onTriggered: {
+      var wanted = Date.now() - AudioLevels.wantAt < 2000 && root.playbackStreams.length > 0
+      if (wanted && !cava.running) cava.running = true
+      else if (!wanted && cava.running) cava.running = false
     }
   }
 

@@ -11,6 +11,7 @@ import "MediaWindow.js" as MediaWindow
 import "taskbar-icons.js" as TaskbarIcons
 import "TaskbarMatch.js" as TaskbarMatch
 import "IconColors.js" as IconColors
+import "AudioLevels.js" as AudioLevels
 
 // Now playing, in place of Omarchy's Media widget (omarchy.media). Reads MPRIS
 // (any player: Edge/Chromium tabs, Spotify, mpv, ...) directly.
@@ -1191,12 +1192,20 @@ BarWidget {
               property real tick: 0
               readonly property real mode: Math.max(0, root.artEffects.indexOf(root.artEffect))
               readonly property real aspect: width / Math.max(1, height)
+              // The music's beat (AudioLevels.js), when cava is sending.
+              property real live: 0
+              property real beatLevel: 0
               fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
               Timer {
                 running: artFx.visible && root.popupOpen && root.playing
                 interval: 66
                 repeat: true
-                onTriggered: artFx.tick += 1
+                onTriggered: {
+                  AudioLevels.want()
+                  artFx.live = AudioLevels.live() ? 1 : 0
+                  artFx.beatLevel = AudioLevels.beat
+                  artFx.tick += 1
+                }
               }
             }
             // What right / middle click just switched to.

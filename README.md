@@ -66,8 +66,8 @@ back; your settings files stay).
   Media Player's (pixel equalizers, and scenes like Tunnel, Battery, Lava)
   and album-art effects (Glitch, CRT, Melt...): right-click the art for the
   next visualizer, middle-click for the next effect; Taskbar & Desktop >
-  Media picks them per place. All drawn on the GPU, and only while
-  something plays.
+  Media picks them per place. They follow the music (its spectrum, from
+  cava), are drawn on the GPU, and only run while something plays.
 - **Safety nets**: a backup lock screen if Omarchy's ever fails, a rescue
   console (Ctrl+Alt+Delete) that can undo recent config changes, and a local
   history of your desktop config (`~/.config/omarchy/config-history log`).

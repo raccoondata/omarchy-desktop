@@ -24,6 +24,8 @@ layout(std140, binding = 0) uniform buf {
     float grainPx; // pixel size, 1 = smooth
     vec4 inkA;     // the accent
     vec4 inkB;     // a second theme colour
+    float live;     // 1: beatLevel is the music's (AudioLevels.js)
+    float beatLevel;
 };
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -39,7 +41,7 @@ void main() {
     vec2 px = floor(qt_TexCoord0 * vec2(w, h) / grainPx) * grainPx + grainPx * 0.5;
     vec2 p = (px - vec2(w, h) * 0.5) / (h * 0.5);
     float t = tick / 15.0;   // seconds
-    float b = beat(tick);
+    float b = live > 0.5 ? beatLevel : beat(tick);
     int s = int(sceneIndex + 0.5);
     float v = 0.0;   // brightness
     float mixB = 0.0;  // how much of the second colour
