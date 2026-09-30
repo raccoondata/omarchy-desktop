@@ -1,0 +1,1 @@
+../../../icons/libreoffice.icon.py

@@ -1,0 +1,1 @@
+../../../icons/fastfetch.icon.py

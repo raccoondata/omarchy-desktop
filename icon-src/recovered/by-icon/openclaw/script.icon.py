@@ -1,0 +1,1 @@
+../../../icons/openclaw.icon.py

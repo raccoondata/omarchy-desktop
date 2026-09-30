@@ -1,0 +1,49 @@
+# written to: ~/.claude/skills/taskbar-icons/scripts/icon-new
+#!/usr/bin/env python3
+"""Start a new icon script from the template.
+
+  icon-new <name> "<what it depicts>" [<dir>]
+
+Writes <dir>/<name>.icon.py (default: the current directory, i.e. your scratch
+folder), laid out like every icon script: a docstring saying what it depicts,
+iconkit's builders, and icon(...) at the end. Draw in it, preview it with
+icon-preview, then install it with icon-set.
+Exit status: 0 written, 1 it exists already, 2 usage.
+"""
+import pathlib
+import re
+import sys
+
+TEMPLATE = '''"""{name}: {what}"""
+from iconkit import *
+
+# 24x24 grid, live area 2..22 (stroke included), centred on 12,12; see
+# ICON-SPEC.md. Builders: path(d), circle(cx, cy, r), rect(x, y, w, h, rx=),
+# ellipse(), dot(cx, cy, r) and solid(d) for solid marks, filled(d) for a
+# bolder filled-and-outlined mark; weight= on any of them for an exception
+# to the 1.75 stroke. Geometry: polar(), rays(), arc(), scallop(),
+# capsule(), rotate(), poly() - angles clockwise from 12 o'clock.
+
+icon(
+    circle(12, 12, 8.5),
+)
+'''
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) not in (2, 3) or args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(2)
+    name, what = args[0], args[1].strip()
+    if not re.fullmatch(r"[a-z0-9_-]+", name):
+        sys.exit("icon names are lowercase letters, digits, - or _")
+    out = pathlib.Path(args[2] if len(args) == 3 else ".") / f"{name}.icon.py"
+    if out.exists():
+        print(f"{out} exists already")
+        sys.exit(1)
+    out.write_text(TEMPLATE.format(name=name, what=what.rstrip(".") + "."))
+    print(f"wrote {out}")
+
+
+main()

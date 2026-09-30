@@ -1,0 +1,1 @@
+../../../icons/lazydocker.icon.py

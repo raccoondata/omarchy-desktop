@@ -1,0 +1,1 @@
+../../../icons/terminal.icon.py

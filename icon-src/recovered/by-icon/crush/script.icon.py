@@ -1,0 +1,1 @@
+../../../icons/crush.icon.py

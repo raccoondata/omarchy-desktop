@@ -1,0 +1,1 @@
+../../../icons/teams.icon.py

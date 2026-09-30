@@ -1,0 +1,1 @@
+../../../icons/vscode.icon.py

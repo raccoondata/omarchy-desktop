@@ -1,0 +1,7 @@
+"""omacut: Omacut: a film strip trimmed by two inward brackets."""
+from iconkit import *
+
+icon(
+    path("M8 8H4.5A1.5 1.5 0 0 0 3 9.5v5A1.5 1.5 0 0 0 4.5 16H8M16 8h3.5A1.5 1.5 0 0 1 21 9.5v5a1.5 1.5 0 0 1-1.5 1.5H16"),
+    path("M10.5 4.5H8v15h2.5M13.5 4.5H16v15h-2.5"),
+)

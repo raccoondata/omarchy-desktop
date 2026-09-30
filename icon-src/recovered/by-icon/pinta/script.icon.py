@@ -1,0 +1,1 @@
+../../../icons/pinta.icon.py

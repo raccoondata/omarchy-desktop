@@ -1,0 +1,1 @@
+../../../icons/browser.icon.py

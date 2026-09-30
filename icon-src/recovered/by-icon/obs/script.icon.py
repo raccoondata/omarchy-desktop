@@ -1,0 +1,1 @@
+../../../icons/obs.icon.py

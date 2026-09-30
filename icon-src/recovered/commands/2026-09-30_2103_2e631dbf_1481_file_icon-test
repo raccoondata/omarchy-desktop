@@ -1,0 +1,64 @@
+# written to: ~/.claude/skills/taskbar-icons/scripts/icon-test
+#!/usr/bin/env python3
+"""See icons on the real taskbar: open one throwaway window per window
+class, screenshot the bar, close them.
+
+  icon-test <out.png> <class>...
+
+Ghostty only accepts dotted classes (e.g. chrome-youtube.com__-Default), so
+anything else opens in foot, which takes any app-id. Classes Omarchy makes
+fullscreen (e.g. com.moonlight_stream.Moonlight) hide the bar: test those on
+their own, or not at all.
+Exit status: 0 screenshot written, 1 windows didn't open, 2 usage.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+
+
+def clients(marker):
+    out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout
+    return [c for c in json.loads(out or "[]") if c.get("title", "").startswith(marker)]
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) < 2 or args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(2)
+    out, classes = args[0], args[1:]
+    marker = f"ICONTEST-{os.getpid()}"
+    try:
+        for i, cls in enumerate(classes, 1):
+            title = f"{marker}-{i}"
+            cmd = (["ghostty", f"--class={cls}", f"--title={title}", "-e", "sleep", "60"] if "." in cls
+                   else ["foot", f"--app-id={cls}", f"--title={title}", "sleep", "60"])
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        for _ in range(50):
+            if len(clients(marker)) >= len(classes):
+                break
+            time.sleep(0.3)
+        else:
+            print(f"only {len(clients(marker))} of {len(classes)} windows opened")
+            sys.exit(1)
+        time.sleep(3)  # let the taskbar pick up classes and programs
+        for c in clients(marker):
+            print(f"{c['title']}: {c['class']}")
+        mon = json.loads(subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True).stdout)[0]
+        subprocess.run(["grim", "-g", f"{mon['x']},{mon['y']} {mon['width']}x40", out], check=True)
+        print(f"wrote {out}")
+    finally:
+        for c in clients(marker):
+            subprocess.run(["hyprctl", "dispatch", f'hl.dsp.window.close({{ window = "address:{c["address"]}" }})'],
+                           capture_output=True)
+        time.sleep(1)
+        for c in clients(marker):
+            try:
+                os.kill(c["pid"], 15)
+            except OSError:
+                pass
+
+
+main()

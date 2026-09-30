@@ -1,0 +1,1 @@
+../../../icons/document.icon.py

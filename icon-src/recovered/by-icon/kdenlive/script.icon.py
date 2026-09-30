@@ -1,0 +1,1 @@
+../../../icons/kdenlive.icon.py

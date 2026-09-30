@@ -1,0 +1,7 @@
+"""cursor: Cursor: an isometric cube."""
+from iconkit import *
+
+icon(
+    path("M12 3.2L19.6 7.6V16.4L12 20.8L4.4 16.4V7.6Z"),
+    path("M4.4 7.6L12 12L19.6 7.6M12 12V20.8"),
+)
