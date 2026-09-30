@@ -53,3 +53,6 @@
 .config/systemd/user/remote-screen.service
 .local/bin/rescue
 .local/share/nautilus-python/extensions/omarchy_agents.py
+.claude/skills/taskbar-icons/
+.local/share/icons/hicolor/256x256/apps/teams.png
+.local/share/icons/hicolor/256x256/apps/youtube-music.png
