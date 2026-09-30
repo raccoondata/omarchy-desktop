@@ -9,6 +9,8 @@
 //   4 crt     scanlines, a rolling band, a bulging screen, a flicker
 //   5 melt    the picture drips and wobbles downward
 //   6 solar   solarized flashes and a posterized, inverted bloom on the beat
+//   7 night   grainy green night-vision footage; the tape tracks on kicks
+//   8 torch   the picture in the dark, lit by a roaming flashlight
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -88,6 +90,28 @@ void main() {
         vec3 sol = abs(c.rgb - vec3(step(0.5, l)));        // solarize
         vec3 post = floor(c.rgb * 4.0) / 4.0;
         c.rgb = mix(post, 1.0 - sol, smoothstep(0.25, 0.9, b));
+    } else if (m == 7) {  // night vision
+        vec2 p = uv;
+        // A kick knocks the tape's tracking: a band slides sideways.
+        float band = floor(uv.y * 24.0);
+        if (b > 0.35 && hash(vec2(band, floor(t))) > 0.8) p.x += (hash(vec2(band, t)) - 0.5) * 0.08 * b;
+        vec4 src = tex(p);
+        float l = dot(src.rgb, vec3(0.299, 0.587, 0.114));
+        l = pow(l, 0.8) * (1.05 + 0.5 * b);                               // gain, blooming on the beat
+        l += (hash(uv * 400.0 + t) - 0.5) * 0.18;                          // grain
+        l *= 0.86 + 0.14 * sin(uv.y * 520.0);                              // scanlines
+        vec2 q = uv * 2.0 - 1.0;
+        l *= 1.0 - 0.55 * dot(q, q) * 0.5;                                 // tube vignette
+        c = vec4(vec3(0.32, 1.0, 0.42) * clamp(l, 0.0, 1.2), src.a);
+    } else if (m == 8) {  // torch
+        vec4 src = tex(uv);
+        // The beam wanders over the picture; wider when the music swells.
+        vec2 spot = vec2(0.5 + 0.32 * sin(t * 0.045) , 0.5 + 0.28 * sin(t * 0.063 + 1.3));
+        vec2 d = (uv - spot) * vec2(aspect, 1.0);
+        float radius = 0.22 + 0.16 * b;
+        float light = smoothstep(radius, radius * 0.35, length(d));
+        light *= hash(vec2(floor(t * 0.5), 5.0)) > 0.95 ? 0.4 : 1.0;      // a flicker
+        c = vec4(src.rgb * (0.05 + light * vec3(1.05, 1.0, 0.88)), src.a);
     } else {
         c = tex(uv);
     }
