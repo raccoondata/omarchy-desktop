@@ -32,6 +32,10 @@ set -euo pipefail
 #                                          (apps that draw their own, like Edge)
 #   taskbar-action titlebar on <classes-json>
 #   taskbar-action titlebar rules          regenerate hypr/titlebar-rules.lua
+#   taskbar-action rekey <old> <new>       an app's key changed (it got its own
+#                                          icon): rename it in the pins, order,
+#                                          workspace pins, title-bar exceptions
+#                                          and "comes to you" apps
 scripts="$HOME/.config/omarchy"
 pins="$HOME/.config/omarchy/taskbar-pins.json"
 wspins="$HOME/.config/omarchy/taskbar-workspaces.json"
@@ -322,6 +326,27 @@ case "$action" in
     read_pins | jq --arg key "$key" --arg icon "$icon" --arg name "$name" --argjson spec "$spec" \
       'map(select(.key != $key)) + [{key: $key, icon: $icon, name: $name} + $spec]' > "$tmp"
     mv "$tmp" "$pins"
+    ;;
+
+  rekey)
+    # An app's key is its icon name, so it changes when the app gets a new
+    # icon (btop: "monitor" -> "btop"); everything stored under the old key
+    # follows, or a pin would stop joining its own windows. Where the new key
+    # is already there, the old entry just goes.
+    old="$1" new="${2:?usage: taskbar-action rekey <old> <new>}"
+    [[ $old != "$new" ]] || exit 0
+    upd() {  # upd <file> <jq filter>
+      [[ -s $1 ]] || return 0
+      local tmp
+      tmp="$(mktemp)"
+      jq --arg o "$old" --arg n "$new" "$2" "$1" > "$tmp" && mv "$tmp" "$1" || rm -f "$tmp"
+    }
+    upd "$pins" 'if any(.[]; .key == $n) then map(select(.key != $o))
+                 else map(if .key == $o then .key = $n | .icon = $n else . end) end'
+    upd "$HOME/.config/omarchy/taskbar-order.json" 'if index($n) then map(select(. != $o)) else map(if . == $o then $n else . end) end'
+    upd "$wspins" 'if any(.[]; .key == $n) then map(select(.key != $o)) else map(if .key == $o then .key = $n else . end) end'
+    upd "$tboff" 'if any(.[]; .key == $n) then map(select(.key != $o)) else map(if .key == $o then .key = $n else . end) end'
+    upd "$HOME/.config/omarchy/taskbar-settings.json" 'if (.hereApps | type) == "array" then .hereApps |= (map(if . == $o then $n else . end) | unique) else . end'
     ;;
 
   unpin)

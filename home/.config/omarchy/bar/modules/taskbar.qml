@@ -72,6 +72,7 @@ BarWidget {
     printErrors: false
     onFileChanged: reload()
     onLoaded: {
+      pinKeyCheck.restart()
       try { root.prefs = JSON.parse(text()) || {} } catch (e) { }
     }
   }
@@ -179,6 +180,29 @@ BarWidget {
   // Pinned programs, kept by taskbar-action in taskbar-pins.json as
   // [{key, icon, name, url | command + cwd}].
   property var pins: []
+
+  // A pin's key is the icon its app had when pinned. When the app gets a new
+  // icon (an update gives btop its own), the pin would stop joining its own
+  // windows: rename it, and everything else stored under that key
+  // (taskbar-action rekey). Once the launcher entries are loaded.
+  property var pinKeysChecked: ({})
+  Timer {
+    id: pinKeyCheck
+    interval: 3000
+    onTriggered: root.checkPinKeys()
+  }
+  function checkPinKeys() {
+    for (var i = 0; i < pins.length; i++) {
+      var pin = pins[i]
+      if (!pin || !pin.key || !pin.desktop || String(pin.key).indexOf(":") !== -1) continue
+      var entry = DesktopEntries.byId(String(pin.desktop).replace(/\.desktop$/, ""))
+      var live = TaskbarMatch.forEntry(entry)
+      var pair = pin.key + ">" + live
+      if (!live || live === pin.key || pinKeysChecked[pair]) continue
+      pinKeysChecked[pair] = true
+      Util.execArgv([omarchyDir + "/taskbar-action", "rekey", pin.key, live])
+    }
+  }
 
   FileView {
     path: root.pinsPath
