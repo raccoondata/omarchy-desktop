@@ -411,7 +411,16 @@ Item {
   readonly property bool lineIcons: menu.taskbar.pref("iconsSuperMenu", "app") === "line"
   function tileIcon(entry) {
     var name = lineIcons ? menu.taskbar.lineIconForEntry(entry) : ""
-    return name ? TaskbarIcons.svg(name, menu.taskbar.lineColor(name, Color.menu.text)) : menu.library.iconSource(entry ? entry.icon : "")
+    if (name) return TaskbarIcons.svg(name, menu.taskbar.lineColor(name, Color.menu.text, menu.taskbar.colorModeFor("SuperMenu")))
+    // The app's own icon, skipping the launcher's line icons (Icons > App
+    // launcher puts them where Omarchy's icon index looks first).
+    var icon = entry ? String(entry.icon || "") : ""
+    var indexed = menu.library.iconIndex ? String(menu.library.iconIndex[icon] || "") : ""
+    if (indexed.indexOf("/omarchy-desktop-launcher-") !== -1) {
+      var themed = Quickshell.iconPath(icon, true)
+      if (themed) return themed
+    }
+    return menu.library.iconSource(icon)
   }
 
   // Omarchy's "suspend off" toggle hides Suspend, as in its own menu.

@@ -14,8 +14,9 @@ description: >
 The desktop draws apps with one line icon each, recoloured at runtime (theme
 foreground, accent when focused, faded when minimized): the taskbar, window
 previews and Super+Tab, and, if chosen in Taskbar & Desktop > Icons, the
-Super menu, now playing and Omarchy's menu (through an icon font built from
-the same icons). So each app needs exactly **one** drawing. Which window,
+Super menu, now playing, Omarchy's app launcher (files the taskbar writes to
+~/.icons, `~/.config/omarchy/launcher-icons`) and Omarchy's menu (through an
+icon font built from the same icons). So each app needs exactly **one** drawing. Which window,
 program or launcher gets which icon: `bar/modules/TaskbarMatch.js`.
 
 **Read `ICON-SPEC.md` (next to this file) first**: the drawing rules (grid,

@@ -963,65 +963,54 @@ Item {
 
       Section { title: "Icons" }
 
-      SettingRow {
-        label: "Taskbar and switcher"
-        description: "the taskbar, window previews and Super+Tab"
-        ButtonGroup {
-          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
-          value: icTab.prefs.iconsTaskbar === "app" ? "app" : "line"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("iconsTaskbar", v) }
-        }
+      Text {
+        width: parent.width
+        wrapMode: Text.WordWrap
+        text: "Line: the desktop's icons in the theme's colours. Coloured: each in its app's colour. Theme-coloured: that colour matched to your theme. Original: each app's own icon. Apps without a line icon keep their own."
+        color: Color.menu.text
+        opacity: 0.55
+        font.family: Style.font.menuFamily
+        font.pixelSize: Style.font.caption
       }
-      SettingRow {
-        label: "Super menu"
-        description: "the app grid; apps without a line icon keep their own"
-        ButtonGroup {
-          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
-          value: icTab.prefs.iconsSuperMenu === "line" ? "line" : "app"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("iconsSuperMenu", v) }
-        }
-      }
-      SettingRow {
-        label: "Now playing"
-        description: "the card and its volume mixer"
-        ButtonGroup {
-          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
-          value: icTab.prefs.iconsNowPlaying === "line" ? "line" : "app"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("iconsNowPlaying", v) }
-        }
-      }
-      SettingRow {
-        label: "Line icon colours"
-        description: (icTab.prefs.iconColors || "mono") === "brand" ? "each app's own colour, taken from its icon"
-          : (icTab.prefs.iconColors || "mono") === "palette" ? "each app's colour, moved to the nearest one in your theme"
-          : "the theme's text and accent colours"
-        ButtonGroup {
-          options: [{ value: "mono", label: "Theme" }, { value: "brand", label: "App colours" }, { value: "palette", label: "On-theme" }]
-          value: ["brand", "palette"].indexOf(icTab.prefs.iconColors) !== -1 ? icTab.prefs.iconColors : "mono"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("iconColors", v) }
+
+      Repeater {
+        model: [
+          { place: "Taskbar", style: "iconsTaskbar", styleDefault: "line", label: "Taskbar and switcher", description: "the taskbar, window previews and Super+Tab" },
+          { place: "SuperMenu", style: "iconsSuperMenu", styleDefault: "app", label: "Super menu", description: "the app grid" },
+          { place: "Launcher", style: "iconsLauncher", styleDefault: "app", label: "App launcher", description: "Omarchy's Super+Space list" },
+          { place: "NowPlaying", style: "iconsNowPlaying", styleDefault: "app", label: "Now playing", description: "the card and its volume mixer" }
+        ]
+        SettingRow {
+          id: placeRow
+          required property var modelData
+          readonly property string style: icTab.prefs[modelData.style] || modelData.styleDefault
+          readonly property string colors: icTab.prefs["iconColors" + modelData.place] || icTab.prefs.iconColors || "mono"
+          label: modelData.label
+          description: modelData.description
+          ButtonGroup {
+            options: [{ value: "mono", label: "Line" }, { value: "brand", label: "Coloured" },
+                      { value: "palette", label: "Theme-coloured" }, { value: "app", label: "Original" }]
+            value: placeRow.style === "app" ? "app" : (["brand", "palette"].indexOf(placeRow.colors) !== -1 ? placeRow.colors : "mono")
+            foreground: Color.menu.text
+            background: Color.menu.background
+            fontFamily: Style.font.menuFamily
+            fontSize: Style.font.bodySmall
+            onChanged: function(v) {
+              if (v === "app") {
+                settings.set(placeRow.modelData.style, "app")
+              } else {
+                settings.set("iconColors" + placeRow.modelData.place, v)
+                settings.set(placeRow.modelData.style, "line")
+              }
+            }
+          }
         }
       }
       SettingRow {
         label: "Omarchy menu"
-        description: "Super+Alt+Space: the entries that are apps (agents, browsers, editors, Install / Remove)"
+        description: "Super+Alt+Space: its entries that are apps (Setup > Default, Install / Remove); one colour, it draws icons as text"
         ButtonGroup {
-          options: [{ value: "line", label: "Line icons" }, { value: "omarchy", label: "Omarchy's" }]
+          options: [{ value: "line", label: "Line" }, { value: "omarchy", label: "Original" }]
           value: icTab.prefs.iconsOmarchyMenu === "line" ? "line" : "omarchy"
           foreground: Color.menu.text
           background: Color.menu.background
