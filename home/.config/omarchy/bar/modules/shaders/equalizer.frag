@@ -176,7 +176,7 @@ float brightness(float c, float r, float t, int s) {
             float side = k == 0 ? -1.0 : 1.0;
             vec2 origin = vec2(k == 0 ? -0.5 : cols - 0.5, -0.5);
             // Sweeping, each at its own pace; aimed up and inwards.
-            float aim = radians(90.0 - side * (32.0 + 22.0 * sin(t * (0.09 + 0.03 * float(k)) + float(k) * 2.1)));
+            float aim = radians(90.0 + side * (32.0 + 22.0 * sin(t * (0.09 + 0.03 * float(k)) + float(k) * 2.1)));
             vec2 d = vec2(c, r) - origin;
             d.y *= cols / max(1.0, rowCount) * 0.55;   // the grid is wide: widen the cone's look
             float dist = length(d) / max(cols, 1.0);

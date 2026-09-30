@@ -1099,7 +1099,8 @@ Item {
       readonly property var eqStyles: [{ value: "spectrum", label: "Spectrum" }, { value: "wave", label: "Wave" }, { value: "embers", label: "Embers" },
                     { value: "ripple", label: "Ripple" }, { value: "scope", label: "Scope" }, { value: "mist", label: "Mist" },
                     { value: "fire", label: "Fire" }, { value: "radar", label: "Radar" }, { value: "swirl", label: "Swirl" },
-                    { value: "plasma", label: "Plasma" }, { value: "rain", label: "Rain" }, { value: "shuffle", label: "Shuffle" }]
+                    { value: "plasma", label: "Plasma" }, { value: "rain", label: "Rain" }, { value: "flashlights", label: "Flashlights" },
+                    { value: "shuffle", label: "Shuffle" }]
 
       Column {
         width: parent.columnWidth
@@ -1171,7 +1172,8 @@ Item {
           showLabel: false
           fontFamily: Style.font.menuFamily
           options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
-                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
+                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" },
+                    { value: "night", label: "Night vision" }, { value: "torch", label: "Flashlight" }]
           value: visTab.prefs.nowPlayingArtFx || "off"
           onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
         }
@@ -1196,7 +1198,8 @@ Item {
             showLabel: false
             fontFamily: Style.font.menuFamily
             options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
-                      { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
+                      { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" },
+                    { value: "night", label: "Night vision" }, { value: "torch", label: "Flashlight" }]
             value: visTab.prefs.superMenuArtFx || "off"
             onChanged: function(v) { settings.set("superMenuArtFx", v) }
           }
@@ -1228,6 +1231,7 @@ Item {
               { value: "swirl", label: "Swirl" },
               { value: "plasma", label: "Plasma" },
               { value: "rain", label: "Rain" },
+              { value: "flashlights", label: "Flashlights" },
               { value: "shuffle", label: "Shuffle" }
             ]
 

@@ -957,7 +957,7 @@ Item {
           // (GPU, only while the menu is open and it's playing).
           readonly property string eqChoice: String(menu.taskbar.pref("superMenuEq", "same"))
           readonly property string fxChoice: String(menu.taskbar.pref("superMenuArtFx", "off"))
-          readonly property var fxModes: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar"]
+          readonly property var fxModes: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar", "night", "torch"]
           Equalizer {
             id: npEq
             anchors.right: npControls.left
