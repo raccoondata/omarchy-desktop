@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The Omarchy bar's height ([bar] size-horizontal in ~/.config/omarchy/shell.toml;
+# the shell reloads it live). Used by the taskbar settings window.
+#   bar-height get        -> number (default 36)
+#   bar-height set <24-64>
+
+toml="$HOME/.config/omarchy/shell.toml"
+
+case "${1:-get}" in
+  get)
+    v="$(sed -n 's/^size-horizontal *= *\([0-9]*\).*/\1/p' "$toml" 2>/dev/null | head -1)"
+    echo "${v:-36}"
+    ;;
+  set)
+    v="${2:?usage: bar-height set <24-64>}"
+    [[ $v =~ ^[0-9]+$ ]] && (( v >= 24 && v <= 64 )) || { echo "24-64 only" >&2; exit 2; }
+    touch "$toml"
+    if grep -q '^size-horizontal' "$toml"; then
+      sed -i "s/^size-horizontal *=.*/size-horizontal = $v/" "$toml"
+    elif grep -q '^\[bar\]' "$toml"; then
+      sed -i "/^\[bar\]/a size-horizontal = $v" "$toml"
+    else
+      printf '\n[bar]\nsize-horizontal = %s\n' "$v" >> "$toml"
+    fi
+    ;;
+  *) exit 2 ;;
+esac

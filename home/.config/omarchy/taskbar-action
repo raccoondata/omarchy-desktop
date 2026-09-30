@@ -1,0 +1,460 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Taskbar right-click / middle-click actions (bar/modules/taskbar.qml).
+#
+#   taskbar-action new      <address>...   another window of the program (the first
+#                                          window's); on the workspace that holds all of
+#                                          them, switching there, else on the current one
+#   taskbar-action newhere  <address>...   another window of the program, on the
+#                                          workspace you're on (apps set to "open on
+#                                          the current workspace", e.g. Files)
+#   taskbar-action minimize <address>...   via window-minimize, so Super+Up restores
+#   taskbar-action restore  <address>...
+#   taskbar-action maximize <address>      toggle maximized
+#   taskbar-action float    <address>      toggle floating/tiled
+#   taskbar-action here     <address>...   move to the focused workspace
+#                                          (here, move and tile lay the windows out
+#                                          evenly when nothing else is tiled there: gather)
+#   taskbar-action move <ws|empty> <address>...  send to a workspace and follow (menu chips, drag and drop)
+#   taskbar-action tile     <address>...   tile them on a workspace of their own (double-click a group)
+#   taskbar-action close    <address>...
+#   taskbar-action focus    <address>      focus/restore, leaving the pointer where it is
+#   taskbar-action pin      <key> <icon> <name> <address>   remember how to start it
+#   taskbar-action unpin    <key>
+#   taskbar-action launch   <key>          start a pinned program
+#   taskbar-action wspin <key> <ws> <name> <classes-json> <address>...
+#                                          always open the program on workspace <ws>
+#                                          (moves its open windows there now, quietly)
+#   taskbar-action wsunpin  <key>
+#   taskbar-action titlebar off <key> <name> <classes-json>
+#                                          no hyprbars title bar for these window classes
+#                                          (apps that draw their own, like Edge)
+#   taskbar-action titlebar on <classes-json>
+#   taskbar-action titlebar rules          regenerate hypr/titlebar-rules.lua
+scripts="$HOME/.config/omarchy"
+pins="$HOME/.config/omarchy/taskbar-pins.json"
+wspins="$HOME/.config/omarchy/taskbar-workspaces.json"
+wsrules="$HOME/.config/hypr/workspace-pins.lua"
+tboff="$HOME/.config/omarchy/titlebar-off.json"
+tbrules="$HOME/.config/hypr/titlebar-rules.lua"
+action="${1:?usage: taskbar-action <action> <address>...}"
+shift
+(( $# > 0 )) || exit 0
+
+dispatch() { hyprctl dispatch "$1" >/dev/null; }
+# Options from Taskbar & Desktop > Windows (~/.config/omarchy/taskbar-settings.json).
+pref() {  # pref <key> <default>
+  jq -r --arg k "$1" --arg d "$2" 'if has($k) and .[$k] != null then .[$k] | tostring else $d end' \
+    "$HOME/.config/omarchy/taskbar-settings.json" 2>/dev/null || echo "$2"
+}
+client() { hyprctl clients -j | jq -c --arg a "$1" '.[] | select(.address == $a)'; }
+workspace_of() { hyprctl clients -j | jq -r --arg a "$1" '.[] | select(.address == $a) | .workspace.name'; }
+focus() { dispatch "hl.dsp.focus({ window = \"address:$1\" })"; }
+is_minimized() { [[ "$(workspace_of "$1")" == special:scratchpad ]]; }
+
+# How to start another copy of a window's program, as JSON:
+#   {"url"}      web apps (they share the browser's process, so the URL is
+#                rebuilt from the class chrome-<host>__<path_with_underscores>-<profile>)
+#   {"desktop"}  apps with an application entry for their window class
+#                (StartupWMClass, or <class>.desktop): launched like the app menu does
+#   {"command", "cwd"}  otherwise the window's own command line and directory
+# Terminals are left to the command line: their entry would open a plain
+# shell, not the program running in the window.
+desktop_for_class() {
+  local class="$1" dir file
+  [[ "$class" =~ ^(com\.mitchellh\.ghostty|Alacritty|kitty|foot)$ ]] && return 1
+  for dir in "$HOME/.local/share/applications" /usr/local/share/applications /usr/share/applications; do
+    [[ -f "$dir/$class.desktop" ]] && { echo "$class.desktop"; return 0; }
+  done
+  for dir in "$HOME/.local/share/applications" /usr/local/share/applications /usr/share/applications; do
+    file="$(grep -lisx "StartupWMClass=$class" "$dir"/*.desktop 2>/dev/null | head -1)"
+    [[ -n "$file" ]] && { basename "$file"; return 0; }
+  done
+  return 1
+}
+
+launch_spec() {
+  local window class pid site path cwd desktop
+  window="$(client "$1")"
+  [[ -n "$window" ]] || return 1
+  class="$(jq -r .class <<<"$window")"
+  pid="$(jq -r .pid <<<"$window")"
+  # (msedge-/brave-: the same, when the default browser is Edge or Brave.)
+  if [[ "$class" =~ ^(chrome|msedge|brave)-(.+)-[^-]+$ ]]; then
+    site="${BASH_REMATCH[2]}"
+    path=""
+    [[ "$site" == *__* ]] && path="${site#*__}"
+    jq -n --arg url "https://${site%%__*}/${path//_//}" '{url: $url}'
+    return
+  fi
+  # Apps whose entry is D-Bus activated can just raise an existing window when
+  # launched again; ask them for a new one directly.
+  case "$class" in
+    org.gnome.Nautilus) jq -n '{command: ["nautilus", "--new-window"]}'; return ;;
+  esac
+  if desktop="$(desktop_for_class "$class")"; then
+    jq -n --arg desktop "$desktop" '{desktop: $desktop}'
+    return
+  fi
+  cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || echo "$HOME")"
+  # Chromium-style apps rewrite their argv into one space-separated string;
+  # split that back into words.
+  jq -R -s --arg cwd "$cwd" '{command: (split("\u0000") | map(select(length > 0))
+    | if length == 1 and (.[0] | test(" ")) then (.[0] | split(" ") | map(select(length > 0))) else . end), cwd: $cwd}' \
+    < "/proc/$pid/cmdline"
+}
+
+run_spec() {
+  local url desktop cwd
+  url="$(jq -r '.url // empty' <<<"$1")"
+  [[ -n "$url" ]] && exec omarchy-launch-webapp "$url"
+  desktop="$(jq -r '.desktop // empty' <<<"$1")"
+  if [[ -n "$desktop" ]]; then
+    # Same as Omarchy's launcher: gtk-launch resolves every entry id (uwsm-app
+    # rejects some), inside a uwsm app scope.
+    setsid -f uwsm-app -- gtk-launch "$desktop" >/dev/null 2>&1
+    return
+  fi
+  mapfile -t cmd < <(jq -r '.command[]' <<<"$1")
+  (( ${#cmd[@]} > 0 )) || return 1
+  cwd="$(jq -r '.cwd // empty' <<<"$1")"
+  cd "$cwd" 2>/dev/null || cd "$HOME"
+  setsid -f uwsm-app -- "${cmd[@]}" >/dev/null 2>&1
+}
+
+read_pins() { [[ -s "$pins" ]] && cat "$pins" || echo '[]'; }
+read_wspins() { [[ -s "$wspins" ]] && cat "$wspins" || echo '[]'; }
+
+# Workspace pins -> Hyprland window rules (hypr/workspace-pins.lua, required by
+# hypr/desktop.lua), then reload so they apply to the next window opened.
+write_wsrules() {
+  local tmp
+  tmp="$(mktemp "$wsrules.XXXXXX")"
+  {
+    echo "-- Generated by ~/.config/omarchy/taskbar-action from"
+    echo "-- ~/.config/omarchy/taskbar-workspaces.json. Change it from the taskbar"
+    echo "-- (right-click an icon > Always open on workspace), not here."
+    read_wspins | jq -r '.[] | select((.classes | length) > 0)
+      | "o.window([[^(" + (.classes | map(gsub("(?<c>[.^$*+?()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("|"))
+        + ")$]], { workspace = \"" + (.workspace | tostring) + "\" }) -- " + .name'
+  } > "$tmp"
+  mv "$tmp" "$wsrules"
+  hyprctl reload >/dev/null
+}
+
+# The workspace holding all the given windows (minimized ones aside), or
+# nothing if they're spread out or all minimized.
+single_workspace() {
+  local group
+  group="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  hyprctl clients -j | jq -r --argjson group "$group" '
+    [.[] | select(.address as $a | $group | index($a)) | .workspace.id | select(. > 0)] | unique
+    | if length == 1 then .[0] else empty end'
+}
+
+# A workspace the given windows already have to themselves (the one holding
+# most of them; lowest number on a tie), or nothing.
+own_workspace() {
+  local group
+  group="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  hyprctl clients -j | jq -r --argjson group "$group" '
+    map(select(.workspace.id > 0)) as $all
+    | ($all | map(select(.address as $a | $group | index($a) | not)) | map(.workspace.id) | unique) as $taken
+    | [$all[] | select(.address as $a | $group | index($a)) | .workspace.id | select(. as $w | $taken | index($w) | not)]
+    | group_by(.) | map({id: .[0], n: length}) | sort_by(-.n, .id) | .[0].id // empty'
+}
+
+# Lowest-numbered workspace with no windows besides the given ones.
+free_workspace() {
+  local group taken id=1
+  group="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  taken="$(hyprctl clients -j | jq -c --argjson group "$group" \
+    '[.[] | select(.address as $a | $group | index($a) | not) | .workspace.id | select(. > 0)] | unique')"
+  while jq -e --argjson id "$id" 'index($id)' <<<"$taken" >/dev/null; do
+    id=$((id + 1))
+  done
+  echo "$id"
+}
+
+# Gathering windows onto a workspace (tile, here, move). Left alone, each one
+# moves in next to whatever's focused there, which makes a lopsided spiral (a
+# half, a quarter, an eighth...) that changes with focus. When the workspace
+# will hold only these windows (floating ones aside), lay them out evenly
+# instead: 2 side by side, 3 one big and two stacked, 4 a 2x2 grid, then the
+# biggest tiles split next. How: take them off the workspace, then bring them
+# back one at a time, each one splitting a chosen window (dwindle splits the
+# focused window 50/50, side by side when it's wider than tall). With other
+# windows there, they just join in. Minimized ones come back, maximized and
+# floating ones become tiles.
+# Before windows arrive on a workspace: un-maximize (or un-fullscreen) what's
+# there, so they tile side by side. Omarchy has Hyprland make an arriving
+# window take over a maximized one's spot instead (misc.on_focus_under_
+# fullscreen = 1), so a window brought here seemed to open "full screen",
+# hiding the one you were using. Only for the taskbar's actions; Hyprland's
+# rule stays as it is elsewhere (a fullscreen video isn't kicked out by some
+# other window taking focus).
+make_room() {  # make_room <workspace name> [address to leave alone]...
+  local ws="$1"
+  shift
+  local skip w
+  skip="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  while IFS=$'\t' read -r w mode; do
+    [[ -n $w ]] || continue
+    focus "$w"
+    case "$mode" in
+      1) dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })' ;;
+      *) dispatch 'hl.dsp.window.fullscreen({ mode = "fullscreen" })' ;;
+    esac
+  done < <(hyprctl clients -j | jq -r --arg ws "$ws" --argjson skip "$skip" \
+    '.[] | select(.workspace.name == $ws and .fullscreen > 0 and (.address as $a | $skip | index($a) | not)) | "\(.address)\t\(.fullscreen)"')
+}
+
+gather() {  # gather <workspace name> <address>...
+  local ws="$1"
+  shift
+  local addrs=("$@") a window group others i j anchor
+  local depth=()
+  for a in "${addrs[@]}"; do
+    is_minimized "$a" && "$scripts/window-restore" --address "$a"
+    window="$(client "$a")"
+    [[ -n $window ]] || continue
+    if (( $(jq -r '.fullscreen // 0' <<<"$window") > 0 )); then
+      focus "$a"
+      dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })'
+    fi
+    if [[ "$(jq -r .floating <<<"$window")" == true ]]; then
+      focus "$a"
+      dispatch 'hl.dsp.window.float({ action = "toggle" })'
+    fi
+  done
+  make_room "$ws" "${addrs[@]}"
+  group="$(printf '%s\n' "${addrs[@]}" | jq -R . | jq -s .)"
+  others="$(hyprctl clients -j | jq --arg ws "$ws" --argjson group "$group" \
+    '[.[] | select(.workspace.name == $ws and (.floating | not) and (.address as $a | $group | index($a) | not))] | length')"
+  # Option gatherLayout: "even" (default) or "plain" (Hyprland places them).
+  if (( others > 0 || ${#addrs[@]} < 2 )) || [[ "$(pref gatherLayout even)" == plain ]]; then
+    for a in "${addrs[@]}"; do
+      dispatch "hl.dsp.window.move({ workspace = \"$ws\", window = \"address:$a\", follow = false })"
+    done
+    return
+  fi
+  for a in "${addrs[@]}"; do
+    dispatch "hl.dsp.window.move({ workspace = \"special:taskbar-arrange\", window = \"address:$a\", follow = false })"
+  done
+  dispatch "hl.dsp.focus({ workspace = \"$ws\" })"
+  # Each one splits the biggest tile so far (the fewest splits deep), the
+  # newest on a tie, so the first window stays the big one: 3 = it plus two
+  # stacked, 4 = a 2x2 grid.
+  for (( i = 0; i < ${#addrs[@]}; i++ )); do
+    if (( i > 0 )); then
+      anchor=0
+      for (( j = 1; j < i; j++ )); do
+        (( depth[j] <= depth[anchor] )) && anchor=$j
+      done
+      focus "${addrs[anchor]}"
+      depth[anchor]=$(( depth[anchor] + 1 ))
+      depth[i]=${depth[anchor]}
+    else
+      depth[0]=0
+    fi
+    dispatch "hl.dsp.window.move({ workspace = \"$ws\", window = \"address:${addrs[i]}\", follow = false })"
+  done
+}
+
+read_tboff() { [[ -s "$tboff" ]] && cat "$tboff" || echo '[]'; }
+
+# Title-bar exceptions -> hyprbars no_bar rules (hypr/titlebar-rules.lua,
+# loaded by hypr/desktop/titlebars.lua once the plugin is in), then reload.
+write_tbrules() {
+  local tmp
+  tmp="$(mktemp "$tbrules.XXXXXX")"
+  {
+    echo "-- Generated by ~/.config/omarchy/taskbar-action from"
+    echo "-- ~/.config/omarchy/titlebar-off.json: apps that draw their own title bar,"
+    echo "-- so hyprbars leaves them alone. Change it from the taskbar (right-click an"
+    echo "-- icon > Hide/Show title bar), not here."
+    read_tboff | jq -r '.[] | select((.classes | length) > 0)
+      | "hl.window_rule({ match = { class = [[^(" + (.classes | map(gsub("(?<c>[.^$*+?()\\[\\]{}|\\\\])"; "\\\(.c)")) | join("|"))
+        + ")$]] }, [\"hyprbars:no_bar\"] = true }) -- " + .name'
+  } > "$tmp"
+  mv "$tmp" "$tbrules"
+  hyprctl reload >/dev/null
+}
+
+case "$action" in
+  new)
+    spec="$(launch_spec "$1")" || exit 0
+    # New windows open on the active workspace, so go to the program's
+    # workspace first when all its windows are on one.
+    target="$(single_workspace "$@")"
+    # Option newWindowPlace: "app" (that workspace, default) or "here".
+    [[ "$(pref newWindowPlace app)" == here ]] && target=""
+    if [[ -n "$target" && "$target" != "$(hyprctl activeworkspace -j | jq -r .id)" ]]; then
+      dispatch "hl.dsp.focus({ workspace = \"$target\" })"
+    fi
+    make_room "$(hyprctl activeworkspace -j | jq -r .name)"
+    run_spec "$spec"
+    ;;
+
+  newhere)
+    spec="$(launch_spec "$1")" || exit 0
+    make_room "$(hyprctl activeworkspace -j | jq -r .name)"
+    run_spec "$spec"
+    ;;
+
+  focus)
+    # Taskbar clicks and scrolling: Hyprland warps the pointer onto a window it
+    # focuses, so put it back and leave it on the taskbar.
+    pos="$(hyprctl cursorpos)"
+    "$scripts/window-restore" --address "$1"
+    x="${pos%%,*}" y="${pos##* }"
+    if [[ "$x" =~ ^-?[0-9]+$ && "$y" =~ ^-?[0-9]+$ ]]; then
+      dispatch "hl.dsp.cursor.move({ x = $x, y = $y })"
+    fi
+    ;;
+
+  pin)
+    # pin <key> <icon> <name> <address>
+    key="$1" icon="${2:-app}" name="${3:-$1}"
+    spec="$(launch_spec "${4:?usage: taskbar-action pin <key> <icon> <name> <address>}")" || exit 1
+    tmp="$(mktemp)"
+    read_pins | jq --arg key "$key" --arg icon "$icon" --arg name "$name" --argjson spec "$spec" \
+      'map(select(.key != $key)) + [{key: $key, icon: $icon, name: $name} + $spec]' > "$tmp"
+    mv "$tmp" "$pins"
+    ;;
+
+  unpin)
+    tmp="$(mktemp)"
+    read_pins | jq --arg key "$1" 'map(select(.key != $key))' > "$tmp"
+    mv "$tmp" "$pins"
+    ;;
+
+  wspin)
+    # wspin <key> <workspace> <name> <classes-json> <address>...
+    key="$1" workspace="${2:?usage: taskbar-action wspin <key> <ws> <name> <classes-json> <address>...}"
+    name="${3:-$1}" classes="${4:-[]}"
+    shift 4 || shift $#
+    tmp="$(mktemp)"
+    read_wspins | jq --arg key "$key" --arg name "$name" --argjson ws "$workspace" --argjson classes "$classes" \
+      'map(select(.key != $key)) + [{key: $key, name: $name, classes: $classes, workspace: $ws}]' > "$tmp"
+    mv "$tmp" "$wspins"
+    write_wsrules
+    # Its open windows go there too, without taking you along (minimized ones
+    # stay minimized).
+    for address in "$@"; do
+      is_minimized "$address" && continue
+      dispatch "hl.dsp.window.move({ workspace = \"$workspace\", window = \"address:$address\", follow = false })"
+    done
+    label="$workspace"; [[ "$workspace" == 10 ]] && label=0
+    omarchy-notification-send -u low "$name will always open on workspace $label" >/dev/null 2>&1 || true
+    ;;
+
+  wsunpin)
+    name="$(read_wspins | jq -r --arg key "$1" 'map(select(.key == $key)) | first | .name // empty')"
+    tmp="$(mktemp)"
+    read_wspins | jq --arg key "$1" 'map(select(.key != $key))' > "$tmp"
+    mv "$tmp" "$wspins"
+    write_wsrules
+    [[ -n "$name" ]] && { omarchy-notification-send -u low "$name opens on the current workspace again" >/dev/null 2>&1 || true; }
+    ;;
+
+  titlebar)
+    # titlebar off <key> <name> <classes-json> | on <classes-json> | rules
+    case "$1" in
+      off)
+        tmp="$(mktemp)"
+        read_tboff | jq --arg key "$2" --arg name "${3:-$2}" --argjson classes "${4:-[]}" \
+          'map(select(.key != $key)) + [{key: $key, name: $name, classes: $classes}]' > "$tmp"
+        mv "$tmp" "$tboff"
+        note="Title bar hidden for ${3:-$2}"
+        ;;
+      on)
+        name="$(read_tboff | jq -r --argjson classes "${2:-[]}" \
+          'map(select(any(.classes[]; . as $c | $classes | index($c)))) | map(.name) | join(", ")')"
+        note="Title bar back for ${name:-this app}"
+        tmp="$(mktemp)"
+        read_tboff | jq --argjson classes "${2:-[]}" \
+          'map(.classes -= $classes) | map(select((.classes | length) > 0))' > "$tmp"
+        mv "$tmp" "$tboff"
+        ;;
+      rules) ;;
+      *) echo "usage: taskbar-action titlebar off <key> <name> <classes-json> | on <classes-json> | rules" >&2; exit 1 ;;
+    esac
+    write_tbrules
+    [[ -n ${note:-} ]] && { omarchy-notification-send -u low "$note" "Undo from the same right-click menu" >/dev/null 2>&1 || true; }
+    ;;
+
+  launch)
+    spec="$(read_pins | jq -c --arg key "$1" 'map(select(.key == $key)) | first // empty')"
+    [[ -n "$spec" ]] || exit 1
+    run_spec "$spec"
+    ;;
+
+  minimize)
+    for address in "$@"; do
+      is_minimized "$address" && continue
+      focus "$address"
+      # window-minimize walks the ladder: a maximized window only un-maximizes.
+      for _ in 1 2; do
+        "$scripts/window-minimize"
+        is_minimized "$address" && break
+      done
+    done
+    ;;
+
+  restore)
+    for address in "$@"; do
+      is_minimized "$address" && "$scripts/window-restore" --address "$address"
+    done
+    ;;
+
+  maximize)
+    is_minimized "$1" && "$scripts/window-restore" --address "$1"
+    focus "$1"
+    dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })'
+    ;;
+
+  float)
+    focus "$1"
+    dispatch 'hl.dsp.window.float({ action = "toggle" })'
+    ;;
+
+  here)
+    target="$(hyprctl activeworkspace -j | jq -r .name)"
+    gather "$target" "$@"
+    focus "$1"
+    ;;
+
+  move)
+    # move <workspace|empty> <address>...: send windows there and follow them.
+    # Minimized windows come back as they go.
+    target="${1:?usage: taskbar-action move <workspace|empty> <address>...}"
+    shift
+    [[ "$target" == empty ]] && target="$(free_workspace "$@")"
+    gather "$target" "$@"
+    dispatch "hl.dsp.focus({ workspace = \"$target\" })"
+    focus "$1"
+    ;;
+
+  tile)
+    # Give the group a workspace of its own, tile the windows there, and switch
+    # to it. If it already has one (nothing else on it), stay there.
+    target="$(own_workspace "$@")"
+    [[ -n "$target" ]] || target="$(free_workspace "$@")"
+    gather "$target" "$@"
+    dispatch "hl.dsp.focus({ workspace = \"$target\" })"
+    focus "$1"
+    ;;
+
+  close)
+    for address in "$@"; do
+      dispatch "hl.dsp.window.close({ window = \"address:$address\" })"
+    done
+    ;;
+
+  *)
+    echo "unknown action: $action" >&2
+    exit 1
+    ;;
+esac

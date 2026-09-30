@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_file="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/minimized-windows.json"
+[[ -f "$state_file" ]] || exit 0
+
+# Restore each recorded window. Stop if an entry is stale so this can never
+# loop forever after an application has been closed while minimized.
+while :; do
+  before="$(jq 'length' "$state_file")"
+  (( before > 0 )) || exit 0
+
+  "$HOME/.config/omarchy/window-restore"
+  sleep 0.08
+
+  after="$(jq 'length' "$state_file")"
+  (( after < before )) || exit 0
+done

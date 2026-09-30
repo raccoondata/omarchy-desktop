@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Loads the Hyprland plugins once the desktop is up (run from
+# hypr/desktop/autostart.lua; never from the config itself, since hyprbars reloads the
+# config as it loads and that hung the login once):
+#
+#   libhyprdragevents.so  window drags -> taskbar (drop on a workspace number,
+#                         snap at screen edges). Always loaded.
+#   hyprbars              title bars, styled by hypr/desktop/titlebars.lua. Prefers the
+#                         locally fixed build, falls back to the stock AUR one.
+#
+# Both local builds live in ~/.local/lib/hyprland/ and come from
+# ~/.config/omarchy/hyprland-plugins/build (rerun it after a Hyprland update).
+# A single `hyprctl plugin load` right at "hyprland.start" silently didn't
+# stick on 2026-09-29, so this waits for the shell, checks `hyprctl plugin
+# list`, and retries. Log: ~/.local/state/omarchy/titlebars.log
+#
+# Kill switches (e.g. from a TTY, or `rescue`, after an update breaks one):
+#   touch ~/.config/omarchy/plugins-off     load no plugins at all
+#   touch ~/.config/omarchy/titlebars-off   just no title bars
+
+lib="$HOME/.local/lib/hyprland"
+dragevents="$lib/libhyprdragevents.so"
+fixed="$lib/libhyprbars-fixed.so"
+stock=/usr/lib/libhyprbars.so
+log="$HOME/.local/state/omarchy/titlebars.log"
+mkdir -p "${log%/*}"
+# Keep the log small: past 256 KB, keep its last 500 lines.
+if [[ -f $log ]] && (( $(stat -c %s "$log") > 262144 )); then
+  tail -n 500 "$log" > "$log.tmp" && mv "$log.tmp" "$log"
+fi
+exec >>"$log" 2>&1
+echo "--- $(date '+%F %T') titlebars-load"
+
+loaded() { hyprctl plugin list 2>/dev/null | grep -q "^Plugin $1 "; }
+
+notify() { omarchy-notification-send -u low "$1" "$2" >/dev/null 2>&1 || true; }
+
+# Let startup settle: wait (up to 30s) for the Omarchy shell, then a moment more.
+for _ in {1..60}; do
+  omarchy-shell shell ping >/dev/null 2>&1 && break
+  sleep 0.5
+done
+sleep 1
+
+[[ -e $HOME/.config/omarchy/plugins-off ]] && { echo "plugins-off present, loading nothing"; exit 0; }
+
+# Window-drag events first, so its listener runs before hyprbars' own.
+if [[ -e $dragevents ]] && ! loaded dragevents; then
+  for attempt in {1..5}; do
+    echo "dragevents attempt $attempt: $(hyprctl plugin load "$dragevents" 2>&1)"
+    sleep 1
+    loaded dragevents && break
+  done
+  loaded dragevents || notify "Window drops are off" \
+    "The drag plugin didn't load (Hyprland updated?). Rebuild: ~/.config/omarchy/hyprland-plugins/build"
+fi
+
+[[ -e $HOME/.config/omarchy/titlebars-off ]] && { echo "titlebars-off present, skipping title bars"; exit 0; }
+
+for attempt in {1..5}; do
+  if loaded hyprbars; then
+    echo "loaded"
+    exit 0
+  fi
+  for plugin in "$fixed" "$stock"; do
+    [[ -e $plugin ]] || continue
+    echo "hyprbars attempt $attempt: $plugin: $(hyprctl plugin load "$plugin" 2>&1)"
+    sleep 1
+    if loaded hyprbars; then
+      [[ $plugin == "$stock" && -e $fixed ]] && notify "Title bars: using the stock plugin" \
+        "Rebuild the fixed one for this Hyprland: ~/.config/omarchy/hyprland-plugins/build"
+      break
+    fi
+  done
+  sleep 1
+done
+
+loaded hyprbars && { echo "loaded"; exit 0; }
+echo "gave up"
+exit 1

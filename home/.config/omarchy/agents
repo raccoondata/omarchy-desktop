@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# The coding agents on this machine, for everything that hands something to an
+# agent: the screenshot bar, the ask card (bar/modules/AskCard.qml: files from
+# Files' right-click, selected text), and the Files menu. The agents are the
+# ones Omarchy knows (omarchy-default-agent), whichever are installed. Two are
+# "primary" (shown as buttons); the rest go under "More".
+#
+#   agents list                      installed agents as JSON, primaries first:
+#                                    [{"id","name","primary","efforts":[levels],"effort"}]
+#                                    (efforts empty: no choice, Omarchy's flags)
+#   agents primary [<a> <b>]         print or set the two primaries
+#   agents effort <id> [<level>]     print or remember an agent's effort level
+#   agents launch-primary <1|2>      a new session of the first/second agent
+#   agents command <id> [--prompt t] its command line, one argument per line
+#   agents launch <id> [--cwd <dir>] [--prompt <text>] [--image <file>]...
+#                    [--effort <level>]
+#                                    a new session in its own terminal window
+#                                    (class org.omarchy.<id>), unattended like
+#                                    `omarchy agent`, with the prompt sent
+#   agents sessions                  open agent sessions as JSON:
+#                                    [{"agent","name","address","title"}]
+#   agents paste <address> <text>    type <text> into that session's input
+#                                    (pasted, not sent: it might be showing a
+#                                    permission prompt)
+#
+# Built on Omarchy's agent support: the agents and their names come from
+# omarchy-default-agent, the first primary IS Omarchy's default agent
+# (~/.config/omarchy/defaults/agent, as Setup > Default Agent sets it), and
+# sessions start through omarchy-agent, so each agent gets Omarchy's own flags
+# for running unattended. Claude Code and Codex are started here instead (for
+# the effort level and images), with the same flags unless agents.conf says
+# otherwise (flags.claude=...). The second primary: agents.conf second=<id>.
+
+conf="$HOME/.config/omarchy/agents.conf"
+default_file="$HOME/.config/omarchy/defaults/agent"
+
+# id<TAB>name for every agent Omarchy knows, from omarchy-default-agent.
+catalog() {
+  grep -oE 'agent="[^"]+"; name="[^"]+"' /usr/bin/omarchy-default-agent 2>/dev/null |
+    sed -E 's/agent="([^"]+)"; name="([^"]+)"/\1\t\2/'
+}
+name_of() {
+  local n
+  n="$(catalog | awk -F'\t' -v id="$1" '$1 == id { print $2; exit }')"
+  # Shorter where Omarchy's is a mouthful for a button.
+  case "$1" in claude) n="Claude" ;; cursor-agent) n="Cursor" ;; copilot) n="Copilot" ;; esac
+  echo "${n:-$1}"
+}
+# Window classes can't all take a dash; cursor-agent -> org.omarchy.cursor_agent.
+class_of() { echo "org.omarchy.${1//-/_}"; }
+
+# The package Omarchy installs an agent from (mise), from omarchy-default-agent.
+package_of() {
+  local pkg
+  pkg="$(awk -v id="$1" '
+    $0 ~ "agent=\"" id "\"" { found = 1 }
+    found && match($0, /agent_package="[^"]+"/) { print substr($0, RSTART + 15, RLENGTH - 16); exit }
+    found && /;;/ { exit }' /usr/bin/omarchy-default-agent 2>/dev/null)"
+  echo "${pkg:-$1}"
+}
+
+# Installed ones, in Omarchy's order, by Omarchy's own test: its commands in
+# ~/.local/bin are placeholders that install the agent on first run, so an
+# agent counts when mise has its package, or ~/.local/bin holds your own
+# install instead of the placeholder. Hermes and OpenClaw: their installers say.
+installed() {
+  local a
+  while IFS=$'\t' read -r a _; do
+    case "$a" in
+      hermes) omarchy-install-hermes-cli --check &>/dev/null && echo "$a" ;;
+      openclaw) omarchy-install-openclaw-cli --check &>/dev/null && echo "$a" ;;
+      *)
+        if [[ -x $HOME/.local/bin/$a ]] && { [[ -L $HOME/.local/bin/$a ]] || ! grep -q '^mise use -g' "$HOME/.local/bin/$a"; }; then
+          echo "$a"
+        elif mise where "$(package_of "$a")" &>/dev/null; then
+          echo "$a"
+        fi ;;
+    esac
+  done < <(catalog)
+  return 0
+}
+
+primaries() {
+  local second="" a out=() list
+  [[ -f $conf ]] && second="$(sed -n 's/^second=//p' "$conf" | tail -1)"
+  mapfile -t list < <(installed)
+  # Omarchy's default agent, then the configured second, then Claude Code and
+  # Codex, then whatever's installed, until there are two.
+  for a in "$(omarchy-default-agent 2>/dev/null)" "$second" claude codex "${list[@]}"; do
+    [[ -n $a ]] || continue
+    printf '%s\n' "${list[@]}" | grep -qx -- "$a" || continue
+    printf '%s\n' "${out[@]}" | grep -qx -- "$a" && continue
+    out+=("$a")
+    (( ${#out[@]} == 2 )) && break
+  done
+  printf '%s\n' "${out[@]}"
+  return 0
+}
+
+# Effort levels per agent (from each CLI's own help), the default here, and
+# the flag. "" = the agent's own default (no flag). Remembered choices:
+# agents.conf effort.<id>=<level>.
+efforts_of() {
+  case "$1" in
+    claude|codex) echo "low medium high xhigh max" ;;
+    grok) echo "low medium high xhigh" ;;
+  esac
+}
+effort_default() { case "$1" in claude|codex) echo max ;; esac; }
+effort_of() {
+  local e=""
+  [[ -f $conf ]] && e="$(sed -n "s/^effort\.$1=//p" "$conf" | tail -1)"
+  [[ -n $e && " $(efforts_of "$1") " == *" $e "* ]] || e="$(effort_default "$1")"
+  echo "$e"
+}
+
+# Extra flags for a new session: agents.conf flags.<id>=..., else Omarchy's
+# (/usr/bin/omarchy-agent). E.g. flags.claude=--dangerously-skip-permissions
+flags_of() {  # flags_of <id> <Omarchy's flags>
+  local f=""
+  [[ -f $conf ]] && f="$(grep "^flags\.$1=" "$conf" | tail -1)"
+  if [[ -n $f ]]; then echo "${f#*=}"; else echo "$2"; fi
+}
+
+# The command line for a new unattended session, with an optional prompt.
+command_for() {  # command_for <id> <prompt> <effort> <image>...
+  local id="$1" prompt="$2" effort="$3"
+  shift 3
+  local images=("$@") img shim
+  cmd=()
+  case "$id" in
+    claude)
+      read -ra cmd <<< "claude $(flags_of claude '--permission-mode auto')"
+      [[ -n $effort ]] && cmd+=(--effort "$effort")
+      [[ -n $prompt ]] && cmd+=(-- "$prompt") ;;
+    codex)
+      read -ra cmd <<< "codex $(flags_of codex '--approve-for-me')"
+      [[ -n $effort ]] && cmd+=(-c "model_reasoning_effort=$effort")
+      for img in "${images[@]}"; do cmd+=(-i "$img"); done
+      [[ -n $prompt ]] && cmd+=(-- "$prompt") ;;
+    *)
+      # omarchy-agent starts Omarchy's default agent with that agent's flags;
+      # a one-line stand-in for omarchy-default-agent, first on PATH, makes it
+      # start this one instead.
+      shim="${XDG_RUNTIME_DIR:-/tmp}/omarchy-agents/$id"
+      mkdir -p "$shim"
+      printf '#!/bin/sh\necho %s\n' "$id" > "$shim/omarchy-default-agent"
+      chmod +x "$shim/omarchy-default-agent"
+      cmd=(env "PATH=$shim:$PATH" omarchy-agent --inline)
+      [[ -n $prompt ]] && cmd+=(--prompt "$prompt")
+      # omarchy-agent has no way to pass an effort level, so Grok with one
+      # picked starts directly (Omarchy's flags plus the level).
+      if [[ $id == grok && -n $effort ]]; then
+        cmd=(grok --permission-mode bypassPermissions --reasoning-effort "$effort")
+        [[ -n $prompt ]] && cmd+=(-- "$prompt")
+      fi ;;
+  esac
+  return 0
+}
+
+case "${1:-}" in
+  list)
+    # Cached until an install, the default agent or the config changes (the
+    # mise checks take a second; Files asks every time it opens a menu).
+    cache="${XDG_RUNTIME_DIR:-/tmp}/omarchy-agents/list.json"
+    stamp="$(stat -c %Y "$0" "$HOME/.local/share/mise/installs" "$default_file" "$conf" "$HOME/.local/bin" 2>/dev/null | paste -sd.)"
+    if [[ -s $cache && "$(head -1 "$cache.stamp" 2>/dev/null)" == "$stamp" ]]; then
+      cat "$cache"
+      exit 0
+    fi
+    mapfile -t prim < <(primaries)
+    {
+      for a in "${prim[@]}"; do printf '%s\t%s\ttrue\t%s\t%s\n' "$a" "$(name_of "$a")" "$(efforts_of "$a")" "$(effort_of "$a")"; done
+      installed | while read -r a; do
+        printf '%s\n' "${prim[@]}" | grep -qx -- "$a" && continue
+        printf '%s\t%s\tfalse\t%s\t%s\n' "$a" "$(name_of "$a")" "$(efforts_of "$a")" "$(effort_of "$a")"
+      done | sort -t$'\t' -k2,2f
+    } | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t")
+        | {id: .[0], name: .[1], primary: (.[2] == "true"),
+           efforts: ((.[3] // "") | split(" ") | map(select(length > 0))), effort: (.[4] // "")})' > "$cache.tmp"
+    mkdir -p "$(dirname "$cache")"
+    mv "$cache.tmp" "$cache" 2>/dev/null || { mkdir -p "$(dirname "$cache")"; mv "$cache.tmp" "$cache"; }
+    echo "$stamp" > "$cache.stamp"
+    cat "$cache"
+    ;;
+
+  primary)
+    # primary <first> <second>: the first becomes Omarchy's default agent.
+    if (( $# >= 3 )); then
+      mkdir -p "$(dirname "$default_file")"
+      printf '%s\n' "$2" > "$default_file"
+      tmp="$(mktemp)"
+      { [[ -f $conf ]] && grep -v '^second=' "$conf"; echo "second=$3"; } > "$tmp"
+      mv "$tmp" "$conf"
+    fi
+    primaries | paste -sd, -
+    ;;
+
+  effort)
+    id="${2:?agent id}"
+    if [[ -n ${3:-} ]]; then
+      [[ " $(efforts_of "$id") " == *" $3 "* ]] || { echo "$id has no effort level $3 (it has: $(efforts_of "$id"))" >&2; exit 2; }
+      tmp="$(mktemp)"
+      { [[ -f $conf ]] && grep -v "^effort\.$id=" "$conf"; echo "effort.$id=$3"; } > "$tmp"
+      mv "$tmp" "$conf"
+    fi
+    effort_of "$id"
+    ;;
+
+  command)
+    # command <id> [--prompt <text>]: the command line a new session would
+    # run, one argument per line (safe-mode-agents starts it outside Omarchy).
+    id="${2:?agent id}"
+    [[ ${3:-} == --prompt ]] && prompt="${4:-}" || prompt=""
+    command_for "$id" "$prompt" "$(effort_of "$id")" || exit 1
+    printf '%s\n' "${cmd[@]}"
+    ;;
+
+  launch-primary)
+    # launch-primary <1|2>: the first or second agent (Super+C / Super+V
+    # double-tap).
+    mapfile -t prim < <(primaries)
+    id="${prim[$(( ${2:-1} - 1 ))]:-${prim[0]:-}}"
+    [[ -n $id ]] || { omarchy-notification-send -u low "No coding agent" "Install one from Omarchy's menu (Install > AI)" 2>/dev/null; exit 1; }
+    exec "$0" launch "$id"
+    ;;
+
+  launch)
+    id="${2:?agent id}"
+    shift 2
+    cwd="" prompt="" images=() effort=default
+    while (( $# )); do
+      case "$1" in
+        --cwd) cwd="$2"; shift 2 ;;
+        --effort) effort="$2"; shift 2 ;;
+        --prompt) prompt="$2"; shift 2 ;;
+        --image) images+=("$2"); shift 2 ;;
+        *) echo "unknown option $1" >&2; exit 2 ;;
+      esac
+    done
+    [[ $effort == default ]] && effort="$(effort_of "$id")"
+    [[ -n $effort && " $(efforts_of "$id") " != *" $effort "* ]] && effort="$(effort_of "$id")"
+    command_for "$id" "$prompt" "$effort" "${images[@]}" || exit 1
+    # Agents won't remember trust for $HOME itself, so that means ~/Work.
+    [[ -z $cwd || $cwd == "$HOME" ]] && cwd="$HOME/Work"
+    cd "$cwd" 2>/dev/null || cd "$HOME"
+    exec omarchy-launch-tui --app-id="$(class_of "$id")" "${cmd[@]}"
+    ;;
+
+  sessions)
+    mapfile -t list < <(installed)
+    programs="$("$HOME/.config/omarchy/window-programs" 2>/dev/null || echo '{}')"
+    names="$(for a in "${list[@]}"; do printf '%s\t%s\t%s\n' "$a" "$(name_of "$a")" "$(class_of "$a")"; done |
+      jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: {name: .[1], class: .[2]}}) | from_entries')"
+    hyprctl clients -j | jq -c --argjson programs "$programs" --argjson agents "$names" '
+      [ .[] | . as $w
+        | ($agents | to_entries | map(select(.value.class == $w.class or .key == ($programs[$w.address] // ""))) | first) as $hit
+        | select($hit != null)
+        | {agent: $hit.key, name: $hit.value.name, address: .address,
+           title: (.title | sub("^[^[:alnum:]]+"; ""))} ]'
+    ;;
+
+  paste)
+    address="${2:?window address}"
+    text="${3:-}"
+    printf '%s' "$text" | wl-copy
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$address\" })" >/dev/null
+    sleep 0.25
+    # Terminal paste, as Super+V (Omarchy's universal paste) does in terminals.
+    hyprctl dispatch 'hl.dsp.send_key_state({ mods = "SHIFT", key = "Insert", state = "down" })' >/dev/null
+    sleep 0.05
+    hyprctl dispatch 'hl.dsp.send_key_state({ mods = "SHIFT", key = "Insert", state = "up" })' >/dev/null
+    sleep 0.4
+    ;;
+
+  *) sed -n '3,26p' "$0"; exit 1 ;;
+esac

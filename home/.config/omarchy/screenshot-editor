@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# The screenshot editor Print Screen opens (~/.config/omarchy/screenshot), for
+# any editor that can open an image file. The taskbar's editor dock
+# (bar/modules/EditorDock.qml) attaches to its window by class.
+#
+#   screenshot-editor open <image>     open the image in the editor; returns
+#                                      when the editor exits
+#   screenshot-editor class            the editor window's class (a regex)
+#   screenshot-editor name             the editor's name, for the dock
+#   screenshot-editor set <editor>     switch (tensaku|satty|swappy|ksnip|custom)
+#   screenshot-editor available        the presets that are installed
+#   screenshot-editor ready            the editor's name if it's installed, else nothing
+#   screenshot-editor latest <image>   the newest version of that screenshot:
+#                                      the file itself (editors that save over
+#                                      it), or what the editor last copied if
+#                                      that's newer (saved next to it as
+#                                      <name>-edited.png), else the original
+#
+# Which editor: ~/.config/omarchy/screenshot-editor.conf
+#   editor=tensaku|satty|swappy|ksnip|custom
+#   command=my-editor --open {file}      (custom: {file} = the image)
+#   class=^(my\.editor)$                 (custom: its window class)
+#
+# Flameshot can't be one: it only annotates screenshots it took itself.
+
+conf="$HOME/.config/omarchy/screenshot-editor.conf"
+editor="tensaku" command="" class=""
+if [[ -f $conf ]]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      editor) editor="$value" ;;
+      command) command="$value" ;;
+      class) class="$value" ;;
+    esac
+  done < <(grep -E '^(editor|command|class)=' "$conf")
+fi
+
+state="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screenshot"
+session_dir() { echo "$state/$(basename "$1")"; }
+
+# The command line for an image, and the window class, per editor.
+spec() {  # spec <image>
+  local f="$1"
+  case "$editor" in
+    tensaku)
+      # Every annotation is copied and saved over the file as you go, so
+      # asking an agent always gets what's on screen; Esc just closes.
+      cmd=(tensaku --filename "$f" --output-filename "$f" --copy-command wl-copy
+        --auto-copy --save-after-copy --disable-notifications
+        --actions-on-enter save-to-clipboard,exit --actions-on-escape exit)
+      win='^(dev\.tensaku\.Tensaku)$' label="Tensaku" ;;
+    satty)
+      cmd=(satty --filename "$f" --output-filename "$f" --copy-command wl-copy
+        --save-after-copy --actions-on-enter save-to-clipboard,exit --actions-on-escape save-to-clipboard,exit)
+      win='^(com\.gabm\.satty)$' label="Satty" ;;
+    swappy)
+      cmd=(swappy -f "$f" -o "$f")
+      win='^(swappy)$' label="Swappy" ;;
+    ksnip)
+      cmd=(ksnip -e "$f")
+      win='^(ksnip|org\.ksnip\.ksnip)$' label="ksnip" ;;
+    custom)
+      read -r -a cmd <<<"${command//\{file\}/$f}"
+      win="${class:-^$}" label="${cmd[0]:-Editor}" ;;
+    *)
+      echo "unknown editor '$editor' in $conf" >&2; return 1 ;;
+  esac
+}
+
+case "${1:-}" in
+  open)
+    image="${2:?image}"
+    spec "$image" || exit 1
+    command -v "${cmd[0]}" >/dev/null || { echo "${cmd[0]} isn't installed" >&2; exit 1; }
+    dir="$(session_dir "$image")"
+    mkdir -p "$dir"
+    touch "$dir/started"
+    # Editors that only copy: keep whatever image they put on the clipboard.
+    wl-paste --type image/png --watch sh -c 'cat > "$0/clip.tmp" && [ -s "$0/clip.tmp" ] && mv "$0/clip.tmp" "$0/clip.png"' "$dir" 2>/dev/null &
+    watcher=$!
+    "${cmd[@]}"
+    kill "$watcher" 2>/dev/null
+    ;;
+  class) spec x && echo "$win" ;;
+  name) spec x && echo "$label" ;;
+  latest)
+    image="${2:?image}"
+    dir="$(session_dir "$image")"
+    clip="$dir/clip.png"
+    # The editor's copy, only if it's newer than both the session and the file
+    # (the capture itself was copied before the session started).
+    if [[ -s $clip && $clip -nt $dir/started && $clip -nt $image ]] && ! cmp -s "$clip" "$image"; then
+      edited="${image%.*}-edited.png"
+      cp "$clip" "$edited" && echo "$edited" && exit 0
+    fi
+    echo "$image"
+    ;;
+  set)
+    choice="${2:?tensaku|satty|swappy|ksnip|custom}"
+    [[ $choice =~ ^(tensaku|satty|swappy|ksnip|custom)$ ]] || { echo "unknown editor $choice" >&2; exit 2; }
+    if [[ -f $conf ]] && grep -q '^editor=' "$conf"; then
+      sed -i "s/^editor=.*/editor=$choice/" "$conf"
+    else
+      printf 'editor=%s\n' "$choice" >> "$conf"
+    fi
+    ;;
+  ready)
+    spec x && command -v "${cmd[0]}" >/dev/null && echo "$label"
+    ;;
+  available)
+    for e in tensaku satty swappy ksnip; do command -v "$e" >/dev/null && echo "$e"; done
+    ;;
+  *) sed -n '3,26p' "$0"; exit 1 ;;
+esac

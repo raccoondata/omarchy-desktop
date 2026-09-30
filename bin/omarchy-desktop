@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# omarchy-desktop: keep the desktop current.
+#
+#   omarchy-desktop update           get the newest version and install it
+#                                    (also Super+Alt+Space > Update > Desktop)
+#   omarchy-desktop status           the installed version, and what's new
+#   omarchy-desktop check            is everything working? (selfcheck)
+#   omarchy-desktop remote on|off    remote access with RustDesk (setup-remote)
+#
+# For the maintainer (a clone on the main branch):
+#   omarchy-desktop release "<what's new>"
+#                                    publish main as the next update: one
+#                                    commit on the stable branch (what
+#                                    everyone else's update pulls), after
+#                                    selfcheck passes
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+repo="$(cd "$(dirname "$self")/.." && pwd)"
+omarchy="$HOME/.config/omarchy"
+bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
+g() { git -C "$repo" "$@"; }
+
+case "${1:-status}" in
+  update)
+    echo "${bold}Checking for updates${off}"
+    branch="$(g branch --show-current)"
+    if ! timeout 60 git -C "$repo" fetch -q origin 2>/dev/null; then
+      echo "Couldn't reach GitHub (offline, or signed out: gh auth login)."
+      exit 1
+    fi
+    new="$(g log --format='  - %s' "HEAD..origin/$branch" 2>/dev/null || true)"
+    if [[ -z $new && ${2:-} != --force ]]; then
+      echo "Already up to date ($(g log -1 --format='%h, %cd' --date=short))."
+      exit 0
+    fi
+    if [[ -n $new ]]; then
+      echo "${bold}What's new${off}"
+      echo "$new"
+      if [[ -n "$(g status --porcelain)" ]]; then
+        echo "The desktop's folder ($repo) has local changes; not updating over them."
+        exit 1
+      fi
+      g merge -q --ff-only "origin/$branch"
+    fi
+    "$repo/install.sh" --update
+    ;;
+
+  status)
+    v="$(g log -1 --format='%h, %cd' --date=short)"
+    echo "omarchy-desktop $v ${dim}($repo, $(g branch --show-current))${off}"
+    if timeout 20 git -C "$repo" fetch -q origin 2>/dev/null; then
+      new="$(g log --format='  - %s' "HEAD..origin/$(g branch --show-current)" 2>/dev/null || true)"
+      if [[ -n $new ]]; then echo "Update available (omarchy-desktop update):"; echo "$new"; else echo "Up to date."; fi
+    fi
+    grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null && echo "Remote access: on" || echo "Remote access: off"
+    ;;
+
+  check) exec "$omarchy/selfcheck" ;;
+
+  remote)
+    case "${2:-}" in
+      on) exec "$omarchy/setup-remote" ;;
+      off) exec "$omarchy/setup-remote" --off ;;
+      *) echo "usage: omarchy-desktop remote on|off"; exit 2 ;;
+    esac
+    ;;
+
+  release)
+    msg="${2:-}"
+    [[ -n $msg ]] || { echo 'usage: omarchy-desktop release "<what is new, one line>"'; exit 2; }
+    [[ "$(g branch --show-current)" == main ]] || { echo "release from the main branch"; exit 1; }
+    "$omarchy/config-history" snapshot "before release" >/dev/null
+    if [[ -n "$(g status --porcelain)" ]]; then
+      echo "Uncommitted changes in $repo; commit them first:"
+      g status --short
+      exit 1
+    fi
+    "$omarchy/selfcheck" --quiet || { echo "selfcheck isn't clean; fix that first (omarchy-desktop check)"; exit 1; }
+    g fetch -q origin
+    tree="$(g rev-parse 'main^{tree}')"
+    if g rev-parse -q --verify origin/stable >/dev/null; then
+      [[ "$(g rev-parse 'origin/stable^{tree}')" == "$tree" ]] && { echo "stable already has this version"; exit 0; }
+      commit="$(g commit-tree "$tree" -p origin/stable -m "$msg")"
+    else
+      commit="$(g commit-tree "$tree" -m "$msg")"
+    fi
+    g push -q origin "main" "$commit:refs/heads/stable"
+    echo "Released: $msg ($(g rev-parse --short "$commit")). Others get it with: omarchy-desktop update"
+    ;;
+
+  *) sed -n '3,17p' "$self"; exit 2 ;;
+esac

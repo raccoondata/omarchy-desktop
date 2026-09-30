@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# After `omarchy update`: keep the local Hyprland plugins (window drops,
+# snapping, fixed title bars) in step with Hyprland, then check the desktop.
+# A new Hyprland needs both plugins rebuilt against its headers; the running
+# compositor keeps the old ones until the next login.
+
+set -uo pipefail
+omarchy="$HOME/.config/omarchy"
+record="$omarchy/hyprland-plugins/hyprbars-commit"
+
+installed="$(pacman -Q hyprland 2>/dev/null | awk '{print $2}' | cut -d- -f1)"
+built="$(awk '{v=$1} END {print v}' "$record" 2>/dev/null)"
+
+if [[ -n $installed && $installed != "$built" ]]; then
+  if "$omarchy/hyprland-plugins/build" > "$HOME/.local/state/omarchy/plugin-build.log" 2>&1; then
+    omarchy-notification-send -u normal "Desktop plugins rebuilt for Hyprland $installed" \
+      "Log out and back in to load them (title bars, window drops, snapping)." >/dev/null 2>&1 || true
+  else
+    omarchy-notification-send -u critical "Desktop plugins need a rebuild" \
+      "Hyprland $installed is installed. Update the AUR package (yay -S hyprland-plugin-hyprbars), then run ~/.config/omarchy/hyprland-plugins/build. Log: ~/.local/state/omarchy/plugin-build.log" \
+      >/dev/null 2>&1 || true
+  fi
+fi
+
+"$omarchy/selfcheck" --quiet >/dev/null 2>&1 || true
+exit 0

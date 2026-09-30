@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Super+Up: one step up the ladder  minimized -> tiled -> maximized.
+#
+# While windows minimized from this workspace are waiting and you are still in
+# a restore run (nothing focused, or focus is where the last Super+Down or
+# restore left it), bring the next one back as a tile. Otherwise toggle
+# maximize on the focused window.
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
+state_file="$state_dir/minimized-windows.json"
+anchor_file="$state_dir/restore-anchor"
+restore="$HOME/.config/omarchy/window-restore"
+
+window="$(hyprctl activewindow -j)"
+address="$(jq -r '.address // empty' <<<"$window")"
+window_workspace="$(jq -r '.workspace.id // -999' <<<"$window")"
+current_workspace="$(hyprctl activeworkspace -j | jq -r '.id')"
+anchor="$(cat "$anchor_file" 2>/dev/null || true)"
+
+# Nothing to maximize, or looking at the scratchpad itself: restore.
+if [[ -z "$address" ]] || (( window_workspace < 0 )); then
+  exec "$restore" "$current_workspace"
+fi
+
+pending=0
+if [[ -f "$state_file" ]]; then
+  hidden="$(hyprctl clients -j | jq '[.[] | select(.workspace.name == "special:scratchpad") | .address]')"
+  pending="$(jq --argjson ws "$current_workspace" --argjson hidden "$hidden" \
+    '[.[] | select(.workspace == $ws and (.address as $a | $hidden | index($a)))] | length' "$state_file")"
+fi
+
+if (( pending > 0 )) && [[ "$address" == "$anchor" ]]; then
+  exec "$restore" "$current_workspace"
+fi
+
+: > "$anchor_file"
+hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })'

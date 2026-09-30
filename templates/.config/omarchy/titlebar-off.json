@@ -1,0 +1,57 @@
+[
+  {
+    "key": "edge",
+    "name": "Microsoft Edge",
+    "classes": [
+      "microsoft-edge"
+    ]
+  },
+  {
+    "key": "chrome",
+    "name": "Chromium",
+    "classes": [
+      "chromium"
+    ]
+  },
+  {
+    "key": "vscode",
+    "name": "Visual Studio Code",
+    "classes": [
+      "Code",
+      "code",
+      "code-oss",
+      "code-url-handler",
+      "com.microsoft.VSCode"
+    ]
+  },
+  {
+    "key": "steam",
+    "name": "Steam",
+    "classes": [
+      "steam"
+    ]
+  },
+  {
+    "key": "obsidian",
+    "name": "Obsidian",
+    "classes": [
+      "obsidian",
+      "md.obsidian.Obsidian"
+    ]
+  },
+  {
+    "key": "folder",
+    "name": "Files",
+    "classes": [
+      "org.gnome.Nautilus"
+    ]
+  },
+  {
+    "key": "rustdesk",
+    "name": "RustDesk",
+    "classes": [
+      "rustdesk",
+      "com.carriez.flutter_hbb"
+    ]
+  }
+]

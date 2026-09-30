@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Keeps a screen to show when the monitor is off. With the monitor switched
+# off, its DisplayPort reads "disconnected", Hyprland is left with only its
+# FALLBACK placeholder (which doesn't redraw), and RustDesk has nothing to
+# share. So while no real monitor is connected this adds a virtual one,
+# REMOTE (2560x1440, rule in hypr/monitors.lua), which the workspaces move
+# to; when a monitor comes back REMOTE goes away and they move back.
+# Picking what RustDesk shares: ./share-picker. Runs as remote-screen.service.
+
+remote="REMOTE"
+
+ensure() {
+  local monitors physical has_remote
+  monitors="$(hyprctl monitors -j 2>/dev/null)" || return
+  physical="$(jq --arg r "$remote" '[.[] | select(.name != "FALLBACK" and .name != $r and (.name | startswith("HEADLESS") | not))] | length' <<<"$monitors")"
+  has_remote="$(jq --arg r "$remote" 'any(.[]; .name == $r)' <<<"$monitors")"
+  if [[ $physical == 0 && $has_remote == false ]]; then
+    echo "no monitor connected: adding $remote"
+    hyprctl output create headless "$remote" >/dev/null
+  elif [[ $physical != 0 && $has_remote == true ]]; then
+    echo "monitor back: removing $remote"
+    hyprctl output remove "$remote" >/dev/null
+  fi
+}
+
+socket="${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:?not in a Hyprland session}/.socket2.sock"
+ensure
+# Monitor events, plus a check every 30 s in case one was missed.
+socat -U - "UNIX-CONNECT:$socket" | while true; do
+  if read -r -t 30 line; then
+    case "$line" in monitoradded*|monitorremoved*) sleep 1; ensure ;; esac
+  else
+    [[ $? -gt 128 ]] || exit 1   # socket closed (Hyprland restarted): let systemd restart us
+    ensure
+  fi
+done

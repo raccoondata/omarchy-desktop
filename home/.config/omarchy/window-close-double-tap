@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Super+Q Q: close the focused window only on a second press of Q within
+# window_ms on the same window, so a single stray Super+Q does nothing.
+window_ms=400
+
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/omarchy"
+state_file="$state_dir/close-tap"
+mkdir -p "$state_dir"
+
+address="$(hyprctl activewindow -j | jq -r '.address // empty')"
+[[ -n "$address" ]] || exit 0
+
+now=$(( $(date +%s%N) / 1000000 ))
+last_ms=0 last_address=""
+[[ -f "$state_file" ]] && read -r last_ms last_address < "$state_file" || true
+
+if [[ "$address" == "$last_address" ]] && (( now - last_ms <= window_ms )); then
+  rm -f "$state_file"
+  hyprctl dispatch 'hl.dsp.window.close()' >/dev/null
+else
+  printf '%s %s\n' "$now" "$address" > "$state_file"
+fi

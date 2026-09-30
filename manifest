@@ -1,0 +1,55 @@
+# Paths (relative to your home folder) that omarchy-desktop owns: install.sh
+# copies them from home/ in this repo, updates replace them, and the
+# maintainer's `omarchy-desktop capture` copies them back in. A trailing /
+# means the whole folder (files dropped upstream are removed on update).
+# Everything else in your home folder is yours and is never touched.
+
+.config/hypr/desktop.lua
+.config/hypr/desktop/
+.config/omarchy/bar/modules/
+.config/omarchy/hyprland-plugins/
+.config/omarchy/hooks/post-update.d/desktop-plugins-selfcheck.hook
+.config/omarchy/agent-notify
+.config/omarchy/agents
+.config/omarchy/ask-agent
+.config/omarchy/audio-owners
+.config/omarchy/backup-lock
+.config/omarchy/bar-height
+.config/omarchy/hotcorner
+
+.config/omarchy/lock
+.config/omarchy/lock-guard
+.config/omarchy/lock-on-autologin
+.config/omarchy/mouse-setting
+.config/omarchy/reboot-to-windows
+.config/omarchy/remote-screen
+.config/omarchy/safe-mode-agents
+.config/omarchy/screenshot
+.config/omarchy/screenshot-editor
+.config/omarchy/screenshot.upstream
+.config/omarchy/selfcheck
+.config/omarchy/setup-system
+.config/omarchy/setup-remote
+.config/omarchy/config-history
+.config/systemd/user/config-history.service
+.config/systemd/user/config-history.timer
+.config/omarchy/share-picker
+.config/omarchy/snap-tile-edge
+.config/omarchy/taskbar-action
+.config/omarchy/taskbar-setting
+.config/omarchy/titlebars
+.config/omarchy/titlebars-load
+.config/omarchy/window-close-double-tap
+.config/omarchy/window-dock
+.config/omarchy/window-maximize-or-restore
+.config/omarchy/window-minimize
+.config/omarchy/window-minimize-all
+.config/omarchy/window-minimize-now
+.config/omarchy/window-programs
+.config/omarchy/window-restore
+.config/omarchy/window-restore-all
+.config/systemd/user/hyprland-safe-mode-agents.service
+.config/systemd/user/lock-guard.service
+.config/systemd/user/remote-screen.service
+.local/bin/rescue
+.local/share/nautilus-python/extensions/omarchy_agents.py

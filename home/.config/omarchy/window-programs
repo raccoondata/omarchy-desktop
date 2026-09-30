@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Print {"0x<address>": "<program>", ...}: for every window, the program in
+# the foreground of the terminal it hosts (nvim, lazygit, claude, ...). Idle
+# shells are left out. The taskbar uses it to show that program's icon.
+
+ps -eo pid=,ppid=,tpgid=,comm= | awk -v clients="$(hyprctl clients -j | jq -r '.[] | "\(.address)=\(.pid)"' | tr '\n' ' ')" '
+  BEGIN { split("bash zsh fish sh dash ghostty", s, " "); for (i in s) shell[s[i]] = 1 }
+  { children[$2] = children[$2] " " $1; fg[$1] = $3; name[$1] = $4 }
+  END {
+    n = split(clients, list, " ")
+    printf "{"
+    first = 1
+    for (i = 1; i <= n; i++) {
+      split(list[i], kv, "=")
+      program = ""
+      # A child of the window process owns the terminal; its tty foreground
+      # process group leader is whatever currently has the keyboard.
+      m = split(children[kv[2]], kids, " ")
+      for (j = 1; j <= m && program == ""; j++) {
+        leader = fg[kids[j]]
+        if (leader > 0 && (leader in name) && !(name[leader] in shell)) program = name[leader]
+      }
+      if (program != "") {
+        printf "%s\"%s\":\"%s\"", (first ? "" : ","), kv[1], program
+        first = 0
+      }
+    }
+    print "}"
+  }'

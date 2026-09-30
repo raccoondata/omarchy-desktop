@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Reboot straight into Windows once, via the firmware's BootNext. The next boot
+# after that goes back to the normal order (Limine -> Omarchy).
+#   reboot-to-windows          reboot now (used by the system menu)
+#   reboot-to-windows --tap    Super+Shift+Escape: first press only warns, a
+#                              second press within window_ms reboots
+#   reboot-to-windows --check  exit 0 if this PC has Windows to boot (the menus
+#                              only show their Windows entry then)
+# Needs /etc/sudoers.d/50-reboot-to-windows (passwordless efibootmgr --bootnext).
+window_ms=2000
+
+# The Windows Boot Manager entry Windows itself maintains in the firmware.
+windows_entry() {
+  command -v efibootmgr >/dev/null || return 0
+  efibootmgr 2>/dev/null | sed -n 's/^Boot\([0-9A-F]\{4\}\)\*\{0,1\} Windows Boot Manager.*/\1/p' | head -1
+}
+
+if [[ ${1:-} == --check ]]; then
+  [[ -n "$(windows_entry)" ]]
+  exit
+fi
+
+if [[ ${1:-} == --tap && -z "$(windows_entry)" ]]; then
+  omarchy-osd -i reboot -m "No Windows on this PC" -d 1500 || true
+  exit 0
+fi
+
+if [[ ${1:-} == --tap ]]; then
+  state_dir="${XDG_RUNTIME_DIR:-/tmp}/omarchy"
+  state_file="$state_dir/reboot-windows-tap"
+  mkdir -p "$state_dir"
+  now=$(( $(date +%s%N) / 1000000 ))
+  last_ms=0
+  [[ -f "$state_file" ]] && read -r last_ms < "$state_file" || true
+  if (( now - last_ms > window_ms )); then
+    printf '%s\n' "$now" > "$state_file"
+    omarchy-osd -i reboot -m "Press again to reboot into Windows" -d "$window_ms" || true
+    exit 0
+  fi
+  rm -f "$state_file"
+fi
+
+entry="$(windows_entry)"
+if [[ -z "$entry" ]]; then
+  notify-send -u critical "Reboot to Windows" "No Windows Boot Manager entry in UEFI NVRAM"
+  exit 1
+fi
+
+if ! sudo -n /usr/bin/efibootmgr --bootnext "$entry" >/dev/null; then
+  notify-send -u critical "Reboot to Windows" "Could not set BootNext=$entry (sudoers rule missing?)"
+  exit 1
+fi
+
+exec omarchy-system-reboot

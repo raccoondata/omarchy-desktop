@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# SDDM logs you in automatically (so RustDesk can reach the desktop after a
+# reboot); lock the screen straight away so the PC still needs the password.
+# Only autologin sessions run through the sddm-autologin PAM service, so a
+# normal password login is left alone.
+session="${XDG_SESSION_ID:-$(loginctl show-user "$USER" -p Display --value 2>/dev/null || true)}"
+service="$(loginctl show-session "$session" -p Service --value 2>/dev/null || true)"
+[[ "$service" == sddm-autologin ]] || exit 0
+
+# The lock screen lives in the Omarchy shell; wait up to 30s for it to answer.
+for _ in {1..60}; do
+  omarchy-shell shell ping >/dev/null 2>&1 && break
+  sleep 0.5
+done
+
+# With the "Locked" card first, for a RustDesk viewer after a reboot.
+"$HOME/.config/omarchy/lock"
