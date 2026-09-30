@@ -99,7 +99,7 @@ Column {
             height: section.owner.iconSize
             sourceSize.width: Math.round(section.owner.iconSize * Screen.devicePixelRatio)
             sourceSize.height: Math.round(section.owner.iconSize * Screen.devicePixelRatio)
-            source: section.owner.library ? section.owner.library.iconSource(tile.modelData.icon) : ""
+            source: section.owner.library ? section.owner.tileIcon(tile.modelData) : ""
             smooth: true
             asynchronous: true
           }

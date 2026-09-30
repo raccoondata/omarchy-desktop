@@ -17,8 +17,9 @@ Where (iconkit.source_dir()):
     --program (a terminal program's name) and --class (a window class
     regex) say which windows get it, checked before the built-in rules
   - the maintainer's PC (maintainer=on in ~/.config/omarchy/desktop.conf):
-    the desktop repo's icon-src/, built into the built-in set that ships to
-    everyone; map it in taskbar.qml by hand (programIcons / classIcons)
+    the desktop repo's icon-src/, built into the built-in set (and the icon
+    font) that ships to everyone; map it by hand in bar/modules/
+    TaskbarMatch.js (programIcons / classIcons)
 Then: omarchy restart shell
 Exit status: 0 done, 1 refused (spec errors, bad input), 2 usage.
 """
@@ -78,7 +79,7 @@ def main():
         except re.error as e:
             sys.exit(f"bad class regex {c!r}: {e}")
     if not user and (programs or classes):
-        sys.exit("maintainer: map built-in icons in taskbar.qml (programIcons / classIcons), not with flags")
+        sys.exit("maintainer: map built-in icons in TaskbarMatch.js (programIcons / classIcons), not with flags")
 
     # The script: as given, or made from a bare drawing.
     if file.suffix == ".py":
@@ -140,7 +141,7 @@ def main():
     maps = ", ".join([f"program {p}" for p in programs] + [f"class /{c}/" for c in classes])
     print(f"{action} '{name}' in {where} ({str(target).replace(home, '~')})"
           + (f", for {maps}" if maps else "") + (f"; kept {len(kept)} working file(s)" if kept else ""))
-    print("Then: omarchy restart shell" + ("" if user else " (and map it in taskbar.qml if it's new)"))
+    print("Then: omarchy restart shell" + ("" if user else " (and map it in TaskbarMatch.js if it's new)"))
 
 
 main()

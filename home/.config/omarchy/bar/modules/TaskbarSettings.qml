@@ -341,6 +341,7 @@ Item {
             { value: "titlebars", label: "Title Bars" },
             { value: "nowplaying", label: "Now Playing" },
             { value: "screenshots", label: "Screenshots" },
+            { value: "icons", label: "Icons" },
             { value: "mouse", label: "Mouse" }
           ]
           value: settings.tab
@@ -362,6 +363,7 @@ Item {
             : settings.tab === "windows" ? windowsTab
             : settings.tab === "agents" ? agentsTab
             : settings.tab === "screenshots" ? screenshotsTab
+            : settings.tab === "icons" ? iconsTab
             : taskbarTab
         }
       }
@@ -941,6 +943,78 @@ Item {
             opacity: 0.45
             font.family: Style.font.menuFamily
             font.pixelSize: Style.font.caption
+          }
+        }
+      }
+    }
+  }
+
+  // Icons: the desktop's line icons (bar/modules/taskbar-icons.js, one
+  // drawing per app recoloured with the theme) or each app's own colour
+  // icon, per place. Apps without a line icon keep their own everywhere.
+  Component {
+    id: iconsTab
+
+    Column {
+      id: icTab
+      width: settings.cardWidth / 2
+      spacing: Style.space(6)
+      readonly property var prefs: settings.taskbar.prefs || ({})
+
+      Section { title: "Icons" }
+
+      SettingRow {
+        label: "Taskbar and switcher"
+        description: "the taskbar, window previews and Super+Tab"
+        ButtonGroup {
+          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
+          value: icTab.prefs.iconsTaskbar === "app" ? "app" : "line"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("iconsTaskbar", v) }
+        }
+      }
+      SettingRow {
+        label: "Super menu"
+        description: "the app grid; apps without a line icon keep their own"
+        ButtonGroup {
+          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
+          value: icTab.prefs.iconsSuperMenu === "line" ? "line" : "app"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("iconsSuperMenu", v) }
+        }
+      }
+      SettingRow {
+        label: "Now playing"
+        description: "the card and its volume mixer"
+        ButtonGroup {
+          options: [{ value: "line", label: "Line icons" }, { value: "app", label: "App colours" }]
+          value: icTab.prefs.iconsNowPlaying === "line" ? "line" : "app"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("iconsNowPlaying", v) }
+        }
+      }
+      SettingRow {
+        label: "Omarchy menu"
+        description: "Super+Alt+Space: the entries that are apps (agents, browsers, editors, Install / Remove)"
+        ButtonGroup {
+          options: [{ value: "line", label: "Line icons" }, { value: "omarchy", label: "Omarchy's" }]
+          value: icTab.prefs.iconsOmarchyMenu === "line" ? "line" : "omarchy"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) {
+            settings.set("iconsOmarchyMenu", v)
+            Util.execArgv([settings.dir + "/menu-icons", v === "line" ? "on" : "off"])
           }
         }
       }

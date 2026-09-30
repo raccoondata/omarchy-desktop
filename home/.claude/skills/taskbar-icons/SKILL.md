@@ -11,10 +11,12 @@ description: >
 
 # Taskbar icons
 
-The taskbar (`~/.config/omarchy/bar/modules/taskbar.qml`) draws every window
-with one line icon, recoloured at runtime: theme foreground when inactive,
-accent when focused, faded when minimized. So each app needs exactly **one**
-drawing, covering both themes and every state.
+The desktop draws apps with one line icon each, recoloured at runtime (theme
+foreground, accent when focused, faded when minimized): the taskbar, window
+previews and Super+Tab, and, if chosen in Taskbar & Desktop > Icons, the
+Super menu, now playing and Omarchy's menu (through an icon font built from
+the same icons). So each app needs exactly **one** drawing. Which window,
+program or launcher gets which icon: `bar/modules/TaskbarMatch.js`.
 
 **Read `ICON-SPEC.md` (next to this file) first**: the drawing rules (grid,
 live area, balance, stroke, fills, elements), the style, and the script
@@ -25,7 +27,7 @@ SVG body into an icon file, and never edit `taskbar-icons.js` or
 
 The tools are in `scripts/` (all Python on `scripts/iconkit.py`, all `-h`):
 `icon-new`, `icon-preview`, `icon-lint`, `icon-set`, `icon-build`,
-`icon-test`. `vmouse` is a separate helper: a virtual mouse for clicking the
+`icon-test`, `icon-font` (maintainer: the font; `icon-build` runs it). `vmouse` is a separate helper: a virtual mouse for clicking the
 taskbar in tests.
 
 ## Workflow
@@ -65,7 +67,7 @@ taskbar in tests.
    - **The maintainer's PC** (`maintainer=on` in
      `~/.config/omarchy/desktop.conf`): the built-in set in the
      omarchy-desktop repo, which ships to everyone. Then map it by hand in
-     `taskbar.qml`: `programIcons` (`program: "icon"`) for terminal
+     `bar/modules/TaskbarMatch.js`: `programIcons` (`program: "icon"`) for terminal
      programs, `classIcons` (`[/regex/, "icon"]`, first match wins; specific
      rules above general ones, web app hosts above the generic browser rule,
      exact classes as `^...$`). `--user` forces your own icons there too.
@@ -84,8 +86,10 @@ the scripts).
 
 ## Gotchas
 
-- The bar doesn't hot-reload icons or `taskbar.qml`: `omarchy restart shell`
-  after installing. `shell.json` does hot-reload.
+- The bar doesn't hot-reload icons, `TaskbarMatch.js` or `taskbar.qml`:
+  `omarchy restart shell` after installing. A new built-in icon in Omarchy's
+  menu also needs an entry in `~/.config/omarchy/menu-icons.json`, then
+  `~/.config/omarchy/menu-icons on`. `shell.json` does hot-reload.
 - Check for errors with:
   `qs log --id $(ls -t $XDG_RUNTIME_DIR/quickshell/by-id/ | head -1) | grep -iE 'taskbar|modules/'`
 - Lessons: a 12-ray Claude burst clumped, a tapered version blobbed, a
