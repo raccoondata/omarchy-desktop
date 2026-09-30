@@ -8,23 +8,28 @@ your own monitors, keybindings, theme and apps alone.
 
 ## Install
 
-On an up-to-date Omarchy, logged in. The repo is private: first accept the
-invite to it (the email from GitHub, or github.com/notifications), then in a
-terminal (Super+Return):
+On an up-to-date Omarchy, logged in: accept the invite to this repo if you
+can (GitHub's email; the setup accepts it for you otherwise), open a terminal
+(Super+Return), paste this and press Enter:
+
+    curl -fsSL https://gist.githubusercontent.com/raccoondata/c170eba976a5fddeb8fe11cd36ab462a/raw/omarchy-desktop-setup.sh | bash
+
+It walks you through it: installs GitHub's command-line tool, signs you in to
+GitHub in the browser (it copies a code: paste it with Ctrl+V, then
+Authorize), downloads this repo to `~/.local/share/omarchy-desktop/src` and
+runs `install.sh`. That asks for your password (for the system parts), which
+keybindings you want (it lists them: all, only the new ones, or none) and
+whether you want remote access (off unless you say yes), then tells you to
+log out and back in. What it printed is kept in
+`~/.local/state/omarchy-desktop/install.log`.
+
+The setup script is `bootstrap.sh` here (published as that gist by
+`omarchy-desktop release`). By hand instead:
 
     yay -S github-cli
     gh auth login --web --clipboard --git-protocol https
     gh repo clone raccoondata/omarchy-desktop ~/.local/share/omarchy-desktop/src
     ~/.local/share/omarchy-desktop/src/install.sh
-
-`gh auth login` copies a code, then opens GitHub in the browser when you press
-Enter: sign in if asked, paste the code (Ctrl+V), then Authorize. That also
-lets `omarchy-desktop update` fetch updates later without asking again.
-
-It asks for your password (for the system parts), which keybindings you want
-(it lists them: all, only the new ones, or none) and whether you want remote
-access (off unless you say yes), then tells you to log out and back in. What
-it printed is kept in `~/.local/state/omarchy-desktop/install.log`.
 
 ## Update
 
