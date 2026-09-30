@@ -566,8 +566,12 @@ BarWidget {
     // Double-tap Super / Caps Lock (hypr/desktop/bindings.lua): the super menu.
     function superMenu(): void { superMenu.toggle() }
     // Super+Space > Setup > Taskbar / Hot Corners: the settings window, on a
-    // tab (taskbar | effects | corners | titlebars).
+    // tab (taskbar | windows | desktop | icons | media |
+    // screenshots | agents; older names like corners still work).
     function settings(tab: string): void { taskbarSettings.open(tab) }
+    // The same without keyboard focus, for a look (screenshots, tests).
+    function settingsPreview(tab: string): void { taskbarSettings.preview(tab) }
+    function settingsClose(): void { taskbarSettings.close() }
     // Print Screen (~/.config/omarchy/screenshot): the screenshot card.
     // ~/.config/omarchy/lock: show the lock card before locking; it goes away
     // by itself on unlock (or if the lock doesn't happen).

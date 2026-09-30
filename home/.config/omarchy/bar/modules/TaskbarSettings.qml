@@ -20,6 +20,9 @@ Item {
 
   required property var taskbar
   property bool opened: false
+  // Opened for a look only (settingsPreview IPC, for screenshots and tests):
+  // no keyboard focus, so it can't take anyone's typing.
+  property bool previewOnly: false
   property string tab: "taskbar"
 
   readonly property string dir: taskbar.omarchyDir
@@ -27,7 +30,10 @@ Item {
   readonly property int cardWidth: Style.space(960)
 
   function open(which) {
-    tab = which && which.length > 0 ? which : "taskbar"
+    // Older names (menu entries, keybindings) for what's now inside another tab.
+    var moved = { corners: "desktop", effects: "desktop", mouse: "desktop", titlebars: "windows",
+                  nowplaying: "media", visualizers: "media", equalizer: "media" }
+    tab = which && which.length > 0 ? (moved[which] || which) : "taskbar"
     barHeightRead.running = true
     scrollRead.running = true
     terminalScrollRead.running = true
@@ -37,7 +43,11 @@ Item {
     opened = true
   }
 
-  function close() { opened = false }
+  function close() { opened = false; previewOnly = false }
+  function preview(which) {
+    previewOnly = true
+    open(which)
+  }
 
   function set(key, value) {
     Util.execArgv([dir + "/taskbar-setting", "set", key, String(value)])
@@ -260,7 +270,7 @@ Item {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "omarchy-taskbar-settings"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: settings.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: settings.opened && !settings.previewOnly ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Rectangle {
       anchors.fill: parent
@@ -342,15 +352,11 @@ Item {
           options: [
             { value: "taskbar", label: "Taskbar" },
             { value: "windows", label: "Windows" },
-            { value: "agents", label: "Agents" },
-            { value: "effects", label: "Effects" },
-            { value: "corners", label: "Hot Corners" },
-            { value: "titlebars", label: "Title Bars" },
-            { value: "nowplaying", label: "Now Playing" },
-            { value: "visualizers", label: "Equalizer" },
-            { value: "screenshots", label: "Screenshots" },
+            { value: "desktop", label: "Desktop" },
             { value: "icons", label: "Icons" },
-            { value: "mouse", label: "Mouse" }
+            { value: "media", label: "Media" },
+            { value: "screenshots", label: "Screenshots" },
+            { value: "agents", label: "Agents" }
           ]
           value: settings.tab
           foreground: Color.menu.text
@@ -361,19 +367,26 @@ Item {
 
         Rectangle { width: parent.width; height: 1; color: Color.menu.text; opacity: 0.12 }
 
-        Loader {
+        // The tab's content, scrolling when it's taller than the screen allows.
+        Flickable {
           width: parent.width
-          sourceComponent: settings.tab === "effects" ? effectsTab
-            : settings.tab === "corners" ? cornersTab
-            : settings.tab === "titlebars" ? titlebarsTab
-            : settings.tab === "mouse" ? mouseTab
-            : settings.tab === "nowplaying" ? nowPlayingTab
-            : settings.tab === "windows" ? windowsTab
+          height: Math.min(tabContent.height, Math.max(Style.space(200), (panel.screen ? panel.screen.height : panel.height) * 0.78))
+          contentWidth: width
+          contentHeight: tabContent.height
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+        Loader {
+          id: tabContent
+          width: parent.width
+          sourceComponent: settings.tab === "desktop" ? desktopTab
+            : settings.tab === "windows" ? windowsPage
+            : settings.tab === "media" ? mediaTab
             : settings.tab === "agents" ? agentsTab
             : settings.tab === "screenshots" ? screenshotsTab
             : settings.tab === "icons" ? iconsTab
-            : settings.tab === "visualizers" ? visualizersTab
             : taskbarTab
+        }
         }
       }
     }
@@ -381,11 +394,71 @@ Item {
 
   // ---------------------------------------------------------------- tabs
 
+  // Desktop: the bar's size, hot corners, motion and the mouse, gathered from
+  // what were small tabs of their own.
+  Component {
+    id: desktopTab
+
+    Column {
+      width: settings.cardWidth
+      spacing: Style.space(16)
+
+      Column {
+        width: (settings.cardWidth - settings.columnGap) / 2
+        spacing: Style.space(6)
+        Section { title: "Bar" }
+        SettingRow {
+          label: "Bar height"
+          description: "the whole Omarchy bar"
+          ValueSlider {
+            value: settings.barHeight
+            minimum: 28; maximum: 56; step: 1; integer: true
+            suffix: " px"
+            onCommitted: function(v) {
+              settings.barHeight = Math.round(v)
+              Util.execArgv([settings.dir + "/bar-height", "set", String(Math.round(v))])
+            }
+          }
+        }
+      }
+      Loader { width: parent.width; sourceComponent: cornersTab }
+      Loader { width: parent.width; sourceComponent: effectsTab }
+      Loader { width: parent.width; sourceComponent: mouseTab }
+    }
+  }
+
+  // Media: the now-playing widget, then the equalizers and effects.
+  Component {
+    id: mediaTab
+
+    Column {
+      width: settings.cardWidth
+      spacing: Style.space(16)
+      Loader { width: parent.width; sourceComponent: nowPlayingTab }
+      Loader { width: parent.width; sourceComponent: visualizersTab }
+    }
+  }
+
+  // Windows: placing them, apps that come to you, and title bars.
+  Component {
+    id: windowsPage
+
+    Column {
+      width: settings.cardWidth
+      spacing: Style.space(16)
+      Loader { width: parent.width; sourceComponent: windowsTab }
+      Loader { width: parent.width; sourceComponent: titlebarsTab }
+    }
+  }
+
   Component {
     id: taskbarTab
 
     Row {
+      id: tbTab
       spacing: settings.columnGap
+      readonly property var prefs: settings.taskbar.prefs || ({})
+      function pick(key, fallback) { var v = prefs[key]; return v === undefined || v === null ? fallback : String(v) }
       readonly property real columnWidth: (settings.cardWidth - settings.columnGap) / 2
 
       Column {
@@ -410,19 +483,6 @@ Item {
             minimum: 0; maximum: 12; step: 1; integer: true
             suffix: " px"
             onCommitted: function(v) { settings.set("iconSpacing", Math.round(v)) }
-          }
-        }
-        SettingRow {
-          label: "Bar height"
-          description: "the whole Omarchy bar"
-          ValueSlider {
-            value: settings.barHeight
-            minimum: 28; maximum: 56; step: 1; integer: true
-            suffix: " px"
-            onCommitted: function(v) {
-              settings.barHeight = Math.round(v)
-              Util.execArgv([settings.dir + "/bar-height", "set", String(Math.round(v))])
-            }
           }
         }
         SettingRow {
@@ -490,6 +550,55 @@ Item {
           ToggleSwitch { checked: settings.taskbar.scrollCycles; onToggled: settings.set("scrollCycle", !checked) }
         }
 
+
+        SettingRow {
+          label: "Double-click a group"
+          description: tbTab.pick("doubleClickGroup", "tile") === "here" ? "brings all its windows to the workspace you're on"
+            : tbTab.pick("doubleClickGroup", "tile") === "none" ? "does nothing extra"
+            : "gives its windows a workspace of their own and takes you there"
+          ButtonGroup {
+            options: [{ value: "tile", label: "Own workspace" }, { value: "here", label: "Bring here" }, { value: "none", label: "Nothing" }]
+            value: tbTab.pick("doubleClickGroup", "tile")
+            foreground: Color.menu.text
+            background: Color.menu.background
+            fontFamily: Style.font.menuFamily
+            fontSize: Style.font.bodySmall
+            onChanged: function(v) { settings.set("doubleClickGroup", v) }
+          }
+        }
+        SettingRow {
+          label: "Double-click a single window"
+          description: "maximize or restore it"
+          ButtonGroup {
+            options: [{ value: "maximize", label: "Maximize" }, { value: "none", label: "Nothing" }]
+            value: tbTab.pick("doubleClickWindow", "maximize")
+            foreground: Color.menu.text
+            background: Color.menu.background
+            fontFamily: Style.font.menuFamily
+            fontSize: Style.font.bodySmall
+            onChanged: function(v) { settings.set("doubleClickWindow", v) }
+          }
+        }
+        SettingRow {
+          label: "Clicking the app you're in"
+          description: "minimize it, like Windows (click again to bring it back)"
+          ToggleSwitch {
+            checked: tbTab.pick("clickActive", "none") === "minimize"
+            onToggled: settings.set("clickActive", checked ? "none" : "minimize")
+          }
+        }
+        SettingRow {
+          label: "Icon order"
+          description: "forget where you've dragged icons"
+          Button {
+            text: "Reset"
+            bordered: true
+            foreground: Color.menu.text
+            fontFamily: Style.font.menuFamily
+            fontSize: Style.font.bodySmall
+            onClicked: Util.execArgv(["rm", "-f", settings.dir + "/taskbar-order.json"])
+          }
+        }
         Item { width: 1; height: Style.space(6) }
         Section { title: "Hover previews" }
 
@@ -514,18 +623,6 @@ Item {
             minimum: 140; maximum: 300; step: 10; integer: true
             suffix: " px"
             onCommitted: function(v) { settings.set("previewSize", Math.round(v)) }
-          }
-        }
-        SettingRow {
-          label: "Icon order"
-          description: "forget where you've dragged icons"
-          Button {
-            text: "Reset"
-            bordered: true
-            foreground: Color.menu.text
-            fontFamily: Style.font.menuFamily
-            fontSize: Style.font.bodySmall
-            onClicked: Util.execArgv(["rm", "-f", settings.dir + "/taskbar-order.json"])
           }
         }
       }
@@ -733,50 +830,6 @@ Item {
         width: winTab.columnWidth
         spacing: Style.space(6)
 
-        Section { title: "Taskbar clicks" }
-
-        SettingRow {
-          label: "Double-click a group"
-          description: winTab.pick("doubleClickGroup", "tile") === "here" ? "brings all its windows to the workspace you're on"
-            : winTab.pick("doubleClickGroup", "tile") === "none" ? "does nothing extra"
-            : "gives its windows a workspace of their own and takes you there"
-          ButtonGroup {
-            options: [{ value: "tile", label: "Own workspace" }, { value: "here", label: "Bring here" }, { value: "none", label: "Nothing" }]
-            value: winTab.pick("doubleClickGroup", "tile")
-            foreground: Color.menu.text
-            background: Color.menu.background
-            fontFamily: Style.font.menuFamily
-            fontSize: Style.font.bodySmall
-            onChanged: function(v) { settings.set("doubleClickGroup", v) }
-          }
-        }
-        SettingRow {
-          label: "Double-click a single window"
-          description: "maximize or restore it"
-          ButtonGroup {
-            options: [{ value: "maximize", label: "Maximize" }, { value: "none", label: "Nothing" }]
-            value: winTab.pick("doubleClickWindow", "maximize")
-            foreground: Color.menu.text
-            background: Color.menu.background
-            fontFamily: Style.font.menuFamily
-            fontSize: Style.font.bodySmall
-            onChanged: function(v) { settings.set("doubleClickWindow", v) }
-          }
-        }
-        SettingRow {
-          label: "Clicking the app you're in"
-          description: "minimize it, like Windows (click again to bring it back)"
-          ToggleSwitch {
-            checked: winTab.pick("clickActive", "none") === "minimize"
-            onToggled: settings.set("clickActive", checked ? "none" : "minimize")
-          }
-        }
-      }
-
-      Column {
-        width: winTab.columnWidth
-        spacing: Style.space(6)
-
         Section { title: "Placing windows" }
 
         SettingRow {
@@ -819,7 +872,12 @@ Item {
           font.pixelSize: Style.font.caption
         }
 
-        Item { width: 1; height: Style.space(6) }
+      }
+
+      Column {
+        width: winTab.columnWidth
+        spacing: Style.space(6)
+
         Section { title: "Apps that come to you" }
         Text {
           width: parent.width
@@ -985,7 +1043,7 @@ Item {
         width: parent.columnWidth
         spacing: Style.space(6)
 
-        Section { title: "Where" }
+        Section { title: "Equalizers and effects" }
 
         SettingRow {
           label: "Taskbar"
@@ -1030,19 +1088,6 @@ Item {
           onChanged: function(v) { settings.set("nowPlayingVisual", v) }
         }
       }
-      SettingRow {
-        label: "Album art effect"
-        description: "moves with the music; middle-click the art to step through them"
-        Dropdown {
-          width: Style.space(180)
-          showLabel: false
-          fontFamily: Style.font.menuFamily
-          options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
-                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
-          value: visTab.prefs.nowPlayingArtFx || "off"
-          onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
-        }
-      }
         SettingRow {
           visible: (visTab.prefs.nowPlayingVisual || "pixel") === "pixel"
           label: "Card equalizer style"
@@ -1056,6 +1101,19 @@ Item {
             onChanged: function(v) { settings.set("nowPlayingCardEq", v) }
           }
         }
+      SettingRow {
+        label: "Album art effect"
+        description: "moves with the music; middle-click the art to step through them"
+        Dropdown {
+          width: Style.space(180)
+          showLabel: false
+          fontFamily: Style.font.menuFamily
+          options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
+                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
+          value: visTab.prefs.nowPlayingArtFx || "off"
+          onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
+        }
+      }
       }
 
       Column {
