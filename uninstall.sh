@@ -14,7 +14,7 @@ bold=$'\e[1m' off=$'\e[0m'
 
 echo "${bold}Uninstall omarchy-desktop${off}"
 echo "Puts Omarchy's own bar, keys and menus back. Your settings files stay."
-read -r -p "Go ahead? [y/N] " a
+read -r -p "Go ahead? [y/N] " a || true
 [[ $a == [yY]* ]] || exit 0
 sudo -v
 

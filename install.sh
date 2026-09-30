@@ -32,7 +32,7 @@ step() { echo; echo "${bold}[$1/$steps] $2${off}"; }
 warn() { echo "  ! $*"; failed+=("$*"); }
 ask() {  # ask <question>  (default no)
   local a
-  read -r -p "  $1 [y/N] " a
+  read -r -p "  $1 [y/N] " a || true
   [[ $a == [yY]* ]]
 }
 conf_get() { sed -n "s/^$1=//p" "$conf" 2>/dev/null | tail -1; }
@@ -159,7 +159,7 @@ EOF
   Mouse (always): middle-drag a window by its top to move it; Shift+click a
   taskbar icon for a new window.
 EOF
-  read -r -p "  Install [a]ll, only the [n]ew ones, or [s]kip? [A/n/s] " a
+  read -r -p "  Install [a]ll, only the [n]ew ones, or [s]kip? [A/n/s] " a || true
   case "$a" in
     [nN]*) conf_set keys new ;;
     [sS]*) conf_set keys off ;;
