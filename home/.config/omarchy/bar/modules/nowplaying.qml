@@ -325,7 +325,7 @@ BarWidget {
       root.equalizerStyle = String(o.equalizerStyle || "spectrum")
       root.clickMode = o.nowPlayingClick === "play" ? "play" : "card"
       root.lineIcons = o.iconsNowPlaying === "line"
-      root.iconColorMode = String(o.iconColors || "mono")
+      root.iconColorMode = String(o.iconColorsNowPlaying || o.iconColors || "mono")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
       root.mixerOpen = o.nowPlayingMixer === true || o.nowPlayingMixer === "true"

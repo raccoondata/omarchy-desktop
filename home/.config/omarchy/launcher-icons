@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Omarchy's app launcher (Super+Space) with the desktop's line icons
+# (Taskbar & Desktop > Icons > App launcher). The launcher indexes app icons
+# from ~/.icons first, keeping the first file per icon name, so line icons in
+# a folder there, named after each app's launcher icon, take their place;
+# the folder isn't an icon theme (no index.theme), so nothing else uses it.
+# The taskbar works out which icon each app gets and in what colour, and
+# runs this to write them:
+#   launcher-icons write <json-file>   {"<icon name>": "<svg>", ...}: replace
+#                                      the folder with exactly these
+#   launcher-icons off                 remove the folder
+#   launcher-icons status              on (and how many) / off
+# Each write goes to a new folder (the name changes with its contents), so
+# the launcher doesn't show images it cached from an older write.
+
+root="$HOME/.icons"
+prefix="omarchy-desktop-launcher"
+
+case "${1:-status}" in
+  status)
+    d="$(find "$root" -maxdepth 1 -type d -name "$prefix-*" 2>/dev/null | head -1)"
+    if [[ -n $d ]]; then echo "on ($(find "$d" -name '*.svg' | wc -l) icons)"; else echo off; fi
+    ;;
+  off)
+    find "$root" -maxdepth 1 -type d -name "$prefix-*" -exec rm -rf {} + 2>/dev/null || true
+    echo off
+    ;;
+  write)
+    src="${2:?usage: launcher-icons write <json-file>}"
+    hash="$(md5sum "$src" | cut -c1-10)"
+    new="$root/$prefix-$hash"
+    if [[ -d $new ]]; then echo "unchanged"; exit 0; fi
+    mkdir -p "$new/scalable/apps"
+    python3 - "$src" "$new/scalable/apps" <<'PY'
+import json, pathlib, re, sys
+icons = json.load(open(sys.argv[1]))
+out = pathlib.Path(sys.argv[2])
+for name, svg in icons.items():
+    if re.fullmatch(r"[A-Za-z0-9._+-]+", name):
+        (out / f"{name}.svg").write_text(svg)
+PY
+    find "$root" -maxdepth 1 -type d -name "$prefix-*" ! -path "$new" -exec rm -rf {} + 2>/dev/null || true
+    echo "on ($(find "$new" -name '*.svg' | wc -l) icons)"
+    ;;
+  *) sed -n '3,16p' "$0"; exit 2 ;;
+esac

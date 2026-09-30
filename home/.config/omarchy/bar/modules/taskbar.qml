@@ -1629,13 +1629,64 @@ BarWidget {
     return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, lineColor(name, color))
   }
 
+  // Omarchy's app launcher (Super+Space) with line icons (Icons > App
+  // launcher): a line icon file for every app that has one, named after the
+  // app's own icon, in a folder the launcher's icon index reads first
+  // (~/.config/omarchy/launcher-icons). Rewritten when the setting, the
+  // colours, the theme or the installed apps change.
+  readonly property bool launcherLineIcons: pref("iconsLauncher", "app") === "line"
+  onLauncherLineIconsChanged: launcherIconsTimer.restart()
+  onLauncherColorModeChanged: if (launcherLineIcons) launcherIconsTimer.restart()
+  onIconColorsRevisionChanged: if (launcherLineIcons) launcherIconsTimer.restart()
+  Connections {
+    target: DesktopEntries
+    function onApplicationsChanged() { if (root.launcherLineIcons) launcherIconsTimer.restart() }
+  }
+  Timer {
+    id: launcherIconsTimer
+    interval: 2000
+    onTriggered: root.writeLauncherIcons()
+  }
+  FileView {
+    id: launcherIconsFile
+    path: Quickshell.env("XDG_RUNTIME_DIR") + "/omarchy-launcher-icons.json"
+    printErrors: false
+    onSaved: Util.execArgv([root.omarchyDir + "/launcher-icons", "write", path])
+  }
+  function writeLauncherIcons() {
+    if (!launcherLineIcons) {
+      Util.execArgv([omarchyDir + "/launcher-icons", "off"])
+      return
+    }
+    var apps = DesktopEntries.applications.values || []
+    var fallback = String(Color.menu.text)
+    var out = {}
+    for (var i = 0; i < apps.length; i++) {
+      var icon = String(apps[i].icon || "")
+      // An icon given as a path is used as is by the launcher; only names can be replaced.
+      if (!icon || icon.charAt(0) === "/" || out[icon] !== undefined) continue
+      // Generic freedesktop names (applications-system, utilities-terminal...)
+      // are shared by unrelated apps: leave those alone.
+      if (/^(applications|utilities|preferences|system|accessories|help|user|x|text|image|audio|video|network|input|media|document|folder|emblem)-/.test(icon)) continue
+      var name = TaskbarMatch.forEntry(apps[i])
+      if (name) out[icon] = TaskbarIcons.markup(name, lineColor(name, fallback, launcherColorMode))
+    }
+    launcherIconsFile.setText(JSON.stringify(out))
+  }
+
   // Line icon colours: "mono" (the theme's, as each place draws), "brand"
   // (each app's own) or "palette" (that, moved onto the theme). IconColors.js.
-  readonly property string iconColorMode: pref("iconColors", "mono")
+  // Set per place (Icons tab): iconColors<Place>, else the older single
+  // iconColors, else "mono".
+  function colorModeFor(place) {
+    return String(pref("iconColors" + place, pref("iconColors", "mono")))
+  }
+  readonly property string iconColorMode: colorModeFor("Taskbar")
+  readonly property string launcherColorMode: colorModeFor("Launcher")
   property int iconColorsRevision: 0
-  function lineColor(name, fallback) {
+  function lineColor(name, fallback, mode) {
     var revision = iconColorsRevision
-    return IconColors.colorFor(name, iconColorMode, String(fallback))
+    return IconColors.colorFor(name, mode || iconColorMode, String(fallback))
   }
   FileView {
     path: root.omarchyDir + "/bar/modules/icon-colors.json"
@@ -1672,6 +1723,7 @@ BarWidget {
   // ---------------------------------------------------------------- events
 
   Component.onCompleted: {
+    launcherIconsTimer.restart()
     reloadAgents()
     Hyprland.refreshToplevels()
     programScan.running = true

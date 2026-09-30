@@ -43,6 +43,8 @@ from iconkit import BUILTIN_JS, GRID, HOME, parts  # noqa: E402
 
 FONT = HOME / ".local/share/fonts/omarchy-desktop-icons.otf"
 CODEPOINTS = HOME / ".config/omarchy/icon-codepoints.json"
+# What the font was built from (a fingerprint of the drawings), for --check.
+STAMP = HOME / ".local/state/omarchy-desktop/icon-font.stamp"
 FAMILY = "OmarchyDesktopIcons"
 UPM, ASCENT, DESCENT = 1000, 800, 200   # the 24-unit grid spans the em box
 FIRST = 0x100000
@@ -77,9 +79,11 @@ def main():
         print(__doc__)
         sys.exit(2)
     icons = builtin_icons()
+    import hashlib
+    fingerprint = hashlib.sha256(json.dumps(icons, sort_keys=True).encode()).hexdigest()
     if "--check" in ARGS:
-        ok = FONT.exists() and FONT.stat().st_mtime >= BUILTIN_JS.stat().st_mtime
-        print("font is current" if ok else "font is older than the icons: run icon-font")
+        ok = FONT.exists() and STAMP.exists() and STAMP.read_text().strip() == fingerprint
+        print("font is current" if ok else "the font wasn't built from these icons: run icon-font")
         sys.exit(0 if ok else 1)
 
     try:
@@ -119,6 +123,8 @@ def main():
     fb.save(str(FONT))
     CODEPOINTS.write_text(json.dumps(dict(sorted(cps.items())), indent=2) + "\n")
     subprocess.run(["fc-cache", "-f", str(FONT.parent)], capture_output=True)
+    STAMP.parent.mkdir(parents=True, exist_ok=True)
+    STAMP.write_text(fingerprint + "\n")
     print(f"built {len(icons)} glyphs into {FONT} (family {FAMILY}); codepoints in {CODEPOINTS}")
 
 

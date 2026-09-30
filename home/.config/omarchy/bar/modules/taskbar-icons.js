@@ -114,6 +114,13 @@ function addIcons(map) {
   }
 }
 
+// The icon as SVG markup, 24px, in `color` (for files: launcher-icons).
+function markup(name, color) {
+  var body = (icons[name] || icons.app).split("%C").join(color)
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="' + color +
+    '" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>'
+}
+
 function svg(name, color) {
   var body = (icons[name] || icons.app).split("%C").join(color)
   return "data:image/svg+xml;utf8," + encodeURIComponent(

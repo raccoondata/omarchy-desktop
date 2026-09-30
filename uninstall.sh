@@ -30,6 +30,7 @@ done
 
 echo "- hooks into Omarchy"
 "$omarchy/menu-icons" off >/dev/null 2>&1 || true
+"$omarchy/launcher-icons" off >/dev/null 2>&1 || true
 hl="$HOME/.config/hypr/hyprland.lua"
 sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hypr.desktop")$/d' "$hl"
 shell="$omarchy/shell.json"
