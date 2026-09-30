@@ -347,6 +347,7 @@ Item {
             { value: "corners", label: "Hot Corners" },
             { value: "titlebars", label: "Title Bars" },
             { value: "nowplaying", label: "Now Playing" },
+            { value: "visualizers", label: "Visualizers" },
             { value: "screenshots", label: "Screenshots" },
             { value: "icons", label: "Icons" },
             { value: "mouse", label: "Mouse" }
@@ -371,6 +372,7 @@ Item {
             : settings.tab === "agents" ? agentsTab
             : settings.tab === "screenshots" ? screenshotsTab
             : settings.tab === "icons" ? iconsTab
+            : settings.tab === "visualizers" ? visualizersTab
             : taskbarTab
         }
       }
@@ -553,87 +555,8 @@ Item {
           description: "outline where a dragged window will land at a screen edge"
           ToggleSwitch { checked: settings.taskbar.snapPreview; onToggled: settings.set("snapPreview", !checked) }
         }
-        SettingRow {
-          label: "App sound marks"
-          description: "an equalizer behind icons of apps playing sound"
-          ToggleSwitch { checked: settings.taskbar.audioMarks; onToggled: settings.set("audioMarks", !checked) }
-        }
       }
 
-      Column {
-        width: parent.columnWidth
-        spacing: Style.space(6)
-
-        Section { title: "Equalizer style" }
-
-        Grid {
-          columns: 3
-          columnSpacing: Style.space(8)
-          rowSpacing: Style.space(8)
-          readonly property real tileWidth: (parent.width - 2 * columnSpacing) / 3
-
-          Repeater {
-            model: [
-              { value: "spectrum", label: "Spectrum" },
-              { value: "wave", label: "Wave" },
-              { value: "embers", label: "Embers" },
-              { value: "ripple", label: "Ripple" },
-              { value: "scope", label: "Scope" },
-              { value: "mist", label: "Mist" },
-              { value: "fire", label: "Fire" },
-              { value: "radar", label: "Radar" },
-              { value: "swirl", label: "Swirl" },
-              { value: "plasma", label: "Plasma" },
-              { value: "rain", label: "Rain" },
-              { value: "shuffle", label: "Shuffle" }
-            ]
-
-            Rectangle {
-              id: swatch
-              required property var modelData
-              readonly property bool current: settings.taskbar.equalizerStyle === modelData.value
-
-              width: parent.tileWidth
-              height: Style.space(76)
-              radius: Style.cornerRadius
-              color: current ? Color.menu.selectedBackground : (swatchMouse.containsMouse ? Util.alpha(Color.menu.text, 0.05) : "transparent")
-              border.width: current ? 2 : 1
-              border.color: current ? Color.accent : Util.alpha(Color.menu.text, 0.14)
-
-              Equalizer {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: Style.space(10)
-                columns: 14
-                rows: 9
-                pixel: 3
-                gap: 1
-                playing: settings.opened
-                style: swatch.modelData.value
-                opacity: swatch.current ? 0.9 : 0.55
-              }
-
-              Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Style.space(8)
-                text: swatch.modelData.label
-                color: swatch.current ? Color.menu.selectedText : Color.menu.text
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              MouseArea {
-                id: swatchMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: settings.set("equalizerStyle", swatch.modelData.value)
-              }
-            }
-          }
-        }
-      }
     }
   }
 
@@ -1042,6 +965,176 @@ Item {
     }
   }
 
+  // Visualizers: where the equalizers and effects show, and which style each
+  // uses. All drawn on the GPU (Equalizer.qml, Visualizer.qml, artfx), and
+  // each only runs while it's shown and something plays.
+  Component {
+    id: visualizersTab
+
+    Row {
+      id: visTab
+      spacing: Style.space(24)
+      readonly property real columnWidth: (settings.cardWidth - spacing) / 2 - Style.space(12)
+      readonly property var prefs: settings.taskbar.prefs || ({})
+      readonly property var eqStyles: [{ value: "spectrum", label: "Spectrum" }, { value: "wave", label: "Wave" }, { value: "embers", label: "Embers" },
+                    { value: "ripple", label: "Ripple" }, { value: "scope", label: "Scope" }, { value: "mist", label: "Mist" },
+                    { value: "fire", label: "Fire" }, { value: "radar", label: "Radar" }, { value: "swirl", label: "Swirl" },
+                    { value: "plasma", label: "Plasma" }, { value: "rain", label: "Rain" }, { value: "shuffle", label: "Shuffle" }]
+
+      Column {
+        width: parent.columnWidth
+        spacing: Style.space(6)
+
+        Section { title: "Where" }
+
+        SettingRow {
+          label: "Taskbar"
+          description: "behind the icons of apps playing sound; its style on the right"
+          ToggleSwitch { checked: settings.taskbar.audioMarks; onToggled: settings.set("audioMarks", !checked) }
+        }
+        SettingRow {
+          label: "Bar, by the song"
+          description: "a small one next to the now-playing title"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "off", label: "Off" }, { value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles)
+            value: visTab.prefs.nowPlayingBarEq || "off"
+            onChanged: function(v) { settings.set("nowPlayingBarEq", v) }
+          }
+        }
+        SettingRow {
+          label: "Card header"
+          description: "by NOW PLAYING in the card"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
+            value: visTab.prefs.nowPlayingHeaderEq || "same"
+            onChanged: function(v) { settings.set("nowPlayingHeaderEq", v) }
+          }
+        }
+      SettingRow {
+        label: "Card visualizer"
+        description: "under the art; right-click the art to step through them"
+        Dropdown {
+          width: Style.space(180)
+          showLabel: false
+          fontFamily: Style.font.menuFamily
+          options: [{ value: "pixel", label: "Pixel equalizer" }, { value: "tunnel", label: "Tunnel" }, { value: "kaleido", label: "Kaleidoscope" },
+                    { value: "starfield", label: "Starfield" }, { value: "battery", label: "Battery" }, { value: "lava", label: "Lava" },
+                    { value: "lissajous", label: "Lissajous" }, { value: "aurora", label: "Aurora" }, { value: "off", label: "Off" }]
+          value: visTab.prefs.nowPlayingVisual || (visTab.prefs.nowPlayingVisualizer === false ? "off" : "pixel")
+          onChanged: function(v) { settings.set("nowPlayingVisual", v) }
+        }
+      }
+      SettingRow {
+        label: "Album art effect"
+        description: "moves with the music; middle-click the art to step through them"
+        Dropdown {
+          width: Style.space(180)
+          showLabel: false
+          fontFamily: Style.font.menuFamily
+          options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
+                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" }]
+          value: visTab.prefs.nowPlayingArtFx || "off"
+          onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
+        }
+      }
+        SettingRow {
+          visible: (visTab.prefs.nowPlayingVisual || "pixel") === "pixel"
+          label: "Card equalizer style"
+          description: "for the card's pixel equalizer"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles)
+            value: visTab.prefs.nowPlayingCardEq || "same"
+            onChanged: function(v) { settings.set("nowPlayingCardEq", v) }
+          }
+        }
+      }
+
+      Column {
+        width: parent.columnWidth
+        spacing: Style.space(6)
+
+        Section { title: "Taskbar style" }
+
+        Grid {
+          columns: 3
+          columnSpacing: Style.space(8)
+          rowSpacing: Style.space(8)
+          readonly property real tileWidth: (parent.width - 2 * columnSpacing) / 3
+
+          Repeater {
+            model: [
+              { value: "spectrum", label: "Spectrum" },
+              { value: "wave", label: "Wave" },
+              { value: "embers", label: "Embers" },
+              { value: "ripple", label: "Ripple" },
+              { value: "scope", label: "Scope" },
+              { value: "mist", label: "Mist" },
+              { value: "fire", label: "Fire" },
+              { value: "radar", label: "Radar" },
+              { value: "swirl", label: "Swirl" },
+              { value: "plasma", label: "Plasma" },
+              { value: "rain", label: "Rain" },
+              { value: "shuffle", label: "Shuffle" }
+            ]
+
+            Rectangle {
+              id: swatch
+              required property var modelData
+              readonly property bool current: settings.taskbar.equalizerStyle === modelData.value
+
+              width: parent.tileWidth
+              height: Style.space(76)
+              radius: Style.cornerRadius
+              color: current ? Color.menu.selectedBackground : (swatchMouse.containsMouse ? Util.alpha(Color.menu.text, 0.05) : "transparent")
+              border.width: current ? 2 : 1
+              border.color: current ? Color.accent : Util.alpha(Color.menu.text, 0.14)
+
+              Equalizer {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: Style.space(10)
+                columns: 14
+                rows: 9
+                pixel: 3
+                gap: 1
+                playing: settings.opened
+                style: swatch.modelData.value
+                opacity: swatch.current ? 0.9 : 0.55
+              }
+
+              Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: Style.space(8)
+                text: swatch.modelData.label
+                color: swatch.current ? Color.menu.selectedText : Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              MouseArea {
+                id: swatchMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: settings.set("equalizerStyle", swatch.modelData.value)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   Component {
     id: nowPlayingTab
 
@@ -1078,19 +1171,6 @@ Item {
           fontFamily: Style.font.menuFamily
           fontSize: Style.font.bodySmall
           onChanged: function(v) { settings.set("nowPlayingScroll", v) }
-        }
-      }
-      SettingRow {
-        label: "Visualizer in the card"
-        description: "the equalizer style, card-wide; runs only while the card is open"
-        ButtonGroup {
-          options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }]
-          value: npTab.prefs.nowPlayingVisualizer === false ? "false" : "true"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("nowPlayingVisualizer", v) }
         }
       }
       SettingRow {

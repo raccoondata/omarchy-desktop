@@ -314,6 +314,27 @@ BarWidget {
   // desktop's line icons (where an app has one).
   property bool lineIcons: false
   property bool cardVisualizer: true
+  // The card's visualizer ("off", "pixel": the equalizer style, or a scene:
+  // Visualizer.qml) and the album art's effect ("off" or shaders/artfx.frag's
+  // modes). Right-click / middle-click the art to step through them.
+  property string cardVisual: "pixel"
+  // Per place (Taskbar & Desktop > Visualizers): "off", "same" (the
+  // taskbar's style) or a style. The bar one is off unless chosen.
+  property string barEq: "off"
+  property string headerEq: "same"
+  property string cardEq: "same"
+  function eqStyle(choice) { return choice === "same" || !choice ? root.equalizerStyle : choice }
+  property string artEffect: "off"
+  readonly property var visuals: ["pixel", "tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "off"]
+  readonly property var artEffects: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar"]
+  readonly property var visualNames: ({ pixel: "Pixel equalizer", tunnel: "Tunnel", kaleido: "Kaleidoscope", starfield: "Starfield",
+    battery: "Battery", lava: "Lava", lissajous: "Lissajous", aurora: "Aurora", off: "No visualizer" })
+  readonly property var artEffectNames: ({ off: "No art effect", glitch: "Glitch", chroma: "Chroma", pixel: "Pixelate", crt: "CRT", melt: "Melt", solar: "Solar" })
+  function stepSetting(key, list, current) {
+    var next = list[(list.indexOf(current) + 1) % list.length]
+    Util.execArgv([root.omarchyDir + "/taskbar-setting", "set", key, next])
+    return next
+  }
   property string iconColorMode: "mono"
   FileView {
     path: root.omarchyDir + "/taskbar-settings.json"
@@ -327,6 +348,11 @@ BarWidget {
       root.clickMode = o.nowPlayingClick === "play" ? "play" : "card"
       root.lineIcons = o.iconsNowPlaying === "line"
       root.cardVisualizer = o.nowPlayingVisualizer !== false
+      root.cardVisual = root.visuals.indexOf(o.nowPlayingVisual) !== -1 ? o.nowPlayingVisual : (o.nowPlayingVisualizer === false ? "off" : "pixel")
+      root.artEffect = root.artEffects.indexOf(o.nowPlayingArtFx) !== -1 ? o.nowPlayingArtFx : "off"
+      root.barEq = String(o.nowPlayingBarEq || "off")
+      root.headerEq = String(o.nowPlayingHeaderEq || "same")
+      root.cardEq = String(o.nowPlayingCardEq || "same")
       root.iconColorMode = String(o.iconColorsNowPlaying || o.iconColors || "mono")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
@@ -440,6 +466,20 @@ BarWidget {
     spacing: Style.space(7)
     opacity: root.playing ? 1 : 0.55
     Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+    // A small visualizer by the song (Visualizers > Bar), off by default.
+    Equalizer {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: root.barEq !== "off" && root.hasMedia && !root.vertical
+      columns: 5
+      rows: 4
+      pixel: Math.max(2, Style.space(3))
+      gap: 1
+      playing: root.playing && visible
+      silent: !root.playing
+      style: root.eqStyle(root.barEq)
+      color: root.accent
+    }
 
     Item {
       id: thumb
@@ -1136,8 +1176,57 @@ BarWidget {
               smooth: true
               mipmap: true
               visible: status === Image.Ready
+              // Still drawn under an art effect, which reads it as a texture.
+              opacity: artFx.visible ? 0 : 1
               layer.enabled: Style.cornerRadius > 0
               layer.effect: MultiEffect { maskEnabled: true; maskSource: artMask }
+            }
+            // The art effect (shaders/artfx.frag), on the GPU; its beat moves
+            // only while the card is open and playing.
+            ShaderEffect {
+              id: artFx
+              anchors.fill: art
+              visible: root.artEffect !== "off" && art.status === Image.Ready
+              property variant source: art
+              property real tick: 0
+              readonly property real mode: Math.max(0, root.artEffects.indexOf(root.artEffect))
+              readonly property real aspect: width / Math.max(1, height)
+              fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
+              Timer {
+                running: artFx.visible && root.popupOpen && root.playing
+                interval: 66
+                repeat: true
+                onTriggered: artFx.tick += 1
+              }
+            }
+            // What right / middle click just switched to.
+            Rectangle {
+              id: fxToast
+              property string text: ""
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Style.space(8)
+              width: toastText.implicitWidth + Style.space(14)
+              height: toastText.implicitHeight + Style.space(6)
+              radius: Style.cornerRadius
+              color: root.tint(Color.popups.background, 0.85)
+              opacity: 0
+              z: 5
+              function show(t) { text = t; toastAnim.restart() }
+              Text {
+                id: toastText
+                anchors.centerIn: parent
+                text: fxToast.text
+                color: root.text
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+              SequentialAnimation {
+                id: toastAnim
+                NumberAnimation { target: fxToast; property: "opacity"; to: 1; duration: 120 }
+                PauseAnimation { duration: 900 }
+                NumberAnimation { target: fxToast; property: "opacity"; to: 0; duration: 300 }
+              }
             }
             Rectangle {
               id: artMask
@@ -1205,7 +1294,17 @@ BarWidget {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: root.raiseApp()
+              acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+              // Left: go to the app. Right: next visualizer. Middle: next art effect.
+              onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                  root.cardVisual = root.stepSetting("nowPlayingVisual", root.visuals, root.cardVisual)
+                  fxToast.show(root.visualNames[root.cardVisual])
+                } else if (mouse.button === Qt.MiddleButton) {
+                  root.artEffect = root.stepSetting("nowPlayingArtFx", root.artEffects, root.artEffect)
+                  fxToast.show(root.artEffectNames[root.artEffect])
+                } else root.raiseApp()
+              }
             }
           }
 
@@ -1235,7 +1334,8 @@ BarWidget {
                 gap: 1
                 playing: root.playing && root.popupOpen
                 silent: !root.playing
-                style: root.equalizerStyle
+                style: root.eqStyle(root.headerEq)
+                visible: root.headerEq !== "off"
                 color: root.accent
               }
               Text {
@@ -1305,21 +1405,30 @@ BarWidget {
         // only runs while the card is open and playing.
         Item {
           id: visualizer
-          visible: root.cardVisualizer
+          visible: root.cardVisual !== "off"
           width: parent.width
-          height: visible ? vis.height : 0
+          height: !visible ? 0 : root.cardVisual === "pixel" ? vis.height : Style.space(72)
           opacity: card.enter * 0.85
+          Visualizer {
+            anchors.fill: parent
+            visible: root.cardVisual !== "pixel"
+            scene: root.cardVisual
+            playing: root.playing && root.popupOpen && visualizer.visible && visible
+            colorA: root.accent
+            colorB: root.text
+          }
           Equalizer {
             id: vis
+            visible: root.cardVisual === "pixel"
             anchors.horizontalCenter: parent.horizontalCenter
             readonly property int cell: Math.max(6, Style.space(6))
             pixel: cell
             gap: 2
             columns: Math.max(8, Math.floor((visualizer.width + gap) / (cell + gap)))
             rows: 5
-            playing: root.playing && root.popupOpen && visualizer.visible
+            playing: root.playing && root.popupOpen && visualizer.visible && visible
             silent: !root.playing
-            style: root.equalizerStyle
+            style: root.eqStyle(root.cardEq)
             color: root.accent
           }
         }
