@@ -8,12 +8,18 @@ your own monitors, keybindings, theme and apps alone.
 
 ## Install
 
-On an up-to-date Omarchy, logged in. The repo is private, so sign in to
-GitHub first:
+On an up-to-date Omarchy, logged in. The repo is private: first accept the
+invite to it (the email from GitHub, or github.com/notifications), then in a
+terminal (Super+Return):
 
-    yay -S github-cli && gh auth login        # HTTPS, sign in with a browser
+    yay -S github-cli
+    gh auth login --web --clipboard --git-protocol https
     gh repo clone raccoondata/omarchy-desktop ~/.local/share/omarchy-desktop/src
     ~/.local/share/omarchy-desktop/src/install.sh
+
+`gh auth login` copies a code, then opens GitHub in the browser when you press
+Enter: sign in if asked, paste the code (Ctrl+V), then Authorize. That also
+lets `omarchy-desktop update` fetch updates later without asking again.
 
 It asks for your password (for the system parts), which keybindings you want
 (it lists them: all, only the new ones, or none) and whether you want remote
