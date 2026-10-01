@@ -29,14 +29,27 @@ var packedBands = null
 var frame = 0
 var wantAt = 0
 var bassAverage = 0
+// The loudest band of recent frames (decaying over a few seconds): cava's own
+// auto-sensitivity takes ~5 s to ramp up after it starts, so until it has,
+// quiet input is lifted toward full range here (at most 25x; never cut).
+var peak = 0
 
 // One line of cava's output: "511;753;...;" (0..1000).
 function set(line) {
   var parts = String(line).split(";")
+  var raw = []
+  var most = 0
+  for (var i = 0; i < 16; i++) {
+    var r = Math.max(0, Math.min(1, (parseInt(parts[i], 10) || 0) / 1000))
+    raw.push(r)
+    most = Math.max(most, r)
+  }
+  peak = Math.max(most, peak * 0.98)
+  var gain = peak < 0.85 ? Math.min(25, 0.85 / Math.max(peak, 0.01)) : 1
   var next = []
   var sum = 0
-  for (var i = 0; i < 16; i++) {
-    var v = Math.max(0, Math.min(1, (parseInt(parts[i], 10) || 0) / 1000))
+  for (var j = 0; j < 16; j++) {
+    var v = Math.min(1, raw[j] * gain)
     next.push(v)
     sum += v
   }

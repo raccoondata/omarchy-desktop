@@ -13,6 +13,7 @@ import "taskbar-icons.js" as TaskbarIcons
 import "TaskbarMatch.js" as TaskbarMatch
 import "IconColors.js" as IconColors
 import "AudioLevels.js" as AudioLevels
+import "Visuals.js" as Visuals
 
 // Now playing, in place of Omarchy's Media widget (omarchy.media). Reads MPRIS
 // (any player: Edge/Chromium tabs, Spotify, mpv, ...) directly.
@@ -331,11 +332,8 @@ BarWidget {
   readonly property bool saving: AudioLevels.saving(mediaSaver, UPower.onBattery, PowerProfiles.profile === PowerProfile.PowerSaver)
   function eqStyle(choice) { return choice === "same" || !choice ? root.equalizerStyle : choice }
   property string artEffect: "off"
-  readonly property var visuals: ["pixel", "tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "woods", "off"]
-  readonly property var artEffects: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar", "night", "torch"]
-  readonly property var visualNames: ({ pixel: "Pixel equalizer", tunnel: "Tunnel", kaleido: "Kaleidoscope", starfield: "Starfield",
-    battery: "Battery", lava: "Lava", lissajous: "Lissajous", aurora: "Aurora", woods: "Digital woods", off: "No visualizer" })
-  readonly property var artEffectNames: ({ off: "No art effect", glitch: "Glitch", chroma: "Chroma", pixel: "Pixelate", crt: "CRT", melt: "Melt", solar: "Solar", night: "Night vision", torch: "Flashlight" })
+  readonly property var visuals: Visuals.values(Visuals.cardVisuals())
+  readonly property var artEffects: Visuals.values(Visuals.artEffects)
   // The next (step 1) or previous (-1) of list after current, saved as key.
   function stepSetting(key, list, current, step) {
     var next = list[(list.indexOf(current) + (step || 1) + list.length) % list.length]
@@ -1388,7 +1386,7 @@ BarWidget {
               onClicked: function(mouse) {
                 if (mouse.button === Qt.LeftButton) { root.raiseApp(); return }
                 root.artEffect = root.stepSetting("nowPlayingArtFx", root.artEffects, root.artEffect, mouse.button === Qt.MiddleButton ? -1 : 1)
-                fxToast.show(root.artEffectNames[root.artEffect])
+                fxToast.show(root.artEffect === "off" ? "No art effect" : Visuals.label(Visuals.artEffects, root.artEffect))
               }
             }
           }
@@ -1545,7 +1543,7 @@ BarWidget {
             onClicked: function(mouse) {
               var shown = root.visuals.filter(function(v) { return v !== "off" })
               root.cardVisual = root.stepSetting("nowPlayingVisual", shown, root.cardVisual, mouse.button === Qt.RightButton ? -1 : 1)
-              visToast.show(root.visualNames[root.cardVisual])
+              visToast.show(Visuals.label(Visuals.cardVisuals(), root.cardVisual))
             }
           }
           Toast { id: visToast }

@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "Visuals.js" as Visuals
 
 // Taskbar settings window: Super+Space > Setup > Taskbar, or a taskbar icon's
 // right-click menu. Built from Omarchy's own controls (toggles, button groups,
@@ -1296,11 +1297,7 @@ Item {
       spacing: Style.space(24)
       readonly property real columnWidth: (settings.cardWidth - spacing) / 2 - Style.space(12)
       readonly property var prefs: settings.taskbar.prefs || ({})
-      readonly property var eqStyles: [{ value: "spectrum", label: "Spectrum" }, { value: "wave", label: "Wave" }, { value: "embers", label: "Embers" },
-                    { value: "ripple", label: "Ripple" }, { value: "scope", label: "Scope" }, { value: "mist", label: "Mist" },
-                    { value: "fire", label: "Fire" }, { value: "radar", label: "Radar" }, { value: "swirl", label: "Swirl" },
-                    { value: "plasma", label: "Plasma" }, { value: "rain", label: "Rain" }, { value: "flashlights", label: "Flashlights" },
-                    { value: "woods", label: "Woods" }, { value: "shuffle", label: "Shuffle" }]
+      readonly property var eqStyles: Visuals.eqStyles.concat([{ value: "shuffle", label: "Shuffle" }])
 
       Column {
         width: parent.columnWidth
@@ -1344,10 +1341,7 @@ Item {
           width: Style.space(180)
           showLabel: false
           fontFamily: Style.font.menuFamily
-          options: [{ value: "pixel", label: "Pixel equalizer" }, { value: "tunnel", label: "Tunnel" }, { value: "kaleido", label: "Kaleidoscope" },
-                    { value: "starfield", label: "Starfield" }, { value: "battery", label: "Battery" }, { value: "lava", label: "Lava" },
-                    { value: "lissajous", label: "Lissajous" }, { value: "aurora", label: "Aurora" }, { value: "woods", label: "Digital woods" },
-                    { value: "off", label: "Off" }]
+          options: Visuals.cardVisuals()
           value: visTab.prefs.nowPlayingVisual || (visTab.prefs.nowPlayingVisualizer === false ? "off" : "pixel")
           onChanged: function(v) { settings.set("nowPlayingVisual", v) }
         }
@@ -1372,9 +1366,7 @@ Item {
           width: Style.space(180)
           showLabel: false
           fontFamily: Style.font.menuFamily
-          options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
-                    { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" },
-                    { value: "night", label: "Night vision" }, { value: "torch", label: "Flashlight" }]
+          options: Visuals.artEffects
           value: visTab.prefs.nowPlayingArtFx || "off"
           onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
         }
@@ -1398,9 +1390,7 @@ Item {
             width: Style.space(180)
             showLabel: false
             fontFamily: Style.font.menuFamily
-            options: [{ value: "off", label: "Off" }, { value: "glitch", label: "Glitch" }, { value: "chroma", label: "Chroma" },
-                      { value: "pixel", label: "Pixelate" }, { value: "crt", label: "CRT" }, { value: "melt", label: "Melt" }, { value: "solar", label: "Solar" },
-                    { value: "night", label: "Night vision" }, { value: "torch", label: "Flashlight" }]
+            options: Visuals.artEffects
             value: visTab.prefs.superMenuArtFx || "off"
             onChanged: function(v) { settings.set("superMenuArtFx", v) }
           }
@@ -1436,22 +1426,7 @@ Item {
           readonly property real tileWidth: (parent.width - 2 * columnSpacing) / 3
 
           Repeater {
-            model: [
-              { value: "spectrum", label: "Spectrum" },
-              { value: "wave", label: "Wave" },
-              { value: "embers", label: "Embers" },
-              { value: "ripple", label: "Ripple" },
-              { value: "scope", label: "Scope" },
-              { value: "mist", label: "Mist" },
-              { value: "fire", label: "Fire" },
-              { value: "radar", label: "Radar" },
-              { value: "swirl", label: "Swirl" },
-              { value: "plasma", label: "Plasma" },
-              { value: "rain", label: "Rain" },
-              { value: "flashlights", label: "Flashlights" },
-              { value: "woods", label: "Woods" },
-              { value: "shuffle", label: "Shuffle" }
-            ]
+            model: visTab.eqStyles
 
             Rectangle {
               id: swatch
