@@ -10,10 +10,13 @@ import qs.Ui
 import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
 import "../../plugins/line-icons/lib/IconColors.js" as IconColors
-import "MediaWindow.js" as MediaWindow
-import "AudioLevels.js" as AudioLevels
-import "TaskbarStatus.js" as TaskbarStatus
-import "Visuals.js" as Visuals
+import "../../plugins/desktop-core/lib/MediaWindow.js" as MediaWindow
+import "../../plugins/desktop-core/lib/AudioLevels.js" as AudioLevels
+import "../../plugins/desktop-core/lib/WindowStatus.js" as TaskbarStatus
+import "../../plugins/desktop-core/lib/Visuals.js" as Visuals
+import "../../plugins/desktop-core/model"
+import "../../plugins/desktop-core/ui"
+import "../../plugins/desktop-core/media"
 
 // Taskbar built from Hyprland's own window list, so each entry knows its
 // workspace. Windows with the same icon share one entry; the dots under it are
@@ -51,6 +54,10 @@ BarWidget {
   readonly property real openPanelIndicatorHeight: 0.4
 
   readonly property var toplevels: Hyprland.toplevels.values
+  // What Desktop Core's service worked out about the windows (what runs in
+  // each terminal, recently used, attention, the agents): the desktop-core
+  // plugin's model/Windows.qml.
+  Windows { id: core }
   // Where the scripts and state files the taskbar uses live.
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"
   readonly property int maxLabelWidth: Number(pref("maxLabelWidth", 120))
@@ -150,9 +157,8 @@ BarWidget {
   readonly property int motionFast: 80
   readonly property int motionMove: 130
   // Window address -> program in the foreground of the terminal it hosts
-  // (nvim, lazygit, claude, ...), from ~/.config/omarchy/window-programs.
-  property var programByAddress: ({})
-  property string programsText: ""
+  // (nvim, lazygit, claude, ...), from Desktop Core.
+  readonly property var programByAddress: core.programs
 
   // Matching rules: TaskbarMatch.js (shared with the Super menu and now playing).
   readonly property var programIcons: TaskbarMatch.programIcons
@@ -546,62 +552,16 @@ BarWidget {
   }
 
   // Windows that want you, by address: Hyprland's urgent hint (a chat message,
-  // a terminal bell) or an agent that finished while you were elsewhere.
-  // Cleared when the window is focused.
-  property var attention: ({})
-  // Last agent state seen per address, to notice working -> idle.
-  property var agentStates: ({})
-
-  function setAttention(address, on) {
-    if ((attention[address] === true) === on) return
-    var next = Object.assign({}, attention)
-    if (on) next[address] = true
-    else delete next[address]
-    attention = next
-  }
-
-  function isActiveAddress(address) {
-    var active = Hyprland.activeToplevel
-    return active ? hexAddress(active) === address : false
-  }
-
-  function noteTitle(address, title) {
-    var state = TaskbarStatus.agentState(title, programByAddress[address] || "")
-    var before = agentStates[address] || ""
-    if (state === before) return
-    var next = Object.assign({}, agentStates)
-    next[address] = state
-    agentStates = next
-    if (before === "working" && state === "idle" && !isActiveAddress(address)) setAttention(address, true)
-  }
+  // a terminal bell) or an agent that finished while you were elsewhere
+  // (Desktop Core); cleared when the window is focused.
+  readonly property var attention: core.attention
 
   // ------------------------------------------------------------- switching
 
-  // Most recently focused first, for Alt+Tab.
-  property var mru: []
+  // Most recently focused first, for Alt+Tab (Desktop Core).
+  readonly property var mru: core.mru
 
-  function noteFocus(address) {
-    var next = mru.filter(function(a) { return a !== address })
-    next.unshift(address)
-    mru = next.slice(0, 64)
-  }
-
-  function forget(address) {
-    mru = mru.filter(function(a) { return a !== address })
-    setAttention(address, false)
-  }
-
-  function switcherWindows() {
-    var rank = {}
-    for (var i = 0; i < mru.length; i++) rank[mru[i]] = i
-    var list = []
-    for (var j = 0; j < toplevels.length; j++) list.push(toplevels[j])
-    return list.sort(function(a, b) {
-      var ra = rank[hexAddress(a)]
-      var rb = rank[hexAddress(b)]
-      return (ra === undefined ? 1000 : ra) - (rb === undefined ? 1000 : rb)
-    })
-  }
+  function switcherWindows() { return core.allByRecent() }
 
   // Keyboard switching: let Hyprland move the pointer onto the window.
   function switchTo(toplevel) {
@@ -645,7 +605,7 @@ BarWidget {
     // Mark a window as wanting you (0x-address), e.g. from a hook; it clears
     // when the window is focused.
     function attention(address: string): void {
-      if (address && !root.isActiveAddress(address)) root.setAttention(address, true)
+      if (address) core.markAttention(address)
     }
     // Hyprland's Shift+click bind (hypr/desktop/bindings.lua) calls this, since the
     // bar never sees modifier keys itself.
@@ -1084,28 +1044,6 @@ BarWidget {
         root.rebuildAudio()
         if (root.audioPids === "") audioSnapshot.restart()
       }
-    }
-  }
-
-  // The music's spectrum for the equalizers and visualizers (AudioLevels.js):
-  // cava runs while something plays and a visualizer asked for it in the last
-  // two seconds, and stops otherwise (checked once a second). No cava
-  // installed: the visualizers keep their generated motion.
-  Process {
-    id: cava
-    command: ["stdbuf", "-oL", "cava", "-p", root.omarchyDir + "/cava.conf"]
-    stdout: SplitParser {
-      onRead: function(line) { AudioLevels.set(line) }
-    }
-  }
-  Timer {
-    interval: 1000
-    repeat: true
-    running: root.playbackStreams.length > 0 || cava.running
-    onTriggered: {
-      var wanted = Date.now() - AudioLevels.wantAt < 2000 && root.playbackStreams.length > 0
-      if (wanted && !cava.running) cava.running = true
-      else if (!wanted && cava.running) cava.running = false
     }
   }
 
@@ -1723,21 +1661,9 @@ BarWidget {
   }
 
   // The installed coding agents, primaries first: [{id, name, primary}]
-  // (~/.config/omarchy/agents list). Re-read when the settings window opens.
-  property var agents: [{ id: "claude", name: "Claude", primary: true }, { id: "codex", name: "Codex", primary: true }]
-  function reloadAgents() { if (!agentsProc.running) agentsProc.running = true }
-  Process {
-    id: agentsProc
-    command: [root.omarchyDir + "/agents", "list"]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          var list = JSON.parse(this.text)
-          if (Array.isArray(list) && list.length > 0) root.agents = list
-        } catch (e) { }
-      }
-    }
-  }
+  // (Desktop Core). Re-read when the settings window opens.
+  readonly property var agents: core.agents
+  function reloadAgents() { core.reloadAgents() }
   function agentName(id) {
     for (var i = 0; i < agents.length; i++) if (agents[i].id === id) return agents[i].name
     return id
@@ -1813,6 +1739,9 @@ BarWidget {
 
   // The image for an icon: the app's own in "app" mode (when it has one),
   // else the line icon, in `color` or its colour (Icons > Line icon colours).
+  // A line icon as an image, for the shared window cards (WindowCard.iconFor).
+  function lineIconUrl(name, color) { return TaskbarIcons.svg(name, color) }
+
   function iconSource(name, appIcon, color) {
     return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, lineColor(name, color))
   }
@@ -1878,49 +1807,12 @@ BarWidget {
 
   // ---------------------------------------------------------------- events
 
-  Component.onCompleted: {
-    reloadAgents()
-    Hyprland.refreshToplevels()
-    programScan.running = true
-    if (Hyprland.activeToplevel) noteFocus(hexAddress(Hyprland.activeToplevel))
-  }
-
-  Process {
-    id: programScan
-    command: [root.omarchyDir + "/window-programs"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        // Only replace the map when it changed: a new map regroups the
-        // taskbar, which rebuilds every entry mid-click or mid-drag.
-        if (text === root.programsText) return
-        root.programsText = text
-        try { root.programByAddress = JSON.parse(text) } catch (e) {}
-      }
-    }
-  }
-
-  // Programs start and quit inside an existing window, which retitles it, so
-  // rescan shortly after any window opens or closes, and at most every few
-  // seconds on title changes (Claude's spinner retitles its window constantly).
-  Timer {
-    id: programScanDelay
-    interval: 600
-    onTriggered: programScan.running = true
-  }
-
-  // Each window's title without its leading symbols (see windowtitlev2).
-  property var titleWords: ({})
-
-  Timer {
-    id: programScanThrottle
-    interval: 3000
-    onTriggered: programScan.running = true
-  }
+  Component.onCompleted: Hyprland.refreshToplevels()
 
   // Keep each window's workspace current when minimize/restore moves it, fetch
   // a new window's class (it isn't known until the next refresh), and follow
-  // focus, urgency and agent titles. Event data is the address without "0x".
+  // window drags and the app you used last. Event data is the address
+  // without "0x".
   Connections {
     target: Hyprland
     function onRawEvent(event) {
@@ -1930,7 +1822,6 @@ BarWidget {
       // refresh below replaces it.
       if (name === "movewindowv2") root.noteWindowMove(data)
       if (name === "movewindow" || name === "movewindowv2" || name === "openwindow") Hyprland.refreshToplevels()
-      if (name === "openwindow" || name === "closewindow") programScanDelay.restart()
 
       // Window drags, from the dragevents plugin (see titlebars-load).
       if (name === "windowdragstart") {
@@ -1942,30 +1833,8 @@ BarWidget {
         root.windowDragPos(data)
       } else if (name === "windowdragend") {
         root.windowDropped(data)
-      } else if (name === "urgent" && data) {
-        if (!root.isActiveAddress("0x" + data)) root.setAttention("0x" + data, true)
       } else if (name === "activewindowv2" && data && data !== ",") {
-        root.setAttention("0x" + data, false)
-        root.noteFocus("0x" + data)
         root.noteAppUse("0x" + data)
-      } else if (name === "closewindow" && data) {
-        root.forget("0x" + data)
-      } else if (name === "windowtitlev2") {
-        var comma = data.indexOf(",")
-        if (comma > 0) {
-          var address = "0x" + data.slice(0, comma)
-          var title = data.slice(comma + 1)
-          root.noteTitle(address, title)
-          // A new program in a terminal retitles it; a spinner only changes
-          // the symbols in front. Rescan (a process list, a few ms of CPU)
-          // only when the words change, not a few times a second while an
-          // agent works.
-          var words = title.replace(/^[^A-Za-z0-9]+/, "")
-          if (root.titleWords[address] !== words) {
-            root.titleWords[address] = words
-            if (!programScanThrottle.running) programScanThrottle.start()
-          }
-        }
       }
     }
   }
@@ -2777,6 +2646,7 @@ BarWidget {
         model: root.popupMode === "picker" && root.popupGroup ? root.popupGroup.windows : []
 
         WindowCard {
+          iconFor: root.lineIconUrl
           id: pickerCard
           required property var modelData
           readonly property var info: root.windowInfo(modelData)

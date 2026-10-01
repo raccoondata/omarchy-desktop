@@ -8,11 +8,13 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 import qs.services
-import "MediaWindow.js" as MediaWindow
-import "AudioLevels.js" as AudioLevels
+import "../../plugins/desktop-core/lib/MediaWindow.js" as MediaWindow
+import "../../plugins/desktop-core/lib/AudioLevels.js" as AudioLevels
 import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
-import "Visuals.js" as Visuals
+import "../../plugins/desktop-core/lib/Visuals.js" as Visuals
 import "../../plugins/line-icons/lib/IconColors.js" as IconColors
+import "../../plugins/desktop-core/ui"
+import "../../plugins/desktop-core/media"
 
 // Super menu: double-tap Super (or Caps Lock, which is Super here) for your
 // common apps in a grid, drawn like Omarchy's own menu.

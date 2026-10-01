@@ -4,8 +4,10 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
-import "Visuals.js" as Visuals
-import "TaskbarStatus.js" as TaskbarStatus
+import "../../plugins/desktop-core/lib/Visuals.js" as Visuals
+import "../../plugins/desktop-core/lib/WindowStatus.js" as TaskbarStatus
+import "../../plugins/desktop-core/ui"
+import "../../plugins/desktop-core/media"
 
 // Taskbar settings window: Super+Space > Setup > Taskbar, or a taskbar icon's
 // right-click menu. Built from Omarchy's own controls (toggles, button groups,

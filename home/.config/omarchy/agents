@@ -251,7 +251,10 @@ case "${1:-}" in
 
   sessions)
     mapfile -t list < <(installed)
-    programs="$("$HOME/.config/omarchy/window-programs" 2>/dev/null || echo '{}')"
+    # What runs in each terminal: Desktop Core keeps it current; without it,
+    # nothing (sessions in their own agent window still show).
+    programs="$(cat "${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/programs.json" 2>/dev/null)"
+    [[ -n $programs ]] || programs='{}'
     names="$(for a in "${list[@]}"; do printf '%s\t%s\t%s\n' "$a" "$(name_of "$a")" "$(class_of "$a")"; done |
       jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {key: .[0], value: {name: .[1], class: .[2]}}) | from_entries')"
     hyprctl clients -j | jq -c --argjson programs "$programs" --argjson agents "$names" '

@@ -143,15 +143,23 @@ if command -v claude >/dev/null || [[ -d $HOME/.claude ]]; then
 fi
 [[ -f $HOME/.local/share/nautilus-python/extensions/omarchy_agents.py ]] && ok "Files right-click agent menu installed" \
   || warn "Files agent menu missing (~/.local/share/nautilus-python/extensions/omarchy_agents.py)"
-# The line icons the taskbar and Super menu draw are the Line Icons plugin's.
-if [[ -f $omarchy/plugins/line-icons/lib/LineIcons.js ]]; then
-  if jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
-    ok "Line Icons plugin installed and on"
+# The desktop's plugins: Desktop Core (the shared window model, controls,
+# music visuals) and Line Icons (the icons the taskbar and Super menu draw).
+plugin_check() {  # plugin_check <id> <name> <file it must have> <what breaks> <repo>
+  if [[ -f $omarchy/plugins/$1/$3 ]]; then
+    if jq -e --arg id "$1" 'any(.plugins[]?; .id == $id)' "$omarchy/shell.json" >/dev/null 2>&1; then
+      ok "$2 plugin installed and on"
+    else
+      warn "$2 plugin installed but off (omarchy plugin enable $1)"
+    fi
   else
-    warn "Line Icons plugin installed but off (omarchy plugin enable line-icons)"
+    bad "$2 plugin missing: $4 (omarchy-desktop update, or omarchy plugin add https://github.com/raccoondata/$5.git --enable)"
   fi
-else
-  bad "Line Icons plugin missing: the taskbar has no icons (omarchy plugin add https://github.com/raccoondata/omarchy-line-icons.git --enable)"
+}
+plugin_check desktop-core "Desktop Core" model/Windows.qml "the taskbar and Super menu don't load" omarchy-desktop-core
+plugin_check line-icons "Line Icons" lib/LineIcons.js "the taskbar has no icons" omarchy-line-icons
+if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
+  warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi
 if hyprctl binds -j 2>/dev/null | jq -e '[.[] | select((.key|ascii_downcase)=="escape" and .modmask==0)] | length > 0' >/dev/null \
    && ! hyprctl clients -j | jq -e 'any(.[]; .class == "dev.tensaku.Tensaku")' >/dev/null; then

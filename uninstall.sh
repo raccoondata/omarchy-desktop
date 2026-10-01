@@ -86,17 +86,21 @@ fi
 rmdir "$HOME/.config/hypr/desktop" 2>/dev/null || true
 rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprland/libhyprbars-fixed.so" "$state/plugins-built"
 rm -f "$HOME/.local/bin/omarchy-desktop"
-# The Line Icons plugin: removed if the desktop added it; one you added
-# yourself stays.
-line_icons="$HOME/.config/omarchy/plugins/line-icons"
-if [[ "$(sed -n 's/^line_icons=//p' "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)" == added && -d $line_icons && ! -L $line_icons ]]; then
-  "$line_icons/bin/teardown" >/dev/null 2>&1 || true
-  omarchy-plugin-disable line-icons >/dev/null 2>&1 || true
-  omarchy-plugin-remove line-icons --yes >/dev/null 2>&1 && echo "  removed the Line Icons plugin (the desktop added it)"
-elif [[ -d $line_icons ]]; then
-  echo "  (the Line Icons plugin stays, you added it: ~/.config/omarchy/plugins/line-icons/bin/teardown,"
-  echo "   then omarchy plugin remove line-icons)"
-fi
+# The desktop's plugins: removed if the desktop added them; ones you added
+# yourself stay.
+for id in line-icons desktop-core; do
+  dir="$HOME/.config/omarchy/plugins/$id"
+  key="plugin_${id//-/_}"
+  mark="$(sed -n "s/^$key=//p" "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"
+  [[ $id == line-icons && -z $mark ]] && mark="$(sed -n 's/^line_icons=//p' "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"
+  if [[ $mark == added && -d $dir && ! -L $dir ]]; then
+    "$dir/bin/teardown" >/dev/null 2>&1 || true
+    omarchy-plugin-disable "$id" >/dev/null 2>&1 || true
+    omarchy-plugin-remove "$id" --yes >/dev/null 2>&1 && echo "  removed the $id plugin (the desktop added it)"
+  elif [[ -d $dir ]]; then
+    echo "  (the $id plugin stays, you added it: $dir/bin/teardown, then omarchy plugin remove $id)"
+  fi
+done
 systemctl --user daemon-reload
 
 echo "- system files"

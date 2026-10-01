@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../../plugins/desktop-core/ui"
 
 // The action bar for handing something to a coding agent, shared by the
 // editor dock (EditorDock.qml, under the screenshot editor's window), the

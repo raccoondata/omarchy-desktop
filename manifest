@@ -47,7 +47,6 @@
 .config/omarchy/window-minimize
 .config/omarchy/window-minimize-all
 .config/omarchy/window-minimize-now
-.config/omarchy/window-programs
 .config/omarchy/window-restore
 .config/omarchy/window-restore-all
 .config/systemd/user/hyprland-safe-mode-agents.service
@@ -57,4 +56,3 @@
 .local/share/nautilus-python/extensions/omarchy_agents.py
 .local/share/icons/hicolor/256x256/apps/teams.png
 .local/share/icons/hicolor/256x256/apps/youtube-music.png
-.config/omarchy/cava.conf

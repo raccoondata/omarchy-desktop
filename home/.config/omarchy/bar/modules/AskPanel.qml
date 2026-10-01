@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Ui
 import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
+import "../../plugins/desktop-core/ui"
 
 // The ask layout, shared by the ask card (AskCard.qml: files, selected text)
 // and the screenshot panel (ScreenshotPreview.qml and EditorDock.qml when
@@ -114,6 +115,7 @@ Column {
       anchors.rightMargin: closeText.visible ? Style.space(10) : 0
       labelWidth: ask.labelWidth
       label: "Ask"
+      iconFor: function(name, color) { return TaskbarIcons.svg(name, color) }
       options: ask.more
         ? [{ value: "__back", label: "‹" }].concat(ask.otherAgents.map(function(a) { return { value: a.id, label: a.name, icon: ask.agentIcon(a.id) } }))
         : ask.shownAgents.map(function(a) { return { value: a.id, label: a.name, icon: ask.agentIcon(a.id) } })

@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "../../plugins/desktop-core/ui"
 
 // Windows-style window switcher (like Alt+Tab), drawn like Omarchy's own
 // launcher. Omarchy keeps Alt+Tab for cycling tiles; this is on Super+Tab.
@@ -144,6 +145,7 @@ Item {
           model: switcher.opened ? switcher.windows : []
 
           WindowCard {
+            iconFor: taskbar.lineIconUrl
             required property var modelData
             required property int index
             readonly property var info: switcher.taskbar.windowInfo(modelData)

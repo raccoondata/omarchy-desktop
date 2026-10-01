@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import "../../plugins/desktop-core/ui"
 
 // One app (or pinned folder) tile in the super menu (SuperMenu.qml): its icon
 // and name, a dot if it's open, + / − to pin, × to take it out of Frequent

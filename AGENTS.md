@@ -43,6 +43,11 @@ home path, an email address or a name it knows about
   copies them into `home/` and commits to `main`. Others get changes only
   through `omarchy-desktop release` (one commit on `stable`), which runs
   selfcheck and the privacy check first.
+- The desktop is being split into Omarchy plugins (docs/SPLIT.md). Shared
+  code is the Desktop Core plugin's (omarchy-desktop-core, installed at
+  `~/.config/omarchy/plugins/desktop-core`): the modules import its `lib/`,
+  `ui/`, `media/` and `model/` (`Windows {}`: programs, recently used,
+  attention, agents). Don't add shared pieces back here.
 - The line icons are the Line Icons plugin's, its own repo
   (omarchy-line-icons, installed at `~/.config/omarchy/plugins/line-icons`):
   the modules import its `lib/` (LineIcons.js, IconMatch.js, IconColors.js).

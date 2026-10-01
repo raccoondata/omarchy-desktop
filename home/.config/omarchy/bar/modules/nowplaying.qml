@@ -8,12 +8,13 @@ import Quickshell.Services.UPower
 import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
-import "MediaWindow.js" as MediaWindow
+import "../../plugins/desktop-core/lib/MediaWindow.js" as MediaWindow
 import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
 import "../../plugins/line-icons/lib/IconColors.js" as IconColors
-import "AudioLevels.js" as AudioLevels
-import "Visuals.js" as Visuals
+import "../../plugins/desktop-core/lib/AudioLevels.js" as AudioLevels
+import "../../plugins/desktop-core/lib/Visuals.js" as Visuals
+import "../../plugins/desktop-core/media"
 
 // Now playing, in place of Omarchy's Media widget (omarchy.media). Reads MPRIS
 // (any player: Edge/Chromium tabs, Spotify, mpv, ...) directly.

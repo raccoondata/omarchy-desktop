@@ -77,38 +77,45 @@ sudo -v
 
 # --- 1 files -----------------------------------------------------------------
 step 1 "Desktop files"
-# The line icons (the taskbar's, the Super menu's, Omarchy's app launcher and
-# menu) are the Line Icons plugin's, and the desktop's files load them, so it
-# comes first: without it nothing is changed. It sets itself up (its icon
-# font, its skill for your agents) when the shell loads it.
-line_icons_url="https://github.com/raccoondata/omarchy-line-icons.git"
-line_icons="$omarchy/plugins/line-icons"
-if [[ ! -d $line_icons ]]; then
-  # Adding also asks a running shell to look for it, which fails outside a
-  # session: the plugin's folder (and it passing Omarchy's check) is what counts.
-  omarchy-plugin-add "$line_icons_url" --yes >/dev/null 2>&1 || true
-  if [[ -d $line_icons ]] && omarchy-plugin-validate "$line_icons" >/dev/null 2>&1; then
-    conf_set line_icons added   # so uninstall knows it may remove it
-    echo "  added the Line Icons plugin"
-  else
-    echo "  ${bold}couldn't add the Line Icons plugin${off} ($line_icons_url)."
-    echo "  The desktop needs it, so nothing was changed. Check the internet connection,"
-    echo "  then run this again (or add it yourself: omarchy plugin add $line_icons_url)."
-    exit 1
+# The desktop's parts that are Omarchy plugins of their own, and that its
+# files load: Desktop Core (the shared window model, controls and music
+# visuals) and Line Icons (the taskbar's, the Super menu's, Omarchy's app
+# launcher and menu icons). They come first: without them nothing is
+# changed. Each sets itself up when the shell loads it. (docs/SPLIT.md)
+plugins_base="https://github.com/raccoondata"
+need_plugin() {  # need_plugin <id> <name> <repo>
+  local id="$1" name="$2" url="$plugins_base/$3.git" dir="$omarchy/plugins/$1"
+  if [[ ! -d $dir ]]; then
+    # Adding also asks a running shell to look for it, which fails outside a
+    # session: the plugin's folder (and it passing Omarchy's check) is what counts.
+    omarchy-plugin-add "$url" --yes >/dev/null 2>&1 || true
+    if [[ -d $dir ]] && omarchy-plugin-validate "$dir" >/dev/null 2>&1; then
+      conf_set "plugin_${id//-/_}" added   # so uninstall knows it may remove it
+      echo "  added the $name plugin"
+    else
+      echo "  ${bold}couldn't add the $name plugin${off} ($url)."
+      echo "  The desktop needs it, so nothing was changed. Check the internet connection,"
+      echo "  then run this again (or add it yourself: omarchy plugin add $url)."
+      exit 1
+    fi
   fi
-fi
-if ! jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
-  if omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable line-icons >/dev/null 2>&1; then
-    echo "  turned on the Line Icons plugin"
-  elif [[ -f $omarchy/shell.json ]] && jq '.plugins = ((.plugins // []) + [{"id": "line-icons"}])' "$omarchy/shell.json" > "$omarchy/shell.json.tmp" 2>/dev/null; then
-    # No shell running (not in a session): on at the next login.
-    mv "$omarchy/shell.json.tmp" "$omarchy/shell.json"
-    echo "  turned on the Line Icons plugin (from your next login)"
-  else
-    rm -f "$omarchy/shell.json.tmp"
-    warn "couldn't turn on the Line Icons plugin; after logging in: omarchy plugin enable line-icons"
+  if ! jq -e --arg id "$id" 'any(.plugins[]?; .id == $id)' "$omarchy/shell.json" >/dev/null 2>&1; then
+    if omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable "$id" >/dev/null 2>&1; then
+      echo "  turned on the $name plugin"
+    elif [[ -f $omarchy/shell.json ]] && jq --arg id "$id" '.plugins = ((.plugins // []) + [{"id": $id}])' "$omarchy/shell.json" > "$omarchy/shell.json.tmp" 2>/dev/null; then
+      # No shell running (not in a session): on at the next login.
+      mv "$omarchy/shell.json.tmp" "$omarchy/shell.json"
+      echo "  turned on the $name plugin (from your next login)"
+    else
+      rm -f "$omarchy/shell.json.tmp"
+      warn "couldn't turn on the $name plugin; after logging in: omarchy plugin enable $id"
+    fi
   fi
-fi
+}
+# Older installs marked Line Icons as line_icons=added.
+[[ "$(conf_get line_icons)" == added && -z "$(conf_get plugin_line_icons)" ]] && conf_set plugin_line_icons added
+need_plugin desktop-core "Desktop Core" omarchy-desktop-core
+need_plugin line-icons "Line Icons" omarchy-line-icons
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
