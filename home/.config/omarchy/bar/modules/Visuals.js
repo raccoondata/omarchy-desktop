@@ -28,7 +28,6 @@ var scenes = [
   { value: "lava", label: "Lava" },
   { value: "lissajous", label: "Lissajous" },
   { value: "aurora", label: "Aurora" },
-  { value: "woods", label: "Digital woods" },
   { value: "glitch", label: "Glitch" },
   { value: "signal", label: "Signal loss" },
   { value: "blocks", label: "Macroblocks" },
