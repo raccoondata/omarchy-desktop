@@ -10,8 +10,10 @@ set -uo pipefail
 #
 # branch: the git branch if the folder is in a repo ("-" when detached),
 # empty if not. kind: the project type from its marker files (in the folder,
-# else at its repo's top): python, rust, go, typescript, node, deno, ruby,
-# php, java, dotnet, elixir, dart, cpp, nix, docker; empty if none. repos:
+# else at its repo's top, else, in a repo, the most common among the folders
+# just inside it: code one level down): python, rust, go, typescript,
+# node, deno, ruby, php, java, dotnet, elixir, dart, cpp, nix, docker; empty
+# if none. repos:
 # how many git repos sit directly inside it (a folder of projects), 0 if none.
 
 kind_of() {
@@ -34,6 +36,20 @@ kind_of() {
   fi
 }
 
+# The most common kind among a folder's subfolders (not hidden ones,
+# dependencies or build output).
+kind_below() {
+  local d=$1 sub k best="" n=0
+  declare -A count=()
+  for sub in "$d"/*/; do
+    case ${sub%/} in */node_modules|*/vendor|*/dist|*/build|*/target|*/.*|*/__pycache__|*/venv|*/.venv) continue ;; esac
+    k=$(kind_of "${sub%/}")
+    [[ -n $k ]] && count[$k]=$(( ${count[$k]:-0} + 1 ))
+  done
+  for k in "${!count[@]}"; do (( count[$k] > n )) && { n=${count[$k]}; best=$k; }; done
+  printf '%s' "$best"
+}
+
 describe() {
   local p=$1 branch="" kind="" top repos=0 g
   if top=$(git -C "$p" rev-parse --show-toplevel 2>/dev/null); then
@@ -41,6 +57,8 @@ describe() {
     branch=${branch:--}
     kind=$(kind_of "$p")
     [[ -z $kind && $top != "$p" ]] && kind=$(kind_of "$top")
+    # A repo whose code is a level down (docs at the top, the app inside).
+    [[ -z $kind ]] && kind=$(kind_below "$p")
   else
     kind=$(kind_of "$p")
   fi

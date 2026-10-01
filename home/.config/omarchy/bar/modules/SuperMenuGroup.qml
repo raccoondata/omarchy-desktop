@@ -2,8 +2,8 @@ import QtQuick
 import qs.Commons
 
 // One block on the super menu's grid (SuperMenu.qml): Pinned or a group, at
-// its place (layout {x, y, w, h}, in tiles; its size follows its apps and
-// where they're dropped). Its title bar drags it somewhere else; a group's
+// its place (layout {x, y, w, h}, in tiles), each tile in its own cell
+// (tiles: [{entry, c, r}]; the size is what they cover). Its title bar drags it somewhere else; a group's
 // ⋯ renames or deletes it, and double-clicking its title renames it.
 Item {
   id: block
@@ -11,6 +11,7 @@ Item {
   required property int sectionIndex
   property string title: ""
   property var entries: []
+  property var tiles: []             // [{ entry, c, r }], same order as entries
   property var layout: ({ x: 0, y: 0, w: 1, h: 1 })
   property int offset: 0
   property bool editable: false      // a group (not Pinned): rename, delete
@@ -28,8 +29,6 @@ Item {
   height: layout.h * rowPitch
   opacity: moving ? 0.45 : 1
 
-  function cellX(i) { return (i % layout.w) * colPitch }
-  function cellY(i) { return owner.bandHeight + Math.floor(i / layout.w) * rowPitch }
 
   HoverHandler { id: blockHover }
 
@@ -144,8 +143,8 @@ Item {
       flatIndex: block.offset + index
       sectionIndex: block.sectionIndex
       draggable: true
-      x: block.cellX(index)
-      y: block.cellY(index)
+      x: block.tiles[index] ? block.tiles[index].c * block.colPitch : 0
+      y: block.tiles[index] ? block.owner.bandHeight + block.tiles[index].r * block.rowPitch : 0
     }
   }
 
