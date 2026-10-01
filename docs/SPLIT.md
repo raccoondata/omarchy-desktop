@@ -70,12 +70,11 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    locally (plugin repo not published yet): the service publishes programs,
    mru, attention, agents and runs cava; the modules import its lib/, ui/,
    media/ and model/; the installer adds it (need_plugin).
-2. now-playing, hot-corners, agent-tools (done locally; Desktop Core's
-   hypr-include adds a plugin's Hyprland file to hyprland.lua; Agent Tools
-   took over the Files extension and the safe-mode unit at the same paths,
-   so install.sh's "dropped files" step skips them), screenshots (next; it
-   imports Agent Tools' ui/AskPanel.qml directly for now, to become an
-   optional bridge when it moves).
+2. now-playing, hot-corners, agent-tools, screenshots (done locally).
+   Desktop Core's hypr-include adds a plugin's Hyprland file to
+   hyprland.lua. Agent Tools took over the Files extension and the safe-mode
+   unit at the same paths, so install.sh's "dropped files" step skips them.
+   Screenshots loads Agent Tools' ask panel through bridges/AskPanel.qml.
 3. super-menu (done locally): its own key file, Host.qml as its link to the
    rest; Desktop Core counts app use. First release: line-icons and
    super-menu, after a visual pass.
