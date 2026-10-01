@@ -8,7 +8,7 @@ import "AudioLevels.js" as AudioLevels
 // tick, 10 times a second, and only while playing and shown, whatever the
 // style or size. The music comes from cava (AudioLevels.js): bars follow the
 // real bands, sparks and speed the loudness. Without cava: generated motion.
-// Muted: one flat row.
+// Muted, or saving power (`saving`, AudioLevels.saving): one flat row.
 //
 //   spectrum  columns step toward random heights, tallest in the middle
 //   wave      a wave rolls across the columns
@@ -35,6 +35,7 @@ ShaderEffect {
   property int gap: 1
   property bool playing: false
   property bool silent: false
+  property bool saving: false
   property string style: "spectrum"
   property color color: Color.accent
 
@@ -52,7 +53,7 @@ ShaderEffect {
   readonly property real rowCount: rows
   readonly property real px: pixel
   readonly property real gapPx: gap
-  readonly property real mute: silent ? 1 : 0
+  readonly property real mute: silent || saving ? 1 : 0
   readonly property color ink: color
   property vector4d bandsA: Qt.vector4d(0, 0, 0, 0)
   property vector4d bandsB: Qt.vector4d(0, 0, 0, 0)
@@ -61,33 +62,19 @@ ShaderEffect {
   property real live: 0
   property real loudness: 0
   property real bass: 0
+  property real beatLevel: 0
+  property real pump: 0
   property int seenFrame: -1
 
   fragmentShader: Qt.resolvedUrl("shaders/equalizer.frag.qsb")
 
   Timer {
-    running: eq.playing && !eq.silent && eq.visible
+    running: eq.playing && !eq.silent && !eq.saving && eq.visible
     interval: 100
     repeat: true
     onTriggered: {
-      AudioLevels.want()
-      if (AudioLevels.live()) {
-        // Only when there's a new frame (cava and this tick run at about
-        // the same rate, so usually there is).
-        if (AudioLevels.frame !== eq.seenFrame) {
-          eq.seenFrame = AudioLevels.frame
-          var b = AudioLevels.packed()
-          eq.bandsA = b[0]; eq.bandsB = b[1]; eq.bandsC = b[2]; eq.bandsD = b[3]
-          eq.loudness = AudioLevels.level
-          eq.bass = AudioLevels.bass
-        }
-        eq.live = 1
-        // Faster when louder.
-        eq.tick += 0.4 + 1.4 * AudioLevels.level
-      } else {
-        eq.live = 0
-        eq.tick += 0.66
-      }
+      // Faster when louder.
+      eq.tick += AudioLevels.feed(eq) ? 0.4 + 1.4 * AudioLevels.level : 0.66
       if (eq.style === "shuffle" && eq.tick % 20 === 0)
         eq.shown = eq.styles[Math.floor(Date.now() / 20000) % eq.styles.length]
     }

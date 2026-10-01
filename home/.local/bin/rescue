@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # rescue: for when the desktop won't come up (black screen, login loop, crash
-# at start). Ctrl+Alt+Delete (or Ctrl+Alt+F3) opens text console 3; log in
+# at start). Ctrl+Alt+Esc (or Ctrl+Alt+F3) opens text console 3; log in
 # there and this starts by itself (~/.bashrc). Anywhere else, type: rescue
 # Back to the desktop: Ctrl+Alt+F1 (or "d" in the menu).
 #

@@ -12,6 +12,10 @@
 //   beat    0..1: a kick (bass jumping above its recent average), decaying
 //   pulse   0..1: the bass, rising at once and falling slowly (for things
 //           that should pump with the music rather than only on kicks)
+//
+// Battery saver (Taskbar & Desktop > Media, mediaSaver): while saving, every
+// equalizer shows a flat row, the card's visualizer holds still, the art
+// effects step aside and cava stops (nobody calls want()).
 
 var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var level = 0
@@ -49,6 +53,14 @@ function set(line) {
   frame += 1
 }
 
+// Whether to save power now. mode: "battery" (on battery or in the power
+// saver profile; the default), "saver" (only in power saver), "off".
+function saving(mode, onBattery, powerSaver) {
+  if (mode === "off") return false
+  if (mode === "saver") return powerSaver
+  return onBattery || powerSaver
+}
+
 // A visualizer is showing and wants the music.
 function want() {
   wantAt = Date.now()
@@ -60,22 +72,19 @@ function live() {
 }
 
 // Hand the music to a visualizer shader: sets its live, beatLevel, pump,
-// loudness and bandsA..bandsD (the names shaders/visualizer.frag and
-// artfx.frag use), only when there's a new frame. Calls want() too.
+// loudness, bass (if it has one) and bandsA..bandsD (the names the shaders
+// use), only when there's a new frame. Calls want() too. Returns live.
 function feed(item) {
   wantAt = Date.now()
   var on = live()
   item.live = on ? 1 : 0
-  if (!on || item.seenFrame === frame) return
+  if (!on || item.seenFrame === frame) return on
   item.seenFrame = frame
   item.beatLevel = beat
   item.pump = pulse
   item.loudness = level
+  if (item.bass !== undefined) item.bass = bass
   item.bandsA = packedBands[0]; item.bandsB = packedBands[1]
   item.bandsC = packedBands[2]; item.bandsD = packedBands[3]
-}
-
-// The 16 bands as four vec4s for a shader.
-function packed() {
-  return packedBands
+  return on
 }

@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Services.UPower
 import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
@@ -324,6 +325,10 @@ BarWidget {
   property string barEq: "off"
   property string headerEq: "same"
   property string cardEq: "same"
+  // Battery saver (AudioLevels.saving): equalizers flat, visualizer still,
+  // no art effect.
+  property string mediaSaver: "battery"
+  readonly property bool saving: AudioLevels.saving(mediaSaver, UPower.onBattery, PowerProfiles.profile === PowerProfile.PowerSaver)
   function eqStyle(choice) { return choice === "same" || !choice ? root.equalizerStyle : choice }
   property string artEffect: "off"
   readonly property var visuals: ["pixel", "tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "woods", "off"]
@@ -354,6 +359,7 @@ BarWidget {
       root.barEq = String(o.nowPlayingBarEq || "off")
       root.headerEq = String(o.nowPlayingHeaderEq || "same")
       root.cardEq = String(o.nowPlayingCardEq || "same")
+      root.mediaSaver = ["battery", "saver", "off"].indexOf(o.mediaSaver) !== -1 ? o.mediaSaver : "battery"
       root.iconColorMode = String(o.iconColorsNowPlaying || o.iconColors || "mono")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
@@ -450,11 +456,14 @@ BarWidget {
 
   // --- on the bar -------------------------------------------------------------
   property bool popupOpen: false
-  function close() { popupOpen = false }
+  // Opened for a look only (cardPreview IPC, for screenshots and tests):
+  // no focus grab, so it can't take anyone's typing.
+  property bool previewOnly: false
+  function close() { popupOpen = false; previewOnly = false }
   onHasMediaChanged: if (!hasMedia) popupOpen = false
   onPopupOpenChanged: {
     if (popupOpen) { streamSnapshot.restart(); if (!outputSinkProc.running) outputSinkProc.running = true }
-    else { streamSnapshot.stop(); streams = [] }
+    else { streamSnapshot.stop(); streams = []; previewOnly = false }
   }
 
   visible: hasMedia
@@ -478,6 +487,7 @@ BarWidget {
       gap: 1
       playing: root.playing && visible
       silent: !root.playing
+      saving: root.saving
       style: root.eqStyle(root.barEq)
       color: root.accent
     }
@@ -984,11 +994,18 @@ BarWidget {
     }
   }
 
+  IpcHandler {
+    target: "nowplaying"
+    function cardPreview(): void { root.previewOnly = true; root.popupOpen = true }
+    function cardClose(): void { root.close() }
+  }
+
   PopupCard {
     id: popup
     anchorItem: root
     bar: root.bar
     owner: root
+    triggerMode: root.previewOnly ? "hover" : "click"
     open: root.popupOpen
     contentWidth: popup.fittedContentWidth(Style.space(384))
     contentHeight: popup.fittedContentHeight(card.implicitHeight)
@@ -1187,7 +1204,7 @@ BarWidget {
             ShaderEffect {
               id: artFx
               anchors.fill: art
-              visible: root.artEffect !== "off" && art.status === Image.Ready
+              visible: root.artEffect !== "off" && art.status === Image.Ready && !root.saving
               property variant source: art
               property real tick: 0
               readonly property real mode: Math.max(0, root.artEffects.indexOf(root.artEffect))
@@ -1348,6 +1365,7 @@ BarWidget {
                 gap: 1
                 playing: root.playing && root.popupOpen
                 silent: !root.playing
+                saving: root.saving
                 style: root.eqStyle(root.headerEq)
                 // One per card: only when the card visualizer below is off.
                 visible: root.headerEq !== "off" && root.cardVisual === "off"
@@ -1429,6 +1447,7 @@ BarWidget {
             visible: root.cardVisual !== "pixel"
             scene: root.cardVisual
             playing: root.playing && root.popupOpen && visualizer.visible && visible
+            saving: root.saving
             colorA: root.accent
             colorB: root.text
           }
@@ -1443,6 +1462,7 @@ BarWidget {
             rows: 5
             playing: root.playing && root.popupOpen && visualizer.visible && visible
             silent: !root.playing
+            saving: root.saving
             style: root.eqStyle(root.cardEq)
             color: root.accent
           }

@@ -4,7 +4,7 @@ set -euo pipefail
 # History of the desktop config (Hyprland, the Omarchy shell/taskbar and its
 # scripts, Ghostty, user services, launchers, default apps), so a change that
 # breaks the desktop can be seen and undone, by you or an agent, even from the
-# rescue console (Ctrl+Alt+Delete).
+# rescue console (Ctrl+Alt+Esc).
 #
 #   config-history snapshot [message]   copy the live files in and commit
 #                                       (timer every 20 min + at login)
