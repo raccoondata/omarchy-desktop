@@ -123,6 +123,7 @@ need_plugin now-playing "Now Playing" omarchy-now-playing widget
 need_plugin super-menu "Super Menu" omarchy-super-menu
 need_plugin hot-corners "Hot Corners" omarchy-hot-corners
 need_plugin agent-tools "Agent Tools" omarchy-agent-tools
+need_plugin screenshots "Screenshots" omarchy-screenshots
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"

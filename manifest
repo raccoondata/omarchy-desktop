@@ -19,9 +19,6 @@
 .config/omarchy/mouse-setting
 .config/omarchy/reboot-to-windows
 .config/omarchy/remote-screen
-.config/omarchy/screenshot
-.config/omarchy/screenshot-editor
-.config/omarchy/screenshot.upstream
 .config/omarchy/selfcheck
 .config/omarchy/setup-system
 .config/omarchy/setup-remote

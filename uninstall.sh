@@ -61,7 +61,7 @@ rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprlan
 rm -f "$HOME/.local/bin/omarchy-desktop"
 # The desktop's plugins: removed if the desktop added them; ones you added
 # yourself stay.
-for id in agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
+for id in screenshots agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
   dir="$HOME/.config/omarchy/plugins/$id"
   key="plugin_${id//-/_}"
   mark="$(sed -n "s/^$key=//p" "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"

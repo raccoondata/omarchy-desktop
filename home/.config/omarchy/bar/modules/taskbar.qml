@@ -62,8 +62,6 @@ BarWidget {
   PluginSettings { id: shared; plugin: "desktop-core" }
   // Where the scripts and state files the taskbar uses live.
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"
-  // The Agent Tools plugin's scripts (agents, ask-agent).
-  readonly property string agentTools: omarchyDir + "/plugins/agent-tools/bin"
   readonly property int maxLabelWidth: Number(pref("maxLabelWidth", 120))
   readonly property bool showLabels: pref("showLabels", false) === true
   readonly property bool snapPreview: pref("snapPreview", true) !== false
@@ -647,24 +645,15 @@ BarWidget {
     function gatherPreview(kind: string): string {
       return JSON.stringify(root.gatherSet(kind).map(function(t) { return root.classOf(t) + " | " + root.title(t) }))
     }
-    // Print Screen (~/.config/omarchy/screenshot): the screenshot card.
     // ~/.config/omarchy/lock: show the lock card before locking; it goes away
     // by itself on unlock (or if the lock doesn't happen).
     function lockCard(): void { root.showLockCard() }
-    function screenshotTaken(path: string, app: string, title: string): void { root.screenshot(path, app, title, 0, 0, 0, 0, -1, -1) }
-    // The captured area (global) and the pointer where the selection ended.
-    function screenshotRegion(path: string, app: string, title: string, x: int, y: int, w: int, h: int, cx: int, cy: int): void {
-      root.screenshot(path, app, title, x, y, w, h, cx, cy)
-    }
     function isDragging(): bool { return root.windowDragging }
     // The ask card is the Agent Tools plugin's now; these stay for older
     // callers (a Files window that loaded the old extension).
     function askFiles(agent: string, paths: string): void { Util.execArgv(["omarchy-shell", "-q", "agent-tools", "askFiles", agent, paths]) }
     function askSelection(): void { Util.execArgv(["omarchy-shell", "-q", "agent-tools", "askSelection"]) }
     function reloadAgents(): void { root.reloadAgents() }
-    // Esc in the screenshot editor while its ask panel/bar shows
-    // (omarchy_screenshot_escape in hypr/desktop/bindings.lua): fold it away.
-    function screenshotEscape(): void { editorDock.collapse() }
   }
 
   // ------------------------------------------------------------ shift-click
@@ -739,37 +728,6 @@ BarWidget {
     taskbar: root
   }
 
-  // After a screenshot (setting screenshotMode): "editor" = open it in the
-  // screenshot editor with EditorDock attached; "preview" = our own preview
-  // window (ScreenshotPreview.qml), also used if the editor doesn't open.
-  readonly property string screenshotMode: String(pref("screenshotMode", "editor"))
-  // How the screenshot's ask controls look: "panel" (the ask layout: question
-  // first; ScreenshotPreview, and EditorDock beside the editor), "bar" (a row
-  // of buttons: under the editor, under the preview's picture) or "button"
-  // (just an Ask button that opens the panel).
-  readonly property string screenshotAsk: String(pref("screenshotAsk", "panel"))
-  property var lastShot: null
-  function screenshot(path, app, title, x, y, w, h, cx, cy) {
-    lastShot = { path: path, area: Qt.rect(x, y, w, h) }
-    if (screenshotMode === "editor") editorDock.start(path, app, title, Qt.rect(x, y, w, h))
-    else screenshotPreview.show(path, app, title, Qt.rect(x, y, w, h))
-  }
-
-  EditorDock {
-    id: editorDock
-    taskbar: root
-    onFailed: function(path, app, title) {
-      var area = root.lastShot && root.lastShot.path === path ? root.lastShot.area : Qt.rect(0, 0, 0, 0)
-      screenshotPreview.show(path, app, title, area)
-    }
-  }
-
-  ScreenshotPreview {
-    id: screenshotPreview
-    taskbar: root
-    onEditRequested: function(path, app, title) { editorDock.start(path, app, title, Qt.rect(0, 0, 0, 0)) }
-  }
-
   // ------------------------------------------------------------ lock card
 
   // Up until Omarchy's lock says it's unlocked again (checked a few times a
@@ -807,23 +765,6 @@ BarWidget {
         else if (root.lockSeen || Date.now() - root.lockCardAt > 4000) root.hideLockCard()
       }
     }
-  }
-
-  function outlineCapture(area) {
-    desktopFx.outlineCapture(area)
-  }
-
-  function releaseCapture() {
-    desktopFx.releaseCapture()
-  }
-
-  function flyCapture(source, from, to, fit) {
-    desktopFx.flyCapture(source, from, to, fit)
-  }
-
-  Connections {
-    target: desktopFx
-    function onCaptureLanded() { if (screenshotPreview.shown) screenshotPreview.captureLanded() }
   }
 
   // For the super menu's "Frequent": count each switch to a different app,

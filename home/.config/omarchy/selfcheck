@@ -74,14 +74,14 @@ else
 fi
 
 # --- Omarchy code we mirror ---------------------------------------------------
-# ~/.config/omarchy/screenshot repeats omarchy-capture-screenshot's capture
-# steps (to know the selected area); flag when Omarchy changes its version.
-upstream="/usr/share/omarchy/bin/omarchy-capture-screenshot"
-if [[ -f $omarchy/screenshot.upstream && -f $upstream ]]; then
-  if [[ "$(sha256sum "$upstream" | awk '{print $1}')" == "$(cat "$omarchy/screenshot.upstream")" ]]; then
+# The Screenshots plugin's capture repeats omarchy-capture-screenshot's steps
+# (to know the selected area); flag when Omarchy changes its version.
+shot="$omarchy/plugins/screenshots/bin/screenshot"
+if [[ -x $shot && -f /usr/share/omarchy/bin/omarchy-capture-screenshot ]]; then
+  if "$shot" --upstream 2>/dev/null; then
     ok "screenshot capture matches Omarchy's"
   else
-    warn "Omarchy's screenshot script changed: compare it with $omarchy/screenshot, then: sha256sum $upstream | awk '{print \$1}' > $omarchy/screenshot.upstream"
+    warn "$("$shot" --upstream 2>&1)"
   fi
 fi
 
@@ -170,6 +170,7 @@ plugin_check now-playing "Now Playing" NowPlaying.qml "no song on the bar" omarc
 plugin_check super-menu "Super Menu" Main.qml "no Super menu" omarchy-super-menu
 plugin_check hot-corners "Hot Corners" bin/hotcorner "no hot corners" omarchy-hot-corners
 plugin_check agent-tools "Agent Tools" bin/agents "no ask card, Files agent menu or agent keys" omarchy-agent-tools
+plugin_check screenshots "Screenshots" bin/screenshot "Print Screen is Omarchy's own (no editor dock or preview)" omarchy-screenshots
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi

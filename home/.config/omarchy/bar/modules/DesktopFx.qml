@@ -14,9 +14,6 @@ import qs.Commons
 //    (windowdragzone events, via taskbar.qml).
 //  - Locking (~/.config/omarchy/lock): a "Locked, type your password" card
 //    just before the lock, so remote viewers see that, not the desktop.
-//  - Print Screen: an accent frame around exactly what was captured, held
-//    while the screenshot toolbar is up, and the capture flying into the
-//    toolbar's thumbnail.
 //  - Minimize/restore: an outline travels from the window into its taskbar
 //    icon, or back out (taskbar.qml watches windows move to/from the
 //    scratchpad, where minimized windows live).
@@ -47,36 +44,6 @@ Item {
     morphAnimation.restart()
   }
 
-  // Print Screen: a frame around exactly what was captured, held while the
-  // screenshot toolbar is up; and the capture itself flying from where it
-  // was into the toolbar's thumbnail (rects in global coordinates).
-  property rect captureArea: Qt.rect(0, 0, 0, 0)
-  property bool captureHeld: false
-  property string flyingSource: ""
-  property rect flyFrom: Qt.rect(0, 0, 0, 0)
-  property rect flyTo: Qt.rect(0, 0, 0, 0)
-  signal captureLanded()
-
-  function outlineCapture(area) {
-    captureArea = area
-    captureHeld = true
-  }
-
-  function releaseCapture() {
-    captureHeld = false
-  }
-
-  // fit: shown whole (flying into a window) rather than filling the target
-  // (the toolbar's thumbnail).
-  property bool flyFit: false
-  function flyCapture(source, from, to, fit) {
-    flyFit = !!fit
-    flyingSource = source
-    flyFrom = from
-    flyTo = to
-    captureFlight.restart()
-  }
-
   // Locking: a full-screen card drawn just before the lock covers the screen.
   // Screen sharing freezes on its last frame while locked (Hyprland hides the
   // lock screen from capture), so a remote viewer (RustDesk) sees this card
@@ -89,7 +56,6 @@ Item {
 
     screen: fx.taskbar.QsWindow.window ? fx.taskbar.QsWindow.window.screen : null
     visible: fx.previewShown || previewFade.running || morphAnimation.running
-      || fx.captureHeld || captureFade.running || captureFlight.running
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
@@ -148,60 +114,6 @@ Item {
           NumberAnimation { target: sheenBand; property: "opacity"; to: 0; duration: 120 }
         }
       }
-    }
-
-    // --------------------------------------------------------- capture
-
-    // Drawn just outside the captured area, so it frames rather than covers.
-    Rectangle {
-      id: captureBox
-      readonly property int w: fx.borderWidth
-      x: fx.captureArea.x - overlay.originX - w
-      y: fx.captureArea.y - overlay.originY - w
-      width: fx.captureArea.width + w * 2
-      height: fx.captureArea.height + w * 2
-      color: "transparent"
-      border.color: Color.accent
-      border.width: w
-      opacity: fx.captureHeld ? 1 : 0
-      visible: opacity > 0
-
-      Behavior on opacity { NumberAnimation { id: captureFade; duration: 220; easing.type: Easing.OutCubic } }
-    }
-
-    // The capture, lifting off where it was and shrinking into the toolbar.
-    Image {
-      id: flyer
-      property real t: 0
-      readonly property real ease: t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-      function mix(a, b) { return a + (b - a) * ease }
-
-      x: mix(fx.flyFrom.x, fx.flyTo.x) - overlay.originX
-      y: mix(fx.flyFrom.y, fx.flyTo.y) - overlay.originY
-      width: Math.max(1, mix(fx.flyFrom.width, fx.flyTo.width))
-      height: Math.max(1, mix(fx.flyFrom.height, fx.flyTo.height))
-      source: fx.flyingSource ? "file://" + fx.flyingSource : ""
-      fillMode: fx.flyFit ? Image.PreserveAspectFit : Image.PreserveAspectCrop
-      asynchronous: false
-      cache: false
-      smooth: true
-      visible: captureFlight.running
-
-      Rectangle {
-        anchors.centerIn: parent
-        width: fx.flyFit ? flyer.paintedWidth : parent.width
-        height: fx.flyFit ? flyer.paintedHeight : parent.height
-        color: "transparent"
-        border.color: Color.accent
-        border.width: 2
-      }
-    }
-
-    SequentialAnimation {
-      id: captureFlight
-      PauseAnimation { duration: 120 }
-      NumberAnimation { target: flyer; property: "t"; from: 0; to: 1; duration: 420 }
-      ScriptAction { script: fx.captureLanded() }
     }
 
     // ------------------------------------------------- minimize / restore

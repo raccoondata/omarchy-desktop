@@ -72,14 +72,6 @@ if NEW then
   o.bind("SUPER + CTRL + L", "Lock system", D .. "lock")
 end
 
-if ALL then
-  -- PRINT: Omarchy's screenshot as before (picker, ~/Pictures, clipboard), then
-  -- a card with Edit / Ask your agents instead of the notification
-  -- (~/.config/omarchy/screenshot, taskbar's ScreenshotCard.qml).
-  hl.unbind("PRINT")
-  o.bind("PRINT", "Screenshot (then edit, or ask an agent about it)", D .. "screenshot")
-end
-
 if NEW then
   -- SUPER+SHIFT+ESCAPE twice within 2s reboots into Windows once (firmware
   -- BootNext); a single press only shows a warning. Also in the system menu.

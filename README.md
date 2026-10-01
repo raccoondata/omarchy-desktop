@@ -69,7 +69,7 @@ added it yourself).
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
   and maximize buttons, hot corners.
-- **Screenshots**: Print Screen opens the editor (Tensaku) with an ask panel
+- **Screenshots** (the Screenshots plugin): Print Screen opens the editor (Tensaku) with an ask panel
   next to it: type a question and send the screenshot to Claude Code, Codex
   or whichever agents you have, in a new or an open session.
 - **Coding agents** (the Agent Tools plugin): finds the agents you have
@@ -160,8 +160,8 @@ new window. Esc in the screenshot editor folds its ask panel first.
   have none, then yours.
 - Plugins, each its own repository and installable on its own: Desktop Core
   (what the others share), Line Icons, Now Playing, Super Menu, Hot Corners,
-  Agent Tools. The installer adds the ones you don't have; each sets itself
-  up (and its `bin/teardown` undoes that).
+  Agent Tools, Screenshots. The installer adds the ones you don't have;
+  each sets itself up (and its `bin/teardown` undoes that).
 - `install.sh`: copies those, adds the plugins, hooks the desktop into
   Omarchy (one line in `hyprland.lua`, the bar widgets in `shell.json`, menu
   entries), runs `setup-system` (packages, rescue console), builds

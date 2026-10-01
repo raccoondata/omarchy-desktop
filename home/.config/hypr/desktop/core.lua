@@ -1,5 +1,5 @@
--- omarchy-desktop: mouse behaviours the taskbar and screenshot editor rely
--- on, loaded whatever keybindings you chose (bindings.lua).
+-- omarchy-desktop: mouse behaviours the taskbar relies on, loaded whatever
+-- keybindings you chose (bindings.lua).
 
 -- Middle-drag a window by its top strip (tab bar, first terminal line) to move
 -- it; drop it at a screen edge to dock it there, or on a taskbar workspace
@@ -96,33 +96,3 @@ hl.bind("SHIFT + mouse:272", function()
   end
   return { pass_event = true }
 end, { description = "Shift+click a taskbar icon: new window" })
--- Esc while the screenshot editor's ask panel/bar is up: in the editor, fold
--- the panel/bar away (the taskbar's EditorDock) instead of closing the editor
--- and the screenshot with it; a second Esc then closes the editor as usual.
--- Anywhere else Esc goes through untouched. Not bound normally: EditorDock
--- binds it (hyprctl eval) only while its panel/bar is showing, and sets
--- omarchy_screenshot_editor to the editor window's address.
--- The key's release is caught too (omarchy_screenshot_escape_release): a
--- release without its press makes the editor ignore the next Esc.
-omarchy_screenshot_editor = ""
-omarchy_screenshot_swallow = false
-function omarchy_screenshot_escape()
-  local window = hl.get_active_window()
-  local address = window and tostring(window.address) or ""
-  if address ~= "" and address:sub(1, 2) ~= "0x" then
-    address = "0x" .. address
-  end
-  if omarchy_screenshot_editor ~= "" and address == omarchy_screenshot_editor then
-    omarchy_screenshot_swallow = true
-    hl.exec_cmd("omarchy-shell -q taskbar screenshotEscape")
-    return
-  end
-  return { pass_event = true }
-end
-function omarchy_screenshot_escape_release()
-  if omarchy_screenshot_swallow then
-    omarchy_screenshot_swallow = false
-    return
-  end
-  return { pass_event = true }
-end

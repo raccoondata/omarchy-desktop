@@ -60,9 +60,7 @@ Item {
     barHeightRead.running = true
     scrollRead.running = true
     terminalScrollRead.running = true
-    editorsProc.running = true
     taskbar.reloadAgents()
-    cornersFile.reload()
     opened = true
     // Typing searches straight away.
     if (!previewOnly) Qt.callLater(function() { searchField.forceActiveFocus() })
@@ -1439,83 +1437,23 @@ Item {
     }
   }
 
-  // Screenshot editor presets that are installed, and the one in use
-  // (~/.config/omarchy/screenshot-editor).
-  property var editorsInstalled: []
-  property string editorInUse: "tensaku"
-  Process {
-    id: editorsProc
-    command: ["bash", "-c", "e=\"$HOME/.config/omarchy/screenshot-editor\"; \"$e\" available | tr '\\n' ' '; echo; sed -n 's/^editor=//p' \"$HOME/.config/omarchy/screenshot-editor.conf\" | tail -1"]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        var lines = this.text.split("\n")
-        settings.editorsInstalled = (lines[0] || "").trim().split(/\s+/).filter(function(x) { return x !== "" })
-        settings.editorInUse = (lines[1] || "tensaku").trim() || "tensaku"
-      }
-    }
-  }
-
   Component {
     id: screenshotsTab
 
     Column {
-      id: shotTab
       width: settings.cardWidth / 2
       spacing: Style.space(6)
-      readonly property var prefs: settings.taskbar.prefs || ({})
-      readonly property var names: ({ tensaku: "Tensaku", satty: "Satty", swappy: "Swappy", ksnip: "ksnip", custom: "Custom" })
-
       Section { title: "After a screenshot (Print Screen)" }
-
       SettingRow {
-        label: "Open"
-        description: (shotTab.prefs.screenshotMode || "editor") === "editor"
-          ? "the screenshot in the editor, with Ask Claude / Ask Codex attached under it"
-          : "a preview window: the screenshot, Ask Claude / Ask Codex, Edit, Open folder"
-        ButtonGroup {
-          options: [{ value: "editor", label: "The editor" }, { value: "preview", label: "A preview" }]
-          value: (shotTab.prefs.screenshotMode || "editor") === "editor" ? "editor" : "preview"
+        label: "Screenshots"
+        description: "the editor or a preview, the ask controls, which editor: the Screenshots plugin's own settings"
+        Button {
+          text: "Open"
           foreground: Color.menu.text
-          background: Color.menu.background
           fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("screenshotMode", v) }
-        }
-      }
-      SettingRow {
-        label: "Ask controls"
-        description: (shotTab.prefs.screenshotAsk || "panel") === "bar"
-          ? "a row of buttons: under the editor window, under the preview's picture"
-          : (shotTab.prefs.screenshotAsk || "panel") === "button"
-          ? "just an Ask button; it opens the panel when you want it"
-          : "the ask layout (agents, a big question box, Send to, Effort): beside the editor window, around the preview's picture"
-        ButtonGroup {
-          options: [{ value: "panel", label: "Panel" }, { value: "bar", label: "Bar" }, { value: "button", label: "Button" }]
-          value: ["bar", "button"].indexOf(shotTab.prefs.screenshotAsk) !== -1 ? shotTab.prefs.screenshotAsk : "panel"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("screenshotAsk", v) }
-        }
-      }
-      SettingRow {
-        label: "Editor"
-        description: "installed editors that can open a screenshot (Flameshot can't: it only edits its own captures); a custom one goes in ~/.config/omarchy/screenshot-editor.conf"
-        ButtonGroup {
-          options: {
-            var list = settings.editorsInstalled.map(function(e) { return { value: e, label: shotTab.names[e] || e } })
-            if (settings.editorInUse === "custom") list.push({ value: "custom", label: "Custom" })
-            return list.length ? list : [{ value: "tensaku", label: "Tensaku" }]
-          }
-          value: settings.editorInUse
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) {
-            settings.editorInUse = v
-            Util.execArgv([settings.dir + "/screenshot-editor", "set", v])
+          onClicked: {
+            settings.close()
+            Util.execArgv(["omarchy-shell", "shell", "summon", "screenshots", "{}"])
           }
         }
       }
