@@ -35,7 +35,7 @@ The setup script is `bootstrap.sh` here (published as that gist by
 
     omarchy-desktop update
 
-or **Super+Alt+Space > Update > Desktop**. It shows what's new, then installs
+or **Super+Space > Update > Desktop**. It shows what's new, then installs
 it. `omarchy-desktop status` says whether there's an update.
 
 Other commands: `omarchy-desktop keys all|new|off` (change the keybindings),
@@ -108,7 +108,7 @@ added it yourself).
   its Open button has the plugin's own settings, for Omarchy's app launcher
   and menu and the new-app offers.
 
-Settings: **Super+Alt+Space > Setup > Taskbar & Desktop** (type to search
+Settings: **Super+Space > Setup > Taskbar & Desktop** (type to search
 them). Health check: `omarchy-desktop check`.
 
 ## Keybindings

@@ -48,7 +48,7 @@ conf_set() {
 command -v omarchy >/dev/null || { echo "This needs Omarchy (https://omarchy.org): install it first."; exit 1; }
 if [[ ! -f /usr/share/omarchy/default/hypr/bootstrap.lua || ! -f $HOME/.config/hypr/hyprland.lua ]]; then
   echo "This needs an Omarchy with the Lua Hyprland config (~/.config/hypr/hyprland.lua)."
-  echo "Update Omarchy first (Super+Alt+Space > Update > Omarchy)."
+  echo "Update Omarchy first (Super+Space > Update > Omarchy)."
   exit 1
 fi
 [[ $EUID -ne 0 ]] || { echo "Run this as yourself, not root (it asks for your password when it needs it)."; exit 1; }
@@ -412,8 +412,8 @@ cat <<EOF
 ${bold}Next${off}
   1. Log out and back in (loads the title bars and window drag plugins).
   2. $keys_line
-     Settings: Super+Alt+Space > Setup > Taskbar & Desktop.
-  3. Updates: omarchy-desktop update (or Super+Alt+Space > Update > Desktop).
+     Settings: Super+Space > Setup > Taskbar & Desktop.
+  3. Updates: omarchy-desktop update (or Super+Space > Update > Desktop).
   4. Something off? omarchy-desktop check. To remove it all: omarchy-desktop uninstall
   (What it printed is in ${log/#$HOME/\~}.)
 EOF
