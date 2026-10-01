@@ -148,6 +148,7 @@ else
     Super+V, twice           your second coding agent  (once: paste, as before)
     Super+Q, twice           close the window
     Super+Ctrl+L             lock, with a backup lock screen   (same key)
+    Ctrl+Alt+Esc             rescue console, for when the desktop misbehaves
 EOF
   "$omarchy/reboot-to-windows" --check && \
   echo "    Super+Shift+Esc, twice   restart into Windows"
@@ -162,7 +163,7 @@ EOF
     Super+Tab                window switcher                 ${dim}was: next workspace${off}
     Print Screen             screenshot, then the editor with the ask panel
                              ${dim}was: Omarchy's screenshot (picker, saved, copied)${off}
-    Ctrl+Alt+Delete          rescue console                  ${dim}was: close all windows${off}
+    Ctrl+Alt+Delete          task manager (btop)             ${dim}was: close all windows${off}
     Super+G, twice           a terminal in this folder       ${dim}once: grouping, as before${off}
     Super+Return, twice      another window of this app      ${dim}once: terminal, as before${off}
     Caps Lock                a second Super key              ${dim}was: Compose (now Right Alt);
@@ -243,11 +244,11 @@ PY
 done
 (( added )) && echo "  $added entries in Omarchy's menu"
 
-# The rescue console (Ctrl+Alt+Delete): its menu opens on login at tty3.
+# The rescue console (Ctrl+Alt+Esc): its menu opens on login at tty3.
 if ! grep -q 'RESCUE_SHOWN' "$HOME/.bashrc" 2>/dev/null; then
   cat >> "$HOME/.bashrc" <<'EOF'
 
-# Text console 3 (Ctrl+Alt+Delete / Ctrl+Alt+F3) is the rescue console: log in
+# Text console 3 (Ctrl+Alt+Esc / Ctrl+Alt+F3) is the rescue console: log in
 # and the rescue menu opens (q = plain shell, d = back to the desktop).
 if [[ $(tty) == /dev/tty3 && -z ${RESCUE_SHOWN-} ]] && command -v rescue &> /dev/null; then
   export RESCUE_SHOWN=1

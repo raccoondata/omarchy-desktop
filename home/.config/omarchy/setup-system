@@ -10,7 +10,7 @@ set -euo pipefail
 #              screen (hyprlock), plus socat, jq, efibootmgr, nautilus-python
 #              (the Files menu), tensaku (the screenshot editor), cava (the
 #              music's spectrum, for the equalizers)
-#   consoles   Ctrl+Alt+Delete -> text console 3 (passwordless `chvt`), with a
+#   consoles   Ctrl+Alt+Esc -> text console 3 (passwordless `chvt`), with a
 #              "Ctrl+Alt+F1 = back to the desktop" banner and the rescue menu
 #   Windows    on a PC that dual-boots Windows: passwordless
 #              `efibootmgr --bootnext` for Restart into Windows
@@ -50,7 +50,7 @@ put /etc/omarchy-rescue.issue <<'EOF'
 
 EOF
 put "/etc/systemd/system/getty@tty3.service.d/rescue-issue.conf" <<'EOF'
-# Rescue console (Ctrl+Alt+Delete): also show /etc/omarchy-rescue.issue.
+# Rescue console (Ctrl+Alt+Esc): also show /etc/omarchy-rescue.issue.
 [Service]
 ExecStart=
 ExecStart=-/usr/bin/agetty --noreset --noclear --issue-file /etc/issue:/etc/omarchy-rescue.issue - ${TERM}

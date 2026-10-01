@@ -923,7 +923,7 @@ Item {
             ShaderEffect {
               id: npFx
               anchors.fill: npImage
-              visible: nowPlaying.fxChoice !== "off" && npImage.status === Image.Ready
+              visible: nowPlaying.fxChoice !== "off" && npImage.status === Image.Ready && !menu.taskbar.mediaSaving
               property variant source: npImage
               property real tick: 0
               readonly property real mode: Math.max(0, nowPlaying.fxModes.indexOf(nowPlaying.fxChoice))
@@ -975,6 +975,7 @@ property real live: 0
             gap: 1
             playing: menu.opened && nowPlaying.p !== null && nowPlaying.p.isPlaying && visible
             silent: !(nowPlaying.p && nowPlaying.p.isPlaying)
+            saving: menu.taskbar.mediaSaving
             style: nowPlaying.eqChoice === "same" ? menu.taskbar.equalizerStyle : nowPlaying.eqChoice
           }
           Column {

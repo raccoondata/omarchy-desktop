@@ -12,6 +12,7 @@ ShaderEffect {
 
   property string scene: "tunnel"
   property bool playing: false
+  property bool saving: false      // saving power: hold still (AudioLevels.saving)
   property int grain: 2            // pixel size: 1 smooth, 2-4 chunkier
   property color colorA: Color.accent
   property color colorB: Color.foreground
@@ -40,7 +41,7 @@ ShaderEffect {
   fragmentShader: Qt.resolvedUrl("shaders/visualizer.frag.qsb")
 
   Timer {
-    running: vis.playing && vis.visible
+    running: vis.playing && !vis.saving && vis.visible
     interval: 66
     repeat: true
     onTriggered: {

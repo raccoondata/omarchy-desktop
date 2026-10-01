@@ -24,6 +24,21 @@ Item {
   // no keyboard focus, so it can't take anyone's typing.
   property bool previewOnly: false
   property string tab: "taskbar"
+  // Search (the box in the header): what's typed, and every setting found
+  // in the tabs (built on the first search; see buildIndex).
+  property string query: ""
+  property var searchIndex: []
+  property int searchPick: 0
+
+  readonly property var tabList: [
+    { value: "taskbar", label: "Taskbar" },
+    { value: "windows", label: "Windows" },
+    { value: "desktop", label: "Desktop" },
+    { value: "icons", label: "Icons" },
+    { value: "media", label: "Media" },
+    { value: "screenshots", label: "Screenshots" },
+    { value: "agents", label: "Agents" }
+  ]
 
   readonly property string dir: taskbar.omarchyDir
   readonly property int columnGap: Style.space(28)
@@ -41,12 +56,22 @@ Item {
     taskbar.reloadAgents()
     cornersFile.reload()
     opened = true
+    // Typing searches straight away.
+    if (!previewOnly) Qt.callLater(function() { searchField.forceActiveFocus() })
   }
 
-  function close() { opened = false; previewOnly = false }
+  function close() { opened = false; previewOnly = false; query = "" }
+  // "?words" previews a search; ">words" opens its first result.
   function preview(which) {
     previewOnly = true
-    open(which)
+    var w = String(which || "")
+    if (w.charAt(0) === "?" || w.charAt(0) === ">") {
+      open("")
+      query = w.slice(1)
+      if (w.charAt(0) === ">") jump(searchResults[0])
+    } else {
+      open(w)
+    }
   }
 
   function set(key, value) {
@@ -149,11 +174,94 @@ Item {
     { value: "lock", label: "Lock screen" }
   ]
 
+  // -------------------------------------------------------------- search
+
+  function tabComponent(v) {
+    return v === "desktop" ? desktopTab
+      : v === "windows" ? windowsPage
+      : v === "media" ? mediaTab
+      : v === "agents" ? agentsTab
+      : v === "screenshots" ? screenshotsTab
+      : v === "icons" ? iconsTab
+      : taskbarTab
+  }
+
+  // Every SettingRow in every tab, with the section it's under: each tab is
+  // built once off screen and read, so new settings are found by themselves.
+  function buildIndex() {
+    var out = []
+    tabList.forEach(function(t) {
+      var o = tabComponent(t.value).createObject(indexHost, { width: settings.cardWidth })
+      if (!o) return
+      var section = ""
+      var walk = function(item) {
+        if (item.objectName === "settingSection") section = item.title
+        else if (item.objectName === "settingRow" && item.label !== "")
+          out.push({ tab: t.value, tabLabel: t.label, section: section, label: item.label, description: item.description,
+                     words: (item.label + " " + item.description + " " + section + " " + t.label).toLowerCase() })
+        var kids = item.children || []
+        for (var i = 0; i < kids.length; i++) walk(kids[i])
+      }
+      walk(o)
+      o.destroy()
+    })
+    searchIndex = out
+  }
+
+  readonly property var searchResults: {
+    var q = query.trim().toLowerCase()
+    if (!q) return []
+    var words = q.split(/\s+/)
+    var hits = searchIndex.filter(function(r) { return words.every(function(w) { return r.words.indexOf(w) !== -1 }) })
+    // Matches in the name first, more so at the start of a word in it.
+    var named = function(r) {
+      var name = r.label.toLowerCase()
+      return words.reduce(function(n, w) {
+        var at = name.indexOf(w)
+        return n + (at === -1 ? 0 : (at === 0 || /\W/.test(name.charAt(at - 1)) ? 2 : 1))
+      }, 0)
+    }
+    return hits.map(function(r, i) { return { r: r, k: -named(r) * 1000 + i } })
+      .sort(function(a, b) { return a.k - b.k }).slice(0, 12).map(function(x) { return x.r })
+  }
+  onQueryChanged: {
+    searchPick = 0
+    if (query !== "" && searchIndex.length === 0) buildIndex()
+  }
+
+  // Open a result: its tab, scrolled to the row, which lights up briefly.
+  function jump(r) {
+    if (!r) return
+    tab = r.tab
+    query = ""
+    Qt.callLater(function() {
+      var found = null
+      var find = function(item) {
+        if (found) return
+        if (item.objectName === "settingRow" && item.label === r.label && item.description === r.description && item.visible) { found = item; return }
+        var kids = item.children || []
+        for (var i = 0; i < kids.length; i++) find(kids[i])
+      }
+      if (tabContent.item) find(tabContent.item)
+      if (!found) return
+      var at = found.mapToItem(tabContent, 0, 0)
+      flick.contentY = Math.max(0, Math.min(at.y - Style.space(40), flick.contentHeight - flick.height))
+      flash.x = at.x - Style.space(6)
+      flash.y = at.y
+      flash.width = found.width + Style.space(12)
+      flash.height = found.height
+      flashFade.restart()
+    })
+  }
+
+  Item { id: indexHost; visible: false }
+
   // ------------------------------------------------------------------ ui
 
   // A label (and a quieter line under it) on the left, a control on the right.
   component SettingRow: Item {
     id: row
+    objectName: "settingRow"
     property string label: ""
     property string description: ""
     default property alias control: slot.data
@@ -200,6 +308,7 @@ Item {
 
   // A small section title with a hairline under it.
   component Section: Column {
+    objectName: "settingSection"
     property string title: ""
     width: parent ? parent.width : 0
     spacing: Style.space(4)
@@ -337,7 +446,26 @@ Item {
             }
           }
 
+          TextField {
+            id: searchField
+            anchors.right: closeButton.left
+            anchors.rightMargin: Style.space(10)
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.space(260)
+            placeholderText: "Search settings"
+            foreground: Color.menu.text
+            font.family: Style.font.menuFamily
+            text: settings.query
+            onTextChanged: settings.query = text
+            Keys.onDownPressed: settings.searchPick = Math.min(settings.searchPick + 1, settings.searchResults.length - 1)
+            Keys.onUpPressed: settings.searchPick = Math.max(settings.searchPick - 1, 0)
+            Keys.onReturnPressed: settings.jump(settings.searchResults[settings.searchPick])
+            Keys.onEnterPressed: settings.jump(settings.searchResults[settings.searchPick])
+            Keys.onEscapePressed: { if (text !== "") settings.query = ""; else settings.close() }
+          }
+
           Button {
+            id: closeButton
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             iconText: ""
@@ -349,26 +477,20 @@ Item {
 
         ButtonGroup {
           id: tabs
-          options: [
-            { value: "taskbar", label: "Taskbar" },
-            { value: "windows", label: "Windows" },
-            { value: "desktop", label: "Desktop" },
-            { value: "icons", label: "Icons" },
-            { value: "media", label: "Media" },
-            { value: "screenshots", label: "Screenshots" },
-            { value: "agents", label: "Agents" }
-          ]
-          value: settings.tab
+          options: settings.tabList
+          value: settings.query === "" ? settings.tab : ""
           foreground: Color.menu.text
           background: Color.menu.background
           fontFamily: Style.font.menuFamily
-          onChanged: function(v) { settings.tab = v }
+          onChanged: function(v) { settings.tab = v; settings.query = "" }
         }
 
         Rectangle { width: parent.width; height: 1; color: Color.menu.text; opacity: 0.12 }
 
         // The tab's content, scrolling when it's taller than the screen allows.
         Flickable {
+          id: flick
+          visible: settings.query === ""
           width: parent.width
           height: Math.min(tabContent.height, Math.max(Style.space(200), (panel.screen ? panel.screen.height : panel.height) * 0.78))
           contentWidth: width
@@ -376,17 +498,95 @@ Item {
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           interactive: contentHeight > height
-        Loader {
-          id: tabContent
-          width: parent.width
-          sourceComponent: settings.tab === "desktop" ? desktopTab
-            : settings.tab === "windows" ? windowsPage
-            : settings.tab === "media" ? mediaTab
-            : settings.tab === "agents" ? agentsTab
-            : settings.tab === "screenshots" ? screenshotsTab
-            : settings.tab === "icons" ? iconsTab
-            : taskbarTab
+          Loader {
+            id: tabContent
+            width: parent.width
+            sourceComponent: settings.tabComponent(settings.tab)
+          }
+          // Where a search result was found: lit, then fading.
+          Rectangle {
+            id: flash
+            radius: Style.cornerRadius
+            color: Color.accent
+            opacity: 0
+            NumberAnimation on opacity { id: flashFade; running: false; from: 0.22; to: 0; duration: 1600; easing.type: Easing.InQuad }
+          }
         }
+
+        // Search results, in place of the tab.
+        Column {
+          visible: settings.query !== ""
+          width: parent.width
+          spacing: Style.space(2)
+
+          Repeater {
+            model: settings.searchResults
+
+            Rectangle {
+              required property var modelData
+              required property int index
+              readonly property bool picked: index === settings.searchPick
+              width: parent.width
+              height: resultText.implicitHeight + Style.space(12)
+              radius: Style.cornerRadius
+              color: picked || resultMouse.containsMouse ? Qt.alpha(Color.menu.text, 0.08) : "transparent"
+
+              Column {
+                id: resultText
+                x: Style.space(10)
+                width: parent.width - Style.space(20)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(2)
+
+                Row {
+                  spacing: Style.space(10)
+                  Text {
+                    id: resultLabel
+                    text: modelData.label
+                    color: Color.menu.text
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.body
+                  }
+                  Text {
+                    anchors.baseline: resultLabel.baseline
+                    text: modelData.tabLabel + (modelData.section ? "  \u203a  " + modelData.section : "")
+                    color: Color.accent
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+                Text {
+                  visible: modelData.description !== ""
+                  width: parent.width
+                  text: modelData.description
+                  color: Color.menu.text
+                  opacity: 0.5
+                  elide: Text.ElideRight
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+
+              MouseArea {
+                id: resultMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: settings.jump(modelData)
+              }
+            }
+          }
+
+          Text {
+            visible: settings.searchResults.length === 0
+            topPadding: Style.space(10)
+            bottomPadding: Style.space(10)
+            text: "No settings match \u201c" + settings.query.trim() + "\u201d"
+            color: Color.menu.text
+            opacity: 0.5
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.body
+          }
         }
       }
     }
@@ -1203,6 +1403,22 @@ Item {
                     { value: "night", label: "Night vision" }, { value: "torch", label: "Flashlight" }]
             value: visTab.prefs.superMenuArtFx || "off"
             onChanged: function(v) { settings.set("superMenuArtFx", v) }
+          }
+        }
+
+        Section { title: "Battery" }
+
+        SettingRow {
+          label: "Save power"
+          description: "equalizers go flat, visualizers hold still and art effects step aside"
+          Dropdown {
+            width: Style.space(180)
+            showLabel: false
+            fontFamily: Style.font.menuFamily
+            options: [{ value: "battery", label: "On battery or power saver" }, { value: "saver", label: "In power saver only" },
+                      { value: "off", label: "Never" }]
+            value: visTab.prefs.mediaSaver || "battery"
+            onChanged: function(v) { settings.set("mediaSaver", v) }
           }
         }
       }

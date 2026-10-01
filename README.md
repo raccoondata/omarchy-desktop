@@ -67,9 +67,10 @@ back; your settings files stay).
   and album-art effects (Glitch, CRT, Melt...): right-click the art for the
   next visualizer, middle-click for the next effect; Taskbar & Desktop >
   Media picks them per place. They follow the music (its spectrum, from
-  cava), are drawn on the GPU, and only run while something plays.
+  cava), are drawn on the GPU, and only run while something plays; on
+  battery or in power saver they rest (equalizers flat, cava stopped).
 - **Safety nets**: a backup lock screen if Omarchy's ever fails, a rescue
-  console (Ctrl+Alt+Delete) that can undo recent config changes, and a local
+  console (Ctrl+Alt+Esc) that can undo recent config changes, and a local
   history of your desktop config (`~/.config/omarchy/config-history log`).
 - **Optional remote access** (`omarchy-desktop remote on`): RustDesk that
   works after a reboot and with the monitor off.
@@ -87,8 +88,8 @@ back; your settings files stay).
   matched to your theme, or the apps' original icons. Defaults: line on the
   taskbar, originals elsewhere.
 
-Settings: **Super+Alt+Space > Setup > Taskbar & Desktop**. Health check:
-`omarchy-desktop check`.
+Settings: **Super+Alt+Space > Setup > Taskbar & Desktop** (type to search
+them). Health check: `omarchy-desktop check`.
 
 ## Keybindings
 
@@ -118,7 +119,8 @@ of your own (say `hypr/mine.lua`) and add `require("hypr.mine")` after
 | Print Screen | screenshot, then the editor with the ask panel | Omarchy's screenshot |
 | Super+Alt+A ✚ | ask an agent about the selected text | – |
 | Super+Ctrl+L ✚ | lock (backup lock if needed) | lock |
-| Ctrl+Alt+Delete | text console 3 with `rescue` (Ctrl+Alt+F1 back) | close all windows |
+| Ctrl+Alt+Delete | task manager (btop; focuses it if open) | close all windows |
+| Ctrl+Alt+Esc ✚ | text console 3 with `rescue` (Ctrl+Alt+F1 back) | – |
 | Super+Shift+Escape, twice ✚ | restart into Windows (only with Windows) | – |
 
 With all of them, Caps Lock works as a second Super key (real Caps Lock: both

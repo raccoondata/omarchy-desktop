@@ -52,11 +52,17 @@ if NEW then
 end
 
 if ALL then
-  -- CTRL+ALT+DELETE opens text console 3 (same as Ctrl+Alt+F3), where `rescue`
-  -- helps when the desktop misbehaves. It was Omarchy's "Close all windows".
-  -- Needs /etc/sudoers.d/50-chvt (passwordless `sudo chvt`).
+  -- CTRL+ALT+DELETE: the task manager (btop, floating; focused if it's
+  -- already open), like Windows. It was Omarchy's "Close all windows".
   hl.unbind("CTRL + ALT + DELETE")
-  o.bind("CTRL + ALT + DELETE", "Text console (like Ctrl+Alt+F3)", "sudo -n /usr/bin/chvt 3")
+  o.bind("CTRL + ALT + DELETE", "Task manager", { tui = "btop", focus = true })
+end
+
+if NEW then
+  -- CTRL+ALT+ESCAPE opens text console 3 (same as Ctrl+Alt+F3), where `rescue`
+  -- helps when the desktop misbehaves. Needs /etc/sudoers.d/50-chvt
+  -- (passwordless `sudo chvt`).
+  o.bind("CTRL + ALT + ESCAPE", "Rescue console (like Ctrl+Alt+F3)", "sudo -n /usr/bin/chvt 3")
 end
 
 if NEW then

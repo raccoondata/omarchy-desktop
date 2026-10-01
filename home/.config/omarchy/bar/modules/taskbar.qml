@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Services.Mpris
+import Quickshell.Services.UPower
 import qs.Commons
 import qs.Ui
 import "taskbar-icons.js" as TaskbarIcons
@@ -52,6 +53,9 @@ BarWidget {
   readonly property bool flashAttention: pref("flashAttention", true) !== false
   readonly property bool hoverWorkspacesEnabled: pref("hoverWorkspaces", true) !== false
   readonly property bool audioMarks: pref("audioMarks", true) !== false
+  // Battery saver for the equalizers and effects (AudioLevels.saving).
+  readonly property bool mediaSaving: AudioLevels.saving(String(pref("mediaSaver", "battery")), UPower.onBattery,
+                                                         PowerProfiles.profile === PowerProfile.PowerSaver)
   // Minimize/restore outline and app open/close pixel effects.
   readonly property bool motionEffects: pref("motionEffects", true) !== false
   // spectrum | wave | embers | ripple (Equalizer.qml)
@@ -2114,6 +2118,7 @@ BarWidget {
           rows: Math.max(4, Math.floor((task.height - Style.space(5)) / (cellSize + 1)))
           playing: root.audioMarks && task.audio.playing
           silent: task.audio.muted
+          saving: root.mediaSaving
           style: root.equalizerStyle
           visible: playing
           anchors.horizontalCenter: parent.horizontalCenter
