@@ -692,6 +692,31 @@ Item {
     }
     return out
   }
+  // The picker's two rows: "none" and the bright colours, then the softer
+  // ones (pale, deep or greyish), each in hue order (red, orange, yellow,
+  // green, cyan, blue, purple). A theme with only one kind: split in two.
+  function hsvOf(hex) {
+    var n = parseInt(String(hex).slice(1, 7), 16)
+    var r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255
+    var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0
+    if (d > 0) h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+    return { h: h * 60, s: max === 0 ? 0 : d / max, v: max }
+  }
+  readonly property var shadeRows: {
+    var all = shadeChoices.map(function(slot) { var c = hsvOf(shadeColor(slot)); return { slot: slot, h: c.h, s: c.s, v: c.v } })
+    var byHue = function(a, b) { return a.h - b.h || b.v - a.v }
+    var bright = function(c) { return c.s >= 0.45 && c.v >= 0.5 }
+    var strong = all.filter(bright).sort(byHue)
+    var soft = all.filter(function(c) { return !bright(c) }).sort(byHue)
+    if (!strong.length || !soft.length) {
+      var sorted = all.sort(byHue), half = Math.ceil(sorted.length / 2)
+      strong = sorted.slice(0, half)
+      soft = sorted.slice(half)
+    }
+    var slots = function(list) { return list.map(function(c) { return c.slot }) }
+    return [[""].concat(slots(strong)), slots(soft)]
+  }
+
   function setShade(sec, slot) {
     var secs = snapshot()
     if (sec < 0 || sec >= secs.length) return
@@ -2185,7 +2210,8 @@ property real live: 0
       id: tileMenuBox
       readonly property real pad: Style.space(4)
       readonly property real widest: menu.tileMenuItems.reduce(function(w, it) {
-        return it.swatches ? w : Math.max(w, tileMenuMetrics.advanceWidth(it.label))
+        if (it.swatches) return Math.max(w, Math.max(menu.shadeRows[0].length, menu.shadeRows[1].length) * Style.space(24))
+        return Math.max(w, tileMenuMetrics.advanceWidth(it.label))
       }, 0)
       visible: menu.tileMenuEntry !== null
       z: 21
@@ -2221,16 +2247,20 @@ property real live: 0
               height: 1
               color: Util.alpha(Color.menu.text, 0.15)
             }
-            // A block's shade: none, then the theme's colours (wrapping).
-            Flow {
+            // A block's shade: two rows (shadeRows), none first.
+            Column {
               id: swatchFlow
               visible: !!menuRow.modelData.swatches
               x: Style.space(8)
               y: menuRow.topGap + Style.space(6)
-              width: menuRow.width - Style.space(16)
               spacing: Style.space(6)
               Repeater {
-                model: menuRow.modelData.swatches ? [""].concat(menu.shadeChoices) : []
+                model: menuRow.modelData.swatches ? menu.shadeRows : []
+                Row {
+                  required property var modelData
+                  spacing: Style.space(6)
+              Repeater {
+                model: parent.modelData
                 Rectangle {
                   required property var modelData
                   readonly property string cur: menu.tileMenuEntry && menu.sections[menu.tileMenuEntry.blockMenu]
@@ -2258,6 +2288,8 @@ property real live: 0
                     onExited: menu.hoverDetail = ""
                     onClicked: menu.runTileMenu({ act: "shade", sec: menu.tileMenuEntry.blockMenu, slot: parent.modelData })
                   }
+                }
+              }
                 }
               }
             }
