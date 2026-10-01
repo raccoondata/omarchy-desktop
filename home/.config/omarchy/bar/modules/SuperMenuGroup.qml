@@ -44,7 +44,9 @@ Item {
     anchors.topMargin: -Style.space(2)
     anchors.bottomMargin: Style.space(5)
     radius: Style.cornerRadius
-    color: block.shade !== "" ? Util.alpha(block.shade, 0.11) : "transparent"
+    color: block.shade !== "" ? Util.alpha(block.shade, 0.22) : "transparent"
+    border.width: 1
+    border.color: block.shade !== "" ? Util.alpha(block.shade, 0.5) : "transparent"
   }
 
   // A faint frame while hovered, the accent while a tile would go in.
@@ -84,7 +86,7 @@ Item {
       textFormat: Text.PlainText
       elide: Text.ElideRight
       color: block.shade !== "" ? block.shade : Color.menu.text
-      opacity: titleMouse.containsMouse ? 0.95 : (block.shade !== "" ? 0.8 : 0.5)
+      opacity: titleMouse.containsMouse ? 1 : (block.shade !== "" ? 1 : 0.5)
       font.family: Style.font.menuFamily
       font.pixelSize: Style.font.bodySmall
 
