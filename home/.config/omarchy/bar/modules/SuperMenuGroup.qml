@@ -15,6 +15,8 @@ Item {
   property var layout: ({ x: 0, y: 0, w: 1, h: 1 })
   property int offset: 0
   property bool editable: false      // a group (not Pinned): rename, delete
+  property string shade: ""          // a soft fill in one of the theme's colours ("" none)
+  property string iconStyle: ""      // its own icon style ("": the Icons setting)
 
   readonly property real colPitch: owner.tileWidth + owner.tileGap
   readonly property real rowPitch: owner.tileHeight + owner.bandHeight
@@ -31,6 +33,19 @@ Item {
 
 
   HoverHandler { id: blockHover }
+
+  // Its shade: a soft fill (icons keep their own colours over it).
+  Rectangle {
+    visible: block.shade !== ""
+    anchors.fill: parent
+    // In from the edges a little, so neighbouring blocks' shades don't touch.
+    anchors.leftMargin: -Style.space(1)
+    anchors.rightMargin: -Style.space(1)
+    anchors.topMargin: -Style.space(2)
+    anchors.bottomMargin: Style.space(5)
+    radius: Style.cornerRadius
+    color: block.shade !== "" ? Util.alpha(block.shade, 0.11) : "transparent"
+  }
 
   // A faint frame while hovered, the accent while a tile would go in.
   Rectangle {
@@ -64,12 +79,12 @@ Item {
       visible: !block.renaming
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: Math.min(implicitWidth, parent.width - (controls.visible ? controls.width + Style.space(8) : 0))
+      width: Math.min(implicitWidth, parent.width - controls.width - Style.space(8))
       text: block.title
       textFormat: Text.PlainText
       elide: Text.ElideRight
-      color: Color.menu.text
-      opacity: titleMouse.containsMouse ? 0.85 : 0.5
+      color: block.shade !== "" ? block.shade : Color.menu.text
+      opacity: titleMouse.containsMouse ? 0.95 : (block.shade !== "" ? 0.8 : 0.5)
       font.family: Style.font.menuFamily
       font.pixelSize: Style.font.bodySmall
 
@@ -106,10 +121,9 @@ Item {
       }
     }
 
-    // A group's ⋯ (rename, delete), while hovered.
+    // ⋯ (shade; a group's rename and delete too), while hovered.
     Rectangle {
       id: controls
-      visible: block.editable
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       width: Style.space(20)
@@ -144,6 +158,8 @@ Item {
       flatIndex: block.offset + index
       sectionIndex: block.sectionIndex
       draggable: true
+      iconStyle: block.iconStyle
+      shadeHex: block.shade
       x: block.tiles[index] ? block.tiles[index].c * block.colPitch : 0
       y: block.tiles[index] ? block.owner.bandHeight + block.tiles[index].r * block.rowPitch : 0
     }

@@ -15,6 +15,8 @@ Rectangle {
   property int sectionIndex: -1      // the owner's section (-2: Frequent, -1: results)
   property bool removable: false     // an × to take it out (Frequent)
   property bool draggable: false     // can be dragged to another spot
+  property string iconStyle: ""      // its block's own icon style ("": the Icons setting)
+  property string shadeHex: ""       // its block's shade (for the "shade" style)
   readonly property bool current: tile.owner.selected === flatIndex
   readonly property bool pinned: tile.owner.isPinned(modelData)
   readonly property bool running: tile.owner.opened && tile.owner.windowsOf(modelData).length > 0
@@ -58,7 +60,7 @@ Rectangle {
       height: tile.owner.iconSize
       sourceSize.width: Math.round(tile.owner.iconSize * Screen.devicePixelRatio)
       sourceSize.height: Math.round(tile.owner.iconSize * Screen.devicePixelRatio)
-      source: tile.owner.library && !tile.modelData.folder ? tile.owner.tileIcon(tile.modelData) : ""
+      source: tile.owner.library && !tile.modelData.folder ? tile.owner.tileIcon(tile.modelData, tile.iconStyle, tile.shadeHex) : ""
       smooth: true
       asynchronous: true
       // A folder: its project's (or git's, or a folder's) icon.

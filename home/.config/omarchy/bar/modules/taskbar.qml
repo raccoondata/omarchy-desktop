@@ -681,6 +681,9 @@ BarWidget {
     dropItem = hit ? hit.item : null
   }
 
+  // The current theme's colours by name (colors.toml: red, blue, accent, ...).
+  property var themeColors: ({})
+
   // For settings (Frequent's hidden apps).
   readonly property var superMenuPanel: superMenu
 
@@ -1779,6 +1782,10 @@ BarWidget {
     onLoaded: {
       IconColors.setPalette(text())
       root.iconColorsRevision += 1
+      // Its named colours too (the Super menu's group shades).
+      var found = {}, re = /^(\w+)\s*=\s*"(#[0-9a-fA-F]{6})"/gm, m
+      while ((m = re.exec(text())) !== null) if (found[m[1]] === undefined) found[m[1]] = m[2]
+      root.themeColors = found
     }
   }
 
