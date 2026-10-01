@@ -24,7 +24,7 @@ This repo is shared. Nothing in it may identify who wrote or changed it:
   A `Co-Authored-By:` line naming the AI model is fine; one naming a person
   is not.
 - Copying from elsewhere (transcripts, logs, another repo, a user's config)?
-  Scrub it first. `icon-src/recover-from-transcripts` shows how.
+  Scrub it first.
 
 `omarchy-desktop release` refuses to publish if a tracked file contains a
 home path, an email address or a name it knows about
@@ -42,10 +42,11 @@ home path, an email address or a name it knows about
 - The maintainer edits the live files in `~/.config/...`; config-history
   copies them into `home/` and commits to `main`. Others get changes only
   through `omarchy-desktop release` (one commit on `stable`), which runs
-  selfcheck and the icon and privacy checks first.
-- Taskbar icons are scripts: `icon-src/icons/<name>.icon.py`, built by the
-  `taskbar-icons` skill (`home/.claude/skills/taskbar-icons/`, its
-  `ICON-SPEC.md`). Never edit `taskbar-icons.js` or the icon font by hand.
+  selfcheck and the privacy check first.
+- The line icons are the Line Icons plugin's, its own repo
+  (omarchy-line-icons, installed at `~/.config/omarchy/plugins/line-icons`):
+  the modules import its `lib/` (LineIcons.js, IconMatch.js, IconColors.js).
+  Draw icons with its `line-icons` skill; never edit its built files by hand.
 - Shell scripts: bash, `set -euo pipefail`, a header comment with usage.
   Python tools: a docstring with usage, `-h`, exit 0 ok / 1 failed / 2 usage.
   Comments explain why, in plain words.

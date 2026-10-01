@@ -158,13 +158,6 @@ case "${1:-status}" in
     fi
     privacy_check || { echo "Fix those first (then: omarchy-desktop privacy)."; exit 1; }
     "$omarchy/selfcheck" --quiet || { echo "selfcheck isn't clean; fix that first (omarchy-desktop check)"; exit 1; }
-    # The icons: every script meets the spec, and the built file is current.
-    "$HOME/.claude/skills/taskbar-icons/scripts/icon-build" --check >/dev/null \
-      || { echo "icons: run ~/.claude/skills/taskbar-icons/scripts/icon-build (or fix what icon-lint reports)"; exit 1; }
-    "$HOME/.claude/skills/taskbar-icons/scripts/icon-font" --check >/dev/null \
-      || { echo "icon font: run ~/.claude/skills/taskbar-icons/scripts/icon-font"; exit 1; }
-    "$HOME/.claude/skills/taskbar-icons/scripts/icon-colors" --check >/dev/null \
-      || { echo "icon colours: run ~/.claude/skills/taskbar-icons/scripts/icon-colors (decide the missing ones in icon-src/icon-colors.json)"; exit 1; }
     g fetch -q origin
     tree="$(g rev-parse 'main^{tree}')"
     if g rev-parse -q --verify origin/stable >/dev/null; then

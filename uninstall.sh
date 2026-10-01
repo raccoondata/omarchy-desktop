@@ -29,8 +29,6 @@ for u in config-history.timer hyprland-safe-mode-agents.service lock-guard.servi
 done
 
 echo "- hooks into Omarchy"
-"$omarchy/menu-icons" off >/dev/null 2>&1 || true
-"$omarchy/launcher-icons" off >/dev/null 2>&1 || true
 hl="$HOME/.config/hypr/hyprland.lua"
 sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hypr.desktop")$/d' "$hl"
 shell="$omarchy/shell.json"
@@ -88,9 +86,9 @@ fi
 rmdir "$HOME/.config/hypr/desktop" 2>/dev/null || true
 rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprland/libhyprbars-fixed.so" "$state/plugins-built"
 rm -f "$HOME/.local/bin/omarchy-desktop"
-for d in "$HOME/.agents/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills" "$HOME/.hermes/skills"; do
-  [[ -L $d/taskbar-icons ]] && rm -f "$d/taskbar-icons"
-done
+# The Line Icons plugin is its own thing and stays; to remove it too:
+echo "  (the Line Icons plugin stays: ~/.config/omarchy/plugins/line-icons/bin/teardown,"
+echo "   then omarchy plugin remove line-icons)"
 systemctl --user daemon-reload
 
 echo "- system files"

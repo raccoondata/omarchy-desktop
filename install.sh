@@ -115,19 +115,23 @@ mv "$list_new" "$state/installed-files"
 done
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$repo/bin/omarchy-desktop" "$HOME/.local/bin/omarchy-desktop"
-# The taskbar-icons skill for every agent, where Omarchy puts its own skills:
-# ~/.agents/skills (shared), Codex, Pi, Hermes (each only if it's set up;
-# Claude Code reads ~/.claude/skills, where the skill itself lives).
-for d in "$HOME/.agents/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills" "$HOME/.hermes/skills"; do
-  [[ -d $(dirname "$d") || $d == "$HOME/.agents/skills" ]] || continue
-  mkdir -p "$d"
-  [[ -e $d/taskbar-icons ]] || ln -s "$HOME/.claude/skills/taskbar-icons" "$d/taskbar-icons"
-done
 gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
-fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || true   # the icon font
-# Omarchy's menu with our icons (Taskbar & Desktop > Icons): refresh it, as
-# the icons or their codepoints may have changed.
-[[ "$("$omarchy/menu-icons" status 2>/dev/null)" == on ]] && "$omarchy/menu-icons" on >/dev/null
+# The line icons (the taskbar's, the Super menu's, Omarchy's app launcher and
+# menu) are the Line Icons plugin's: add it from git and turn it on. It sets
+# itself up (its icon font, its skill for your agents) when the shell loads it.
+line_icons_url="https://github.com/raccoondata/omarchy-line-icons.git"
+if [[ ! -d $omarchy/plugins/line-icons ]]; then
+  if omarchy-plugin-add "$line_icons_url" --yes >/dev/null 2>&1; then
+    echo "  added the Line Icons plugin"
+  else
+    echo "  ${bold}couldn't add the Line Icons plugin${off} ($line_icons_url); the taskbar needs it:"
+    echo "    omarchy plugin add $line_icons_url --enable"
+  fi
+fi
+if [[ -d $omarchy/plugins/line-icons ]] && ! jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
+  omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
+  omarchy-plugin-enable line-icons >/dev/null 2>&1 && echo "  turned on the Line Icons plugin"
+fi
 conf_set repo "$repo"
 if [[ -d $backup ]]; then
   echo "  done; files it replaced are in ${backup/#$HOME/\~}"
