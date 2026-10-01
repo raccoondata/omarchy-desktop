@@ -77,6 +77,38 @@ sudo -v
 
 # --- 1 files -----------------------------------------------------------------
 step 1 "Desktop files"
+# The line icons (the taskbar's, the Super menu's, Omarchy's app launcher and
+# menu) are the Line Icons plugin's, and the desktop's files load them, so it
+# comes first: without it nothing is changed. It sets itself up (its icon
+# font, its skill for your agents) when the shell loads it.
+line_icons_url="https://github.com/raccoondata/omarchy-line-icons.git"
+line_icons="$omarchy/plugins/line-icons"
+if [[ ! -d $line_icons ]]; then
+  # Adding also asks a running shell to look for it, which fails outside a
+  # session: the plugin's folder (and it passing Omarchy's check) is what counts.
+  omarchy-plugin-add "$line_icons_url" --yes >/dev/null 2>&1 || true
+  if [[ -d $line_icons ]] && omarchy-plugin-validate "$line_icons" >/dev/null 2>&1; then
+    conf_set line_icons added   # so uninstall knows it may remove it
+    echo "  added the Line Icons plugin"
+  else
+    echo "  ${bold}couldn't add the Line Icons plugin${off} ($line_icons_url)."
+    echo "  The desktop needs it, so nothing was changed. Check the internet connection,"
+    echo "  then run this again (or add it yourself: omarchy plugin add $line_icons_url)."
+    exit 1
+  fi
+fi
+if ! jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
+  if omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable line-icons >/dev/null 2>&1; then
+    echo "  turned on the Line Icons plugin"
+  elif [[ -f $omarchy/shell.json ]] && jq '.plugins = ((.plugins // []) + [{"id": "line-icons"}])' "$omarchy/shell.json" > "$omarchy/shell.json.tmp" 2>/dev/null; then
+    # No shell running (not in a session): on at the next login.
+    mv "$omarchy/shell.json.tmp" "$omarchy/shell.json"
+    echo "  turned on the Line Icons plugin (from your next login)"
+  else
+    rm -f "$omarchy/shell.json.tmp"
+    warn "couldn't turn on the Line Icons plugin; after logging in: omarchy plugin enable line-icons"
+  fi
+fi
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -116,22 +148,6 @@ done
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$repo/bin/omarchy-desktop" "$HOME/.local/bin/omarchy-desktop"
 gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
-# The line icons (the taskbar's, the Super menu's, Omarchy's app launcher and
-# menu) are the Line Icons plugin's: add it from git and turn it on. It sets
-# itself up (its icon font, its skill for your agents) when the shell loads it.
-line_icons_url="https://github.com/raccoondata/omarchy-line-icons.git"
-if [[ ! -d $omarchy/plugins/line-icons ]]; then
-  if omarchy-plugin-add "$line_icons_url" --yes >/dev/null 2>&1; then
-    echo "  added the Line Icons plugin"
-  else
-    echo "  ${bold}couldn't add the Line Icons plugin${off} ($line_icons_url); the taskbar needs it:"
-    echo "    omarchy plugin add $line_icons_url --enable"
-  fi
-fi
-if [[ -d $omarchy/plugins/line-icons ]] && ! jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
-  omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
-  omarchy-plugin-enable line-icons >/dev/null 2>&1 && echo "  turned on the Line Icons plugin"
-fi
 conf_set repo "$repo"
 if [[ -d $backup ]]; then
   echo "  done; files it replaced are in ${backup/#$HOME/\~}"

@@ -41,7 +41,8 @@ it. `omarchy-desktop status` says whether there's an update.
 Other commands: `omarchy-desktop keys all|new|off` (change the keybindings),
 `remote on|off` (remote access), `check` (is everything working?), and
 `uninstall` (takes it all out again, putting Omarchy's bar, keys and menus
-back; your settings files stay).
+back; your settings files stay, and so does the Line Icons plugin if you had
+added it yourself).
 
 ## What you get
 

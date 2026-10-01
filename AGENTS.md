@@ -47,6 +47,8 @@ home path, an email address or a name it knows about
   (omarchy-line-icons, installed at `~/.config/omarchy/plugins/line-icons`):
   the modules import its `lib/` (LineIcons.js, IconMatch.js, IconColors.js).
   Draw icons with its `line-icons` skill; never edit its built files by hand.
+  `install.sh` adds it before touching any file (no plugin, no install) and
+  marks `line_icons=added` in desktop.conf; `uninstall.sh` removes it only then.
 - Shell scripts: bash, `set -euo pipefail`, a header comment with usage.
   Python tools: a docstring with usage, `-h`, exit 0 ok / 1 failed / 2 usage.
   Comments explain why, in plain words.
