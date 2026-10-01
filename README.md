@@ -53,7 +53,8 @@ added it yourself).
   choose) comes to you instead. Coding agents (Claude, Codex and the others
   Omarchy sets up) and terminals can be gathered together: right-click one >
   Bring agents (and terminals) together, or set double-clicking one to do it
-  (Taskbar & Desktop > Taskbar).
+  (Taskbar & Desktop > Taskbar); Windows > Bring together picks which agents
+  and terminals count (Omarchy's tool windows like btop don't, by default).
 - **Super menu** (double-tap Super, or Caps Lock): apps and folders (pinned,
   and in named groups: blocks anywhere on the grid whose tiles stay where
   you drop them, so a group is the shape you arrange: past its edge grows

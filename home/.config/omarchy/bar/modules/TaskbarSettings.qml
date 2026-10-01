@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 import "Visuals.js" as Visuals
+import "TaskbarStatus.js" as TaskbarStatus
 
 // Taskbar settings window: Super+Space > Setup > Taskbar, or a taskbar icon's
 // right-click menu. Built from Omarchy's own controls (toggles, button groups,
@@ -1211,6 +1212,7 @@ Item {
       }
 
       Column {
+        id: bringCol
         width: winTab.columnWidth
         spacing: Style.space(6)
 
@@ -1276,6 +1278,92 @@ Item {
             font.family: Style.font.menuFamily
             font.pixelSize: Style.font.caption
           }
+        }
+
+        // Which agents and terminals "Bring agents (and terminals) together"
+        // gathers: the ones on this PC (installed, or open now).
+        Section { title: "Bring together" }
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "What right-click > Bring agents (and terminals) together gathers, and double-click when Taskbar > Double-click an agent says so."
+          color: Color.menu.text
+          opacity: 0.45
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        // Terminals installed here: their commands, checked once per opening.
+        property var terminalBins: []
+        Process {
+          running: true
+          command: ["sh", "-c", "for b; do command -v \"$b\" >/dev/null 2>&1 && echo \"$b\"; done", "sh"].concat(
+            [].concat.apply([], TaskbarStatus.terminalKinds.map(function(k) { return k.bins })))
+          stdout: StdioCollector {
+            onStreamFinished: bringCol.terminalBins = this.text.split("\n").filter(function(b) { return b !== "" })
+          }
+        }
+        readonly property var openWindows: settings.taskbar.toplevels || []
+
+        readonly property var agentOptions: {
+          var list = [], seen = {}
+          function add(id, label) {
+            if (!id || id === "agent" || seen[id]) return
+            seen[id] = true
+            list.push({ value: id, label: label })
+          }
+          var installed = settings.taskbar.agents || []
+          for (var i = 0; i < installed.length; i++) add(installed[i].id, installed[i].name)
+          for (var j = 0; j < openWindows.length; j++) {
+            var id = settings.taskbar.agentIdOfWindow(openWindows[j])
+            add(id, settings.taskbar.agentName(id))
+          }
+          return list
+        }
+        readonly property var terminalOptions: {
+          var open = {}
+          for (var j = 0; j < openWindows.length; j++) open[settings.taskbar.terminalKindOfWindow(openWindows[j])] = true
+          var list = []
+          for (var i = 0; i < TaskbarStatus.terminalKinds.length; i++) {
+            var k = TaskbarStatus.terminalKinds[i]
+            var here = open[k.id] || k.id === "omarchy" || k.bins.some(function(b) { return bringCol.terminalBins.indexOf(b) !== -1 })
+            if (here) list.push({ value: k.id, label: k.label })
+          }
+          list.push({ value: TaskbarStatus.otherTerminals.id, label: TaskbarStatus.otherTerminals.label })
+          return list
+        }
+        function toggleOff(key, offList, value) {
+          var next = offList.indexOf(value) === -1 ? offList.concat([value]) : offList.filter(function(v) { return v !== value })
+          settings.set(key, JSON.stringify(next))
+        }
+
+        Text {
+          text: "Agents"
+          color: Color.menu.text
+          opacity: 0.7
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.caption
+        }
+        CheckList {
+          width: parent.width
+          options: bringCol.agentOptions
+          checked: bringCol.agentOptions.map(function(o) { return o.value })
+            .filter(function(v) { return settings.taskbar.gatherAgentsOff.indexOf(v) === -1 })
+          onToggled: function(v) { bringCol.toggleOff("gatherAgentsOff", settings.taskbar.gatherAgentsOff, v) }
+        }
+        Text {
+          text: "Terminals"
+          color: Color.menu.text
+          opacity: 0.7
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.caption
+        }
+        CheckList {
+          width: parent.width
+          options: bringCol.terminalOptions
+          checked: bringCol.terminalOptions.map(function(o) { return o.value })
+            .filter(function(v) { return settings.taskbar.gatherTerminalsOff.indexOf(v) === -1 })
+          onToggled: function(v) { bringCol.toggleOff("gatherTerminalsOff", settings.taskbar.gatherTerminalsOff, v) }
         }
       }
     }

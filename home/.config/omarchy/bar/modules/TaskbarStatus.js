@@ -36,18 +36,57 @@ function isAgentClass(windowClass) {
   return !!m && (m[1] === "agent" || isAgentProgram(m[1].replace(/_/g, "-")))
 }
 
-// Terminal windows: the terminals Omarchy installs (omarchy-install-terminal:
-// Alacritty, foot, Ghostty, kitty), its own terminal apps (org.omarchy.*,
-// TUI.*), and other common ones. Terminals retitle freely (a shell prompt can
-// end in "(2)"), so they never report unread counts.
-var terminalClass = /^(com\.mitchellh\.ghostty|org\.omarchy\.|TUI\.|Alacritty|kitty|foot|org\.wezfurlong\.wezterm|org\.kde\.konsole|org\.gnome\.(Console|Terminal|Ptyxis)|dev\.warp\.Warp|XTerm|URxvt|st-256color|Rio|com\.raggesilver\.BlackBox)/
+// Terminal windows, by kind (Taskbar & Desktop > Windows chooses which
+// ones gather with agents): the terminals Omarchy installs
+// (omarchy-install-terminal: Alacritty, foot, Ghostty, kitty), other common
+// ones, and Omarchy's own tool windows (org.omarchy.<program>, TUI.*: btop,
+// package installs, About; mostly floating popups, so off by default).
+// "bins" are the commands that show a terminal is installed.
+var terminalKinds = [
+  { id: "ghostty", label: "Ghostty", match: /^com\.mitchellh\.ghostty/, bins: ["ghostty"] },
+  { id: "alacritty", label: "Alacritty", match: /^Alacritty/, bins: ["alacritty"] },
+  { id: "kitty", label: "kitty", match: /^kitty/, bins: ["kitty"] },
+  { id: "foot", label: "foot", match: /^(foot|footclient|org\.codeberg\.dnkl\.foot)/, bins: ["foot"] },
+  { id: "wezterm", label: "WezTerm", match: /^org\.wezfurlong\.wezterm/, bins: ["wezterm"] },
+  { id: "konsole", label: "Konsole", match: /^org\.kde\.konsole/, bins: ["konsole"] },
+  { id: "gnome-console", label: "GNOME Console", match: /^org\.gnome\.Console/, bins: ["kgx"] },
+  { id: "gnome-terminal", label: "GNOME Terminal", match: /^org\.gnome\.Terminal/, bins: ["gnome-terminal"] },
+  { id: "ptyxis", label: "Ptyxis", match: /^org\.gnome\.Ptyxis/, bins: ["ptyxis"] },
+  { id: "warp", label: "Warp", match: /^dev\.warp\.Warp/, bins: ["warp-terminal"] },
+  { id: "xterm", label: "XTerm", match: /^(XTerm|UXTerm|xterm)/, bins: ["xterm"] },
+  { id: "urxvt", label: "URxvt", match: /^URxvt/, bins: ["urxvt"] },
+  { id: "st", label: "st", match: /^st-256color/, bins: ["st"] },
+  { id: "rio", label: "Rio", match: /^[Rr]io$/, bins: ["rio"] },
+  { id: "blackbox", label: "Black Box", match: /^com\.raggesilver\.BlackBox/, bins: ["blackbox", "blackbox-terminal"] },
+  { id: "omarchy", label: "Omarchy's tool windows", match: /^(org\.omarchy\.|TUI\.)/, bins: [] }
+]
+// Any other window with a program in a terminal's foreground: "other".
+var otherTerminals = { id: "other", label: "Other terminals" }
+var terminalsOffByDefault = ["omarchy"]
 
+// Windows that are never gathered: Omarchy's screensaver.
+function neverGathered(windowClass) {
+  return /^org\.omarchy\.screensaver/.test(String(windowClass || ""))
+}
+
+// A window class's terminal kind id, or "" (agents' own windows aren't one).
+function terminalKindOf(windowClass) {
+  var c = String(windowClass || "")
+  if (isAgentClass(c) || neverGathered(c)) return ""
+  for (var i = 0; i < terminalKinds.length; i++) if (terminalKinds[i].match.test(c)) return terminalKinds[i].id
+  return ""
+}
+
+// Terminals retitle freely (a shell prompt can end in "(2)"), so they never
+// report unread counts.
 function isTerminalClass(windowClass) {
-  return terminalClass.test(String(windowClass || ""))
+  var c = String(windowClass || "")
+  for (var i = 0; i < terminalKinds.length; i++) if (terminalKinds[i].match.test(c)) return true
+  return false
 }
 
 function unreadCount(title, windowClass) {
-  if (terminalClass.test(String(windowClass || ""))) return 0
+  if (isTerminalClass(windowClass)) return 0
   var text = String(title || "")
   var match = text.match(/^\((\d+)\)\s/) || text.match(/\s\((\d+)\)$/)
   return match ? parseInt(match[1], 10) : 0

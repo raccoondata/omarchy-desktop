@@ -117,6 +117,17 @@ BarWidget {
   // windows) | agents (every coding agent's) | agentsTerminals (those and
   // every terminal's).
   readonly property string doubleClickGather: String(pref("doubleClickGather", "same"))
+  // Terminal kinds (TaskbarStatus.terminalKinds ids, or "other") that don't
+  // gather with agents (Taskbar & Desktop > Windows).
+  // Agents (ids, as in ~/.config/omarchy/agents) that don't gather.
+  readonly property var gatherAgentsOff: {
+    var list = pref("gatherAgentsOff", [])
+    return Array.isArray(list) ? list : []
+  }
+  readonly property var gatherTerminalsOff: {
+    var list = pref("gatherTerminalsOff", TaskbarStatus.terminalsOffByDefault)
+    return Array.isArray(list) ? list : TaskbarStatus.terminalsOffByDefault
+  }
   readonly property bool clickActiveMinimizes: pref("clickActive", "none") === "minimize"
   readonly property int hoverDelay: Math.max(150, Math.min(1500, Number(pref("hoverDelay", 450))))
   readonly property int previewSize: Math.max(130, Math.min(320, Number(pref("previewSize", 190))))
@@ -435,13 +446,37 @@ BarWidget {
   }
 
   // A coding agent's window: a terminal running one, or an agent's own
-  // window class. A terminal: a terminal's window class, or any window with a
-  // program in the foreground of a terminal (window-programs).
-  function isAgentWindow(toplevel) {
-    return !!toplevel && (TaskbarStatus.isAgentProgram(programOf(toplevel)) || TaskbarStatus.isAgentClass(classOf(toplevel)))
+  // window class. A terminal's kind: by its window class, or "other" for any
+  // other window with a program in a terminal's foreground (window-programs).
+  // Which agent a window is ("" for none): the one running in it, else its
+  // own window class's (org.omarchy.claude; Omarchy's org.omarchy.agent
+  // before its agent is known: "agent").
+  function agentIdOfWindow(toplevel) {
+    if (!toplevel) return ""
+    var cls = classOf(toplevel)
+    if (TaskbarStatus.neverGathered(cls)) return ""
+    var program = programOf(toplevel)
+    if (TaskbarStatus.isAgentProgram(program)) return program
+    if (!TaskbarStatus.isAgentClass(cls)) return ""
+    return cls.replace(/^org\.omarchy\./, "").replace(/_/g, "-")
   }
+  // An agent that gathers (not switched off).
+  function isAgentWindow(toplevel) {
+    var id = agentIdOfWindow(toplevel)
+    return id !== "" && gatherAgentsOff.indexOf(id) === -1
+  }
+  function terminalKindOfWindow(toplevel) {
+    if (!toplevel) return ""
+    var cls = classOf(toplevel)
+    if (TaskbarStatus.neverGathered(cls)) return ""
+    var kind = TaskbarStatus.terminalKindOf(cls)
+    if (kind) return kind
+    return programOf(toplevel) !== "" && !TaskbarStatus.isAgentClass(cls) ? "other" : ""
+  }
+  // A terminal that gathers with agents (its kind isn't switched off).
   function isTerminalWindow(toplevel) {
-    return !!toplevel && (TaskbarStatus.isTerminalClass(classOf(toplevel)) || programOf(toplevel) !== "")
+    var kind = terminalKindOfWindow(toplevel)
+    return kind !== "" && gatherTerminalsOff.indexOf(kind) === -1
   }
 
   // Every open window of a kind ("agents" or "agentsTerminals"), for
