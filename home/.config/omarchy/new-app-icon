@@ -8,8 +8,12 @@ set -uo pipefail
 #   new-app-icon <desktop id> <name> [<window class>] [<icon>]
 #       a notification; clicking it (now or later, from the history) runs:
 #   new-app-icon --make <desktop id> <name> [<window class>] [<icon>]
-#       the first primary agent (agents) in a new terminal, asked to draw and
-#       map the icon
+#       the agent in a new terminal, asked to draw and map the icon
+#
+# The agent: Icons > New apps > "Draw with" (setting newAppIconsAgent, an
+# agent's id), else your default agent (the first primary, agents). Any agent
+# works: the skill is linked where each looks (install.sh), and the prompt
+# also says where it is.
 #
 # Each app is offered once; dismissing it is "no".
 
@@ -18,11 +22,15 @@ make=false
 [[ ${1:-} == --make ]] && { make=true; shift; }
 id=${1:?desktop id} name=${2:?name} class=${3:-} icon=${4:-}
 
-agent=$("$dir/agents" primary 2>/dev/null | cut -d, -f1)
+installed=$("$dir/agents" list 2>/dev/null)
+agent=$(jq -r '.newAppIconsAgent // ""' "$dir/taskbar-settings.json" 2>/dev/null)
+if [[ -z $agent ]] || ! jq -e --arg a "$agent" 'any(.[]; .id == $a)' <<<"$installed" >/dev/null 2>&1; then
+  agent=$("$dir/agents" primary 2>/dev/null | cut -d, -f1)
+fi
 [[ -n $agent ]] || exit 0
 
 if ! $make; then
-  agent_name=$("$dir/agents" list 2>/dev/null | jq -r --arg a "$agent" '.[] | select(.id == $a) | .name' 2>/dev/null)
+  agent_name=$(jq -r --arg a "$agent" '.[] | select(.id == $a) | .name' <<<"$installed" 2>/dev/null)
   exec omarchy-notification-send --app-name "Taskbar & Desktop" ${icon:+-i "$icon"} \
     "$name installed" "It has no line icon yet. Click to have ${agent_name:-$agent} draw one to match the others." \
     --exec "$dir/new-app-icon" --make "$id" "$name" "$class" "$icon"
@@ -31,7 +39,8 @@ fi
 details="desktop id: $id"
 [[ -n $class ]] && details+=", window class: $class"
 [[ -n $icon ]] && details+=", its icon: $icon"
-prompt="Use the taskbar-icons skill to draw a line icon for the newly installed app \"$name\" ($details). \
+prompt="Use the taskbar-icons skill (its instructions: $HOME/.claude/skills/taskbar-icons/SKILL.md) to draw a line icon \
+for the newly installed app \"$name\" ($details). \
 Follow the skill's workflow and its icon spec: look at the real logo, draw it, preview it at real size, add it, \
 map it so the taskbar, the Super menu and the app launcher use it, then test it."
 
