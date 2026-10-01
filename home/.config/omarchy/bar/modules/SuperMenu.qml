@@ -726,8 +726,8 @@ Item {
   }
 
   // A block's own icon style (over the Icons setting): stepped from its ⋯.
-  readonly property var iconStyleNames: ({ "": "default", line: "line", brand: "coloured", palette: "theme-coloured",
-                                           original: "the apps' own", shade: "in the group's shade" })
+  readonly property var iconStyleNames: ({ "": "Default (Icons setting)", line: "Line", brand: "Coloured", palette: "Theme-coloured",
+                                           original: "Original", shade: "Group shade" })
   function setIcons(sec, style) {
     var secs = snapshot()
     if (sec < 0 || sec >= secs.length) return
@@ -913,12 +913,10 @@ Item {
     if (e.blockMenu !== undefined) {
       var block = sections[e.blockMenu] || {}
       var cur = block.icons || ""
-      var list = [{ label: "Shade", act: "shades", sec: e.blockMenu, swatches: true }]
+      var list = [{ header: "Shade" }, { act: "shades", sec: e.blockMenu, swatches: true }, { header: "Icons", gap: true }]
       // Its icons: one line per style, the current one ticked.
-      ;["", "line", "brand", "palette", "original"].concat(block.shade ? ["shade"] : []).forEach(function(style, i) {
-        list.push({ label: (i === 0 ? "Icons:  " : "            ") + iconStyleNames[style]
-                    + (style === "" ? " (the Icons setting)" : "") + (style === cur ? "   \u2713" : ""),
-                    act: "icons", sec: e.blockMenu, style: style, gap: i === 0 })
+      ;["", "line", "brand", "palette", "original"].concat(block.shade ? ["shade"] : []).forEach(function(style) {
+        list.push({ label: iconStyleNames[style], act: "icons", sec: e.blockMenu, style: style, checkable: true, checked: style === cur })
       })
       if (block.group) {
         list.push({ label: "Rename", act: "rename", sec: e.blockMenu, gap: true })
@@ -2211,7 +2209,8 @@ property real live: 0
       readonly property real pad: Style.space(4)
       readonly property real widest: menu.tileMenuItems.reduce(function(w, it) {
         if (it.swatches) return Math.max(w, Math.max(menu.shadeRows[0].length, menu.shadeRows[1].length) * Style.space(24))
-        return Math.max(w, tileMenuMetrics.advanceWidth(it.label))
+        if (it.header) return w
+        return Math.max(w, tileMenuMetrics.advanceWidth(it.label) + (it.checkable ? Style.space(20) : 0))
       }, 0)
       visible: menu.tileMenuEntry !== null
       z: 21
@@ -2236,7 +2235,8 @@ property real live: 0
             required property var modelData
             readonly property real topGap: modelData.gap ? Style.space(9) : 0
             width: tileMenuColumn.width
-            height: topGap + (modelData.swatches ? swatchFlow.height + Style.space(12) : Style.space(28))
+            height: topGap + (modelData.swatches ? swatchFlow.height + Style.space(10)
+                              : modelData.header ? Style.space(20) : Style.space(28))
             radius: Style.cornerRadius
             color: itemMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
             Rectangle {
@@ -2293,15 +2293,41 @@ property real live: 0
                 }
               }
             }
+            // A section's heading.
             Text {
-              visible: !menuRow.modelData.swatches
+              visible: !!menuRow.modelData.header
               anchors.left: parent.left
               anchors.leftMargin: Style.space(10)
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Style.space(2)
+              text: menuRow.modelData.header ? String(menuRow.modelData.header).toUpperCase() : ""
+              color: Color.menu.text
+              opacity: 0.45
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.caption
+              font.letterSpacing: 1
+            }
+            // A choice's tick (checkable lines keep a column for it).
+            Text {
+              visible: !!menuRow.modelData.checkable
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(10)
+              anchors.verticalCenter: rowLabel.verticalCenter
+              text: menuRow.modelData.checked ? "\u2713" : ""
+              color: itemMouse.containsMouse ? Color.menu.selectedText : Color.accent
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+            Text {
+              id: rowLabel
+              visible: !menuRow.modelData.swatches && !menuRow.modelData.header
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(menuRow.modelData.checkable ? 30 : 10)
               anchors.right: parent.right
               anchors.rightMargin: Style.space(10)
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(6)
-              text: menuRow.modelData.label
+              text: menuRow.modelData.label || ""
               textFormat: Text.PlainText
               elide: Text.ElideRight
               color: itemMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
@@ -2311,7 +2337,7 @@ property real live: 0
             MouseArea {
               id: itemMouse
               anchors.fill: parent
-              enabled: !menuRow.modelData.swatches
+              enabled: !menuRow.modelData.swatches && !menuRow.modelData.header
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: menu.runTileMenu(menuRow.modelData)
