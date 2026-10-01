@@ -674,8 +674,9 @@ Item {
     // soft, in the style of the theme's own bright or soft colours).
     var m = /^hue:(\d+):([bs])$/.exec(String(slot))
     if (m) {
+      // A touch calmer than the theme's own, so they sit beside them.
       var style = m[2] === "b" ? shadeStyle.bright : shadeStyle.soft
-      return hexOf(parseInt(m[1], 10), style.s, style.v)
+      return hexOf(parseInt(m[1], 10), style.s * 0.82, style.v * 0.95)
     }
     return taskbar.themeColors[slot] || ""
   }
@@ -970,7 +971,7 @@ Item {
     items.push({ header: sec === -1 ? "Pin to" : "Move to", gap: true })
     for (var i = 0; i < sections.length; i++)
       if (i !== sec) items.push({ label: sections[i].name, act: "move", sec: i })
-    items.push({ label: e.folder ? "New group with this folder" : "New group with this app", act: "group" })
+    items.push({ label: e.folder ? "New group with this folder" : "New group with this app", act: "group", gap: true })
     if (isFrequent(e)) items.push({ label: "Remove from Frequent", act: "hide", gap: true })
     // A pinned folder: what each click opens it with (each opens its choices).
     if (e.folder && sec !== -1) {
