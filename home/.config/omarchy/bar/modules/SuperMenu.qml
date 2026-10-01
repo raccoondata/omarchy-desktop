@@ -672,7 +672,9 @@ Item {
 
   // ------------------------------------------------------------- shades
   // A block's shade: one of the theme's colours, by name ("" for none).
-  readonly property var shadeSlots: ["accent", "red", "yellow", "green", "cyan", "blue", "magenta"]
+  readonly property var shadeSlots: ["accent", "red", "orange", "yellow", "green", "cyan", "blue", "magenta", "brown",
+    "bright_red", "bright_yellow", "bright_green", "bright_cyan", "bright_blue", "bright_magenta",
+    "selection", "muted", "foreground", "light_foreground", "dark_foreground"]
   function shadeColor(slot) {
     if (!slot) return ""
     if (slot === "accent") return String(Color.accent)
@@ -1174,10 +1176,27 @@ Item {
   // Opened for a look only (superMenuPreview IPC, for screenshots and
   // tests): no keyboard focus, so it can't take anyone's typing.
   property bool previewOnly: false
+  Timer {
+    id: previewMenuTimer
+    property int sec: 0
+    interval: 500
+    onTriggered: {
+      var L = menu.layouts[sec]
+      if (L) menu.openBlockMenu(sec, blockCanvas.mapToItem(null, (L.x + L.w) * menu.colPitch - menu.tileGap, L.y * menu.rowPitch + menu.bandHeight))
+    }
+  }
+  // "#menu:N" opens block N's ⋯ menu instead of typing (for screenshots).
   function preview(text) {
     previewOnly = true
     open()
-    query = text || ""
+    var m = /^#menu:(\d+)$/.exec(String(text || ""))
+    if (m) {
+      // Once the menu has settled in (its entrance moves it).
+      previewMenuTimer.sec = parseInt(m[1], 10)
+      previewMenuTimer.restart()
+    } else {
+      query = text || ""
+    }
   }
 
   function close() {
@@ -2156,11 +2175,22 @@ property real live: 0
       acceptedButtons: Qt.LeftButton | Qt.RightButton
       onClicked: menu.tileMenuEntry = null
     }
+    // Sized to its longest line (up to a limit; longer ones end in "…").
+    FontMetrics {
+      id: tileMenuMetrics
+      font.family: Style.font.menuFamily
+      font.pixelSize: Style.font.bodySmall
+    }
     Rectangle {
+      id: tileMenuBox
+      readonly property real pad: Style.space(4)
+      readonly property real widest: menu.tileMenuItems.reduce(function(w, it) {
+        return it.swatches ? w : Math.max(w, tileMenuMetrics.advanceWidth(it.label))
+      }, 0)
       visible: menu.tileMenuEntry !== null
       z: 21
-      width: Style.space(230)
-      height: tileMenuColumn.implicitHeight + Style.space(8)
+      width: Math.max(Style.space(200), Math.min(Style.space(400), widest + Style.space(24) + pad * 2))
+      height: tileMenuColumn.implicitHeight + pad * 2
       x: Math.max(4, Math.min(menu.tileMenuPoint.x, parent.width - width - 4))
       y: Math.max(4, Math.min(menu.tileMenuPoint.y, parent.height - height - 4))
       radius: Style.cornerRadius
@@ -2170,37 +2200,40 @@ property real live: 0
 
       Column {
         id: tileMenuColumn
-        x: Style.space(4)
-        y: Style.space(4)
-        width: parent.width - Style.space(8)
+        x: tileMenuBox.pad
+        y: tileMenuBox.pad
+        width: tileMenuBox.width - tileMenuBox.pad * 2
         Repeater {
           model: menu.tileMenuItems
           Rectangle {
+            id: menuRow
             required property var modelData
+            readonly property real topGap: modelData.gap ? Style.space(9) : 0
             width: tileMenuColumn.width
-            height: Style.space(28) + (modelData.gap ? Style.space(9) : 0)
+            height: topGap + (modelData.swatches ? swatchFlow.height + Style.space(12) : Style.space(28))
+            radius: Style.cornerRadius
+            color: itemMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
             Rectangle {
-              visible: !!parent.modelData.gap
+              visible: !!menuRow.modelData.gap
               anchors.top: parent.top
               anchors.topMargin: Style.space(4)
               width: parent.width
               height: 1
               color: Util.alpha(Color.menu.text, 0.15)
             }
-            radius: Style.cornerRadius
-            color: itemMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
-            // A block's shade: none, then the theme's colours.
-            Row {
-              visible: !!parent.modelData.swatches
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
+            // A block's shade: none, then the theme's colours (wrapping).
+            Flow {
+              id: swatchFlow
+              visible: !!menuRow.modelData.swatches
+              x: Style.space(8)
+              y: menuRow.topGap + Style.space(6)
+              width: menuRow.width - Style.space(16)
               spacing: Style.space(6)
               Repeater {
-                model: parent.visible ? [""].concat(menu.shadeChoices) : []
+                model: menuRow.modelData.swatches ? [""].concat(menu.shadeChoices) : []
                 Rectangle {
                   required property var modelData
-                  readonly property string cur: menu.sections[menu.tileMenuEntry ? menu.tileMenuEntry.blockMenu : 0]
+                  readonly property string cur: menu.tileMenuEntry && menu.sections[menu.tileMenuEntry.blockMenu]
                     ? menu.sections[menu.tileMenuEntry.blockMenu].shade : ""
                   width: Style.space(18)
                   height: width
@@ -2221,7 +2254,7 @@ property real live: 0
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onEntered: menu.hoverDetail = parent.modelData === "" ? "No shade" : "Shade: " + parent.modelData
+                    onEntered: menu.hoverDetail = parent.modelData === "" ? "No shade" : "Shade: " + parent.modelData.replace(/_/g, " ")
                     onExited: menu.hoverDetail = ""
                     onClicked: menu.runTileMenu({ act: "shade", sec: menu.tileMenuEntry.blockMenu, slot: parent.modelData })
                   }
@@ -2229,13 +2262,16 @@ property real live: 0
               }
             }
             Text {
-              visible: !parent.modelData.swatches
+              visible: !menuRow.modelData.swatches
               anchors.left: parent.left
               anchors.leftMargin: Style.space(10)
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(10)
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(6)
-              text: parent.modelData.label
+              text: menuRow.modelData.label
               textFormat: Text.PlainText
+              elide: Text.ElideRight
               color: itemMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
               font.family: Style.font.menuFamily
               font.pixelSize: Style.font.bodySmall
@@ -2243,10 +2279,10 @@ property real live: 0
             MouseArea {
               id: itemMouse
               anchors.fill: parent
-              enabled: !parent.modelData.swatches
+              enabled: !menuRow.modelData.swatches
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: menu.runTileMenu(parent.modelData)
+              onClicked: menu.runTileMenu(menuRow.modelData)
             }
           }
         }
