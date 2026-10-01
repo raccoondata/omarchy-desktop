@@ -70,7 +70,8 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    locally (plugin repo not published yet): the service publishes programs,
    mru, attention, agents and runs cava; the modules import its lib/, ui/,
    media/ and model/; the installer adds it (need_plugin).
-2. now-playing (done locally), hot-corners, agent-tools, screenshots.
+2. now-playing, hot-corners (done locally; Desktop Core's hypr-include adds
+   a plugin's Hyprland file to hyprland.lua), agent-tools, screenshots.
 3. super-menu (done locally): its own key file, Host.qml as its link to the
    rest; Desktop Core counts app use. First release: line-icons and
    super-menu, after a visual pass.

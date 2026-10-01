@@ -17,7 +17,7 @@ import "../../plugins/desktop-core/media"
 //   taskbar options   ~/.config/omarchy/taskbar-setting (the taskbar's entry
 //                     in shell.json, which the bar reloads by itself)
 //   bar height        ~/.config/omarchy/bar-height (Omarchy's shell.toml)
-//   hot corners       ~/.config/omarchy/hotcorner (hotcorners.conf)
+//   hot corners       the Hot Corners plugin's own settings (an Open button)
 //   title bars        ~/.config/omarchy/titlebars, taskbar-action titlebar
 //   mouse             ~/.config/omarchy/mouse-setting (hypr/mouse.lua)
 Item {
@@ -130,38 +130,6 @@ Item {
     Util.execArgv([dir + "/mouse-setting", "terminal", String(terminalScroll)])
   }
 
-  property var corners: ({})
-  FileView {
-    id: cornersFile
-    path: settings.dir + "/hotcorners.conf"
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: {
-      var map = {}
-      var lines = text().split("\n")
-      for (var i = 0; i < lines.length; i++) {
-        var m = lines[i].match(/^([a-z-]+)=(\S+)/)
-        if (m) map[m[1]] = m[2]
-      }
-      settings.corners = map
-    }
-  }
-
-  function setCorner(corner, action) {
-    var next = Object.assign({}, corners)
-    next[corner] = action
-    corners = next
-    Util.execArgv([dir + "/hotcorner", "set", corner, action])
-  }
-
-  function setRipple(on) {
-    var next = Object.assign({}, corners)
-    next.effect = on ? "on" : "off"
-    corners = next
-    Util.execArgv([dir + "/hotcorner", "effect", on ? "on" : "off"])
-  }
-
   property bool titlebarsOn: true
   FileView {
     path: settings.dir + "/titlebars-off"
@@ -171,16 +139,6 @@ Item {
     onLoaded: settings.titlebarsOn = false
     onLoadFailed: settings.titlebarsOn = true
   }
-
-  readonly property var cornerActions: [
-    { value: "none", label: "Nothing" },
-    { value: "desktop", label: "Show desktop" },
-    { value: "minimize", label: "Minimize all" },
-    { value: "restore", label: "Restore all" },
-    { value: "switcher", label: "Window switcher" },
-    { value: "menu", label: "Omarchy menu" },
-    { value: "lock", label: "Lock screen" }
-  ]
 
   // -------------------------------------------------------------- search
 
@@ -1002,102 +960,25 @@ Item {
   Component {
     id: cornersTab
 
-    Row {
-      spacing: settings.columnGap
-
-      // A small screen with a picker in each corner.
-      Rectangle {
-        id: screenArt
-        width: Style.space(520)
-        height: Math.round(width * 0.5625)
-        radius: Style.cornerRadius + 4
-        color: Util.alpha(Color.menu.text, 0.03)
-        border.width: 2
-        border.color: Util.alpha(Color.menu.text, 0.25)
-
-        // The bar across the top, for orientation.
-        Rectangle {
-          x: 2; y: 2
-          width: parent.width - 4
-          height: Style.space(10)
-          color: Util.alpha(Color.menu.text, 0.08)
-        }
-
-        Repeater {
-          model: [
-            { corner: "top-left", right: false, bottom: false },
-            { corner: "top-right", right: true, bottom: false },
-            { corner: "bottom-left", right: false, bottom: true },
-            { corner: "bottom-right", right: true, bottom: true }
-          ]
-
-          Item {
-            id: cornerItem
-            required property var modelData
-            readonly property string action: settings.corners[modelData.corner] || "none"
-
-            width: picker.width
-            height: picker.height
-            x: modelData.right ? screenArt.width - width - Style.space(14) : Style.space(14)
-            y: modelData.bottom ? screenArt.height - height - Style.space(14) : Style.space(20)
-
-            // A dot in the very corner shows which one this is.
-            Rectangle {
-              readonly property int size: Style.space(8)
-              width: size; height: size; radius: size / 2
-              color: cornerItem.action === "none" ? Util.alpha(Color.menu.text, 0.3) : Color.accent
-              x: cornerItem.modelData.right ? cornerItem.width + Style.space(14) - size - 4 : -Style.space(14) + 4
-              y: cornerItem.modelData.bottom ? cornerItem.height + Style.space(14) - size - 4 : -Style.space(20) + 4
-            }
-
-            Dropdown {
-              id: picker
-              width: Style.space(170)
-              showLabel: false
-              options: settings.cornerActions
-              value: cornerItem.action
-              fontFamily: Style.font.menuFamily
-              onChanged: function(v) { settings.setCorner(cornerItem.modelData.corner, v) }
-            }
-          }
-        }
-      }
-
-      Column {
-        width: settings.cardWidth - screenArt.width - settings.columnGap
-        spacing: Style.space(6)
-
-        Section { title: "Hot corners" }
-
-        Text {
-          width: parent.width
-          text: "Push the pointer into a corner of the screen to run its action. Corners are ignored mid-drag and in true fullscreen."
-          wrapMode: Text.WordWrap
-          color: Color.menu.text
-          opacity: 0.6
-          font.family: Style.font.menuFamily
-          font.pixelSize: Style.font.bodySmall
-        }
-
-        Item { width: 1; height: Style.space(6) }
-
-        SettingRow {
-          label: "Corner effect"
-          description: "an accent bracket in the corner that fired"
-          ToggleSwitch {
-            checked: (settings.corners.effect || "on") !== "off"
-            onToggled: settings.setRipple(!checked)
+    Column {
+      width: settings.cardWidth / 2
+      spacing: Style.space(6)
+      Section { title: "Hot corners" }
+      SettingRow {
+        label: "Hot Corners"
+        description: "push the pointer into a screen corner: the Hot Corners plugin's own settings"
+        Button {
+          text: "Open"
+          foreground: Color.menu.text
+          fontFamily: Style.font.menuFamily
+          onClicked: {
+            settings.close()
+            Util.execArgv(["omarchy-shell", "shell", "summon", "hot-corners", "{}"])
           }
         }
       }
     }
   }
-
-  function setPrimaries(first, second) {
-    Util.execArgv([dir + "/agents", "primary", first, second])
-    agentsReload.restart()
-  }
-  Timer { id: agentsReload; interval: 400; onTriggered: settings.taskbar.reloadAgents() }
 
   Component {
     id: agentsTab

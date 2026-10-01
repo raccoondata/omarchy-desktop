@@ -121,6 +121,7 @@ need_plugin desktop-core "Desktop Core" omarchy-desktop-core
 need_plugin line-icons "Line Icons" omarchy-line-icons
 need_plugin now-playing "Now Playing" omarchy-now-playing widget
 need_plugin super-menu "Super Menu" omarchy-super-menu
+need_plugin hot-corners "Hot Corners" omarchy-hot-corners
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -256,10 +257,12 @@ fi
 # with Windows), the settings window, and updating this desktop.
 menu="$omarchy/extensions/omarchy-menu.jsonc"
 [[ -f $menu ]] || { mkdir -p "$(dirname "$menu")"; cp /usr/share/omarchy/config/omarchy/extensions/omarchy-menu.jsonc "$menu"; }
+# Hot Corners is its own plugin now, with its own Setup entry: the
+# desktop's old one goes.
+sed -i '/"setup.hotcorners":.*taskbar settings corners/d' "$menu"
 entries=(
   '"system.lock": {"icon": "", "label": "Lock", "action": "$HOME/.config/omarchy/lock"},'
   '"system.reboot-windows": {"when":"\"$HOME/.config/omarchy/reboot-to-windows\" --check","icon":"","label":"Reboot to Windows","description":"Boot Windows once, then back to Omarchy","action":"$HOME/.config/omarchy/reboot-to-windows"},'
-  '"setup.hotcorners": {"icon": "", "label": "Hot Corners", "description": "what pushing the pointer into a screen corner does", "action": "omarchy-shell -q taskbar settings corners"},'
   '"setup.taskbar": {"icon": "", "label": "Taskbar & Desktop", "description": "taskbar, windows, agents, effects, hot corners, title bars, now playing, screenshots, icons, mouse", "action": "omarchy-shell -q taskbar settings taskbar"},'
   '"update.desktop": {"icon": "", "label": "Desktop", "description": "omarchy-desktop: taskbar, Super menu, windows", "action": "omarchy-launch-floating-terminal-with-presentation omarchy-desktop update"},'
 )

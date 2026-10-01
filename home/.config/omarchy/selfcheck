@@ -160,6 +160,7 @@ plugin_check desktop-core "Desktop Core" model/Windows.qml "the taskbar and Supe
 plugin_check line-icons "Line Icons" lib/LineIcons.js "the taskbar has no icons" omarchy-line-icons
 plugin_check now-playing "Now Playing" NowPlaying.qml "no song on the bar" omarchy-now-playing
 plugin_check super-menu "Super Menu" Main.qml "no Super menu" omarchy-super-menu
+plugin_check hot-corners "Hot Corners" bin/hotcorner "no hot corners" omarchy-hot-corners
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi

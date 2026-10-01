@@ -12,8 +12,6 @@ import qs.Commons
 //    like a focused window, with one soft sheen passing over it as the zone is
 //    entered. Zones and areas come from the dragevents plugin
 //    (windowdragzone events, via taskbar.qml).
-//  - Hot corner: an accent bracket draws along the two edges of the corner
-//    that fired, then fades (~/.config/omarchy/hotcorner calls hotCorner).
 //  - Locking (~/.config/omarchy/lock): a "Locked, type your password" card
 //    just before the lock, so remote viewers see that, not the desktop.
 //  - Print Screen: an accent frame around exactly what was captured, held
@@ -32,7 +30,6 @@ Item {
   property bool previewEnabled: true
   readonly property bool previewShown: previewEnabled && zone !== "none" && area.width > 0
 
-  property string corner: ""
   // Matches Hyprland's window border (general:border_size in Omarchy).
   readonly property int borderWidth: 2
 
@@ -86,16 +83,12 @@ Item {
   // instead of whatever was on the desktop, and knows to type the password.
   property bool lockCard: false
 
-  function ripple(name) {
-    corner = name
-    bracket.restart()
-  }
 
   PanelWindow {
     id: overlay
 
     screen: fx.taskbar.QsWindow.window ? fx.taskbar.QsWindow.window.screen : null
-    visible: fx.previewShown || previewFade.running || bracket.running || morphAnimation.running
+    visible: fx.previewShown || previewFade.running || morphAnimation.running
       || fx.captureHeld || captureFade.running || captureFlight.running
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
@@ -241,60 +234,6 @@ Item {
       }
     }
 
-    // --------------------------------------------------------- hot corner
-
-    // An L of accent lines hugging the corner, like a window border drawn
-    // into the corner and let go.
-    Item {
-      id: cornerMark
-      readonly property bool atRight: fx.corner.indexOf("right") !== -1
-      readonly property bool atBottom: fx.corner.indexOf("bottom") !== -1
-      readonly property int reach: 140
-      property real grow: 0
-
-      anchors.fill: parent
-      opacity: 0
-
-      Rectangle {
-        // Along the top or bottom edge.
-        width: cornerMark.reach * cornerMark.grow
-        height: fx.borderWidth + 1
-        x: cornerMark.atRight ? parent.width - width : 0
-        y: cornerMark.atBottom ? parent.height - height : 0
-        color: Color.accent
-      }
-
-      Rectangle {
-        // Along the left or right edge.
-        width: fx.borderWidth + 1
-        height: cornerMark.reach * cornerMark.grow
-        x: cornerMark.atRight ? parent.width - width : 0
-        y: cornerMark.atBottom ? parent.height - height : 0
-        color: Color.accent
-      }
-
-      // A faint wash in the corner itself.
-      Rectangle {
-        readonly property real size: cornerMark.reach * 0.55 * cornerMark.grow
-        width: size
-        height: size
-        x: cornerMark.atRight ? parent.width - width : 0
-        y: cornerMark.atBottom ? parent.height - height : 0
-        gradient: Gradient {
-          orientation: Gradient.Vertical
-          GradientStop { position: 0.0; color: cornerMark.atBottom ? "transparent" : Util.alpha(Color.accent, 0.18) }
-          GradientStop { position: 1.0; color: cornerMark.atBottom ? Util.alpha(Color.accent, 0.18) : "transparent" }
-        }
-      }
-    }
-
-    SequentialAnimation {
-      id: bracket
-      ScriptAction { script: { cornerMark.grow = 0; cornerMark.opacity = 1 } }
-      NumberAnimation { target: cornerMark; property: "grow"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
-      PauseAnimation { duration: 140 }
-      NumberAnimation { target: cornerMark; property: "opacity"; to: 0; duration: 260; easing.type: Easing.InQuad }
-    }
   }
 
   // The lock card gets its own window on the top-most layer, above menus,

@@ -618,9 +618,9 @@ BarWidget {
       var hit = root.workspaceAtGlobal(x, y)
       return hit ? hit.id : 0
     }
-    // ~/.config/omarchy/hotcorner: the ripple, and whether a window drag is
-    // under way (a corner reached mid-drag is ignored).
-    function hotCorner(corner: string): void { desktopFx.ripple(corner) }
+    // Hot corners (the Hot Corners plugin): whether a window drag is under way
+    // (a corner reached mid-drag is ignored); hotCorner stays for older callers.
+    function hotCorner(corner: string): void { Util.execArgv(["omarchy-shell", "-q", "hot-corners", "ripple", corner]) }
     // Double-tap Super / Caps Lock (hypr/desktop/bindings.lua): the super menu.
     // The Super menu is its own plugin now; these stay for older callers.
     function superMenu(): void { Util.execArgv(["omarchy-shell", "-q", "super-menu", "toggle"]) }
