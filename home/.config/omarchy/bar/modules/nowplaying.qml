@@ -1508,7 +1508,8 @@ BarWidget {
           id: visualizer
           visible: root.cardVisual !== "off"
           width: parent.width
-          height: !visible ? 0 : root.cardVisual === "pixel" ? vis.height : Style.space(72)
+          // One height for every visualizer, so switching doesn't move the card.
+          height: !visible ? 0 : Style.space(72)
           opacity: card.enter * 0.85
           Visualizer {
             anchors.fill: parent
@@ -1522,12 +1523,12 @@ BarWidget {
           Equalizer {
             id: vis
             visible: root.cardVisual === "pixel"
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.centerIn: parent
             readonly property int cell: Math.max(6, Style.space(6))
             pixel: cell
             gap: 2
             columns: Math.max(8, Math.floor((visualizer.width + gap) / (cell + gap)))
-            rows: 5
+            rows: Math.max(5, Math.floor((visualizer.height + gap) / (cell + gap)))
             playing: root.playing && root.popupOpen && visualizer.visible && visible
             silent: !root.playing
             saving: root.saving
