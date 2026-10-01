@@ -23,12 +23,14 @@ import "Visuals.js" as Visuals
 //             the ids); its right-click menu sets what Click / Shift+click /
 //             Ctrl+click (or Enter with those) do for that folder alone
 //             ("folderActions" in supermenu.json; else the folder settings)
-//   Groups    named blocks for tasks, placed freely on the grid with Pinned
-//             ("groups": [{name, apps, x, y, w, h}], "pinnedLayout"): each
-//             at its own spot and size in tiles; drag a title to move it, the
-//             corner to resize, ⋯ for sizes / rename / delete (its apps go
-//             back to Pinned). "+ New group"; drag tiles between blocks (or
-//             right-click > Move to); more than fit: "+N" lists the rest
+//   Groups    named blocks for tasks, anywhere on the grid with Pinned
+//             ("groups": [{name, apps, x, y, w}], "pinnedLayout"). Their size
+//             follows where you drop apps: on a block, into it; just right
+//             of one, it widens; just below, onto its end; anywhere else, a
+//             new group there. A block is as tall as its apps need (one that
+//             grows pushes the ones below down); a group left empty goes.
+//             Drag a title to move a block; ⋯ renames or deletes a group
+//             (its apps go back to Pinned)
 //   Frequent  the apps you use most lately that aren't pinned, from
 //             ~/.local/state/omarchy/app-usage.json (the taskbar counts every
 //             switch to an app, and launches from here). Optional (setting
@@ -259,7 +261,7 @@ Item {
         menu.pinnedLayout = data.pinnedLayout || null
         menu.folderActions = data.folderActions && typeof data.folderActions === "object" ? data.folderActions : ({})
         menu.groups = Array.isArray(data.groups) ? data.groups.filter(function(g) { return g && typeof g.name === "string" })
-          .map(function(g) { return { name: g.name, apps: Array.isArray(g.apps) ? g.apps : [], x: g.x, y: g.y, w: g.w, h: g.h } }) : []
+          .map(function(g) { return { name: g.name, apps: Array.isArray(g.apps) ? g.apps : [], x: g.x, y: g.y, w: g.w } }) : []
       } catch (e) {
         menu.pinnedIds = []
         menu.hiddenFrequent = []
@@ -322,8 +324,8 @@ Item {
   // wide, each at its own place and size (layout {x, y, w, h}, in tiles).
   // Each section's tiles skip ids with no app behind them (uninstalled for
   // now; kept, at the end of its list).
-  property var groups: []            // [{ name, apps, x, y, w, h }]
-  property var pinnedLayout: null    // Pinned's {x, y, w, h}
+  property var groups: []            // [{ name, apps, x, y, w }]
+  property var pinnedLayout: null    // Pinned's {x, y, w}
   property int renaming: -1          // the section whose name is being edited
   readonly property int tileGap: Style.space(6)
   readonly property int bandHeight: Style.space(24)   // a block's title bar (and between its rows)
@@ -364,30 +366,43 @@ Item {
     return { x: 0, y: 200, w: w, h: h }
   }
 
-  // Where each block is: its saved place, or the first free spot for one
-  // without (Pinned: full width at the top; a group: 3x2).
+  // Where each block is and how big: its saved place and width, as tall as
+  // its tiles need (and no wider than them). Blocks are placed top to
+  // bottom; one that would overlap an earlier one moves down until it
+  // doesn't. A block without a place takes the first free spot (Pinned:
+  // full width; a group: up to 3 wide).
   readonly property var layouts: {
-    var placed = []
-    var rects = [pinnedLayout].concat(groups.map(function(g) { return { x: g.x, y: g.y, w: g.w, h: g.h } }))
-    for (var i = 0; i < rects.length; i++) {
-      var r = rects[i]
-      if (fits(r, placed, -1)) placed.push({ x: r.x, y: r.y, w: r.w, h: r.h })
-      else if (i === 0) placed.push(firstSpot(columns, Math.max(1, Math.ceil(sectionEntries[0].length / columns)), placed))
-      else placed.push(firstSpot(Math.min(3, columns), 2, placed))
+    var specs = [pinnedLayout || { w: columns }].concat(groups.map(function(g) { return { x: g.x, y: g.y, w: g.w || 3 } }))
+    var sized = specs.map(function(r, i) {
+      var n = sectionEntries[i] ? sectionEntries[i].length : 0
+      var want = Math.max(1, Math.min(columns, Math.round(r.w) || 1))
+      var w = Math.max(1, Math.min(want, n || 1))
+      var has = typeof r.x === "number" && typeof r.y === "number" && r.x >= 0 && r.y >= 0
+      return { x: has ? Math.min(Math.round(r.x), columns - w) : -1, y: has ? Math.round(r.y) : -1, w: w,
+               h: Math.max(1, Math.ceil(Math.max(1, n) / w)), has: has }
+    })
+    var placed = new Array(sized.length)
+    var done = []
+    sized.map(function(r, i) { return i }).filter(function(i) { return sized[i].has })
+      .sort(function(a, b) { return sized[a].y - sized[b].y || sized[a].x - sized[b].x })
+      .forEach(function(i) {
+        var r = { x: sized[i].x, y: sized[i].y, w: sized[i].w, h: sized[i].h }
+        for (var guard = 0; guard < 300 && !fits(r, done, -1); guard++) r.y++
+        placed[i] = r
+        done.push(r)
+      })
+    for (var i = 0; i < sized.length; i++) {
+      if (placed[i]) continue
+      placed[i] = firstSpot(sized[i].w, sized[i].h, done)
+      done.push(placed[i])
     }
     return placed
   }
   readonly property int gridRows: layouts.reduce(function(m, r) { return Math.max(m, r.y + r.h) }, 0)
 
-  // The tiles a block shows: all, or (more than fit) all but the last
-  // cell's worth, the last cell listing the rest.
+  // The tiles a block shows (all of them: blocks grow to fit).
   function shownCount(sec) {
-    // (A block's place can lag its section for a moment while groups change.)
-    var L = layouts[sec]
-    if (!L || !sectionEntries[sec]) return 0
-    var cap = L.w * L.h
-    var n = sectionEntries[sec].length
-    return n > cap ? Math.max(0, cap - 1) : n
+    return sectionEntries[sec] ? sectionEntries[sec].length : 0
   }
 
   // Where each block's tiles start among all the tiles shown.
@@ -446,10 +461,11 @@ Item {
   // automatically stay put once anything changes); sets Pinned's too.
   function placedGroups() {
     var all = layouts
-    pinnedLayout = { x: all[0].x, y: all[0].y, w: all[0].w, h: all[0].h }
+    pinnedLayout = { x: all[0].x, y: all[0].y, w: Math.max(all[0].w, pinnedLayout && pinnedLayout.w || 0) }
     return groups.map(function(g, i) {
       var r = all[i + 1]
-      return { name: g.name, apps: g.apps, x: r.x, y: r.y, w: r.w, h: r.h }
+      // The width it was given, even while it has fewer apps than that.
+      return { name: g.name, apps: g.apps, x: r.x, y: r.y, w: Math.max(r.w, g.w || 0) }
     })
   }
 
@@ -488,31 +504,26 @@ Item {
     if (at < shownCount(toSec)) selected = sectionOffsets[toSec] + at
   }
 
-  // A block's new place or size (every block's place saved with it).
+  // A block's new place (every block's place saved with it).
   function setLayout(sec, rect) {
     var next = placedGroups()
-    if (sec === 0) pinnedLayout = { x: rect.x, y: rect.y, w: rect.w, h: rect.h }
-    else if (sec > 0 && sec <= next.length) {
-      next[sec - 1].x = rect.x; next[sec - 1].y = rect.y; next[sec - 1].w = rect.w; next[sec - 1].h = rect.h
-    }
+    if (sec === 0) pinnedLayout = { x: rect.x, y: rect.y, w: pinnedLayout.w }
+    else if (sec > 0 && sec <= next.length) { next[sec - 1].x = rect.x; next[sec - 1].y = rect.y }
     groups = next
     saveConfig()
   }
 
-  // A size from ⋯: where it is if it fits there, else the first spot it does.
-  function resizeTo(sec, w, h) {
-    var L = layouts[sec]
-    var r = { x: Math.min(L.x, columns - w), y: L.y, w: w, h: h }
-    if (!fits(r, layouts, sec)) {
-      var others = layouts.slice()
-      others[sec] = null
-      r = firstSpot(w, h, others)
-    }
-    setLayout(sec, r)
+  // A block's width (from dropping an app just right of it).
+  function setWidth(sec, w) {
+    var next = placedGroups()
+    if (sec === 0) pinnedLayout = { x: pinnedLayout.x, y: pinnedLayout.y, w: w }
+    else if (sec > 0 && sec <= next.length) next[sec - 1].w = w
+    groups = next
+    saveConfig()
   }
 
-  // Moving or resizing a block by dragging: which, how, and the outline of
-  // where it would go (ok: it fits there).
+  // Moving a block by dragging its title: which, and the outline of where it
+  // would go (ok: it fits there).
   property string blockAction: ""
   property int blockSection: -1
   property var blockGhost: null
@@ -528,13 +539,9 @@ Item {
   function updateBlock(scenePoint) {
     if (blockAction === "") return
     var p = blockCanvas.mapFromItem(null, scenePoint.x, scenePoint.y)
-    var L = layouts[blockSection], r
-    if (blockAction === "move")
-      r = { x: Math.max(0, Math.min(columns - L.w, Math.round((p.x - blockGrab.x) / colPitch))),
-            y: Math.max(0, Math.round((p.y - blockGrab.y) / rowPitch)), w: L.w, h: L.h }
-    else
-      r = { x: L.x, y: L.y, w: Math.max(1, Math.min(columns - L.x, Math.round((p.x - L.x * colPitch + tileGap) / colPitch))),
-            h: Math.max(1, Math.round((p.y - L.y * rowPitch) / rowPitch)) }
+    var L = layouts[blockSection]
+    var r = { x: Math.max(0, Math.min(columns - L.w, Math.round((p.x - blockGrab.x) / colPitch))),
+              y: Math.max(0, Math.round((p.y - blockGrab.y) / rowPitch)), w: L.w, h: L.h }
     r.ok = fits(r, layouts, blockSection)
     blockGhost = r
   }
@@ -547,14 +554,23 @@ Item {
   }
 
   function addGroup(name, withId) {
-    var all = layouts
-    var rect = firstSpot(Math.min(3, columns), 2, all)
+    var rect = firstSpot(1, 1, layouts)
+    addGroupAt(rect.x, rect.y, withId, name)
+  }
+
+  // A new group at a cell (where an app was dropped), named by typing.
+  function addGroupAt(c, r, withId, name) {
     var next = placedGroups()
-    next.push({ name: name, apps: [], x: rect.x, y: rect.y, w: rect.w, h: rect.h })
+    next.push({ name: name || "New group", apps: [], x: c, y: r, w: 3 })
     groups = next
     if (withId) placeApp(withId, next.length, 0)
     else saveConfig()
     renaming = next.length
+  }
+
+  // A group that's been left empty (its last app dragged out) goes.
+  function dropIfEmpty(sec) {
+    if (sec >= 1 && sec <= groups.length && groups[sec - 1].apps.length === 0 && renaming !== sec) deleteGroup(sec)
   }
 
   function renameGroup(sec, name) {
@@ -659,24 +675,51 @@ Item {
     : dragSection === -2 ? (frequentEntries[dragIndex] || null)
     : dragSection >= 0 && dragSection < sectionEntries.length ? (sectionEntries[dragSection][dragIndex] || null) : null
 
-  // Where the pointer would drop: the section under it and the place in it.
-  function updateDrop(point) {
-    for (var i = 0; i < blockRepeater.count; i++) {
-      var item = blockRepeater.itemAt(i)
-      var at = item ? item.dropIndexAt(point) : -1
-      if (at >= 0) { dropSection = i; dropIndex = at; return }
+  // Where a dragged tile would go, from the cell under the pointer: onto a
+  // block (at that spot); just right of one (it widens, if that column's
+  // free beside it); just below one (onto its end); anywhere else (a new
+  // group there). {kind: "insert" | "widen" | "below" | "new", sec, idx, c, r}
+  property var dropPlan: null
+  function planDrop(scenePoint) {
+    var p = blockCanvas.mapFromItem(null, scenePoint.x, scenePoint.y)
+    if (p.x < 0 || p.x > blockCanvas.width || p.y < 0 || p.y > blockCanvas.height) return null
+    var c = Math.max(0, Math.min(columns - 1, Math.floor(p.x / colPitch)))
+    var r = Math.max(0, Math.floor((p.y - bandHeight) / rowPitch))
+    var i, L
+    for (i = 0; i < layouts.length; i++) {
+      L = layouts[i]
+      if (c >= L.x && c < L.x + L.w && r >= L.y && r < L.y + L.h)
+        return { kind: "insert", sec: i, idx: Math.min((r - L.y) * L.w + (c - L.x), sectionEntries[i].length), c: c, r: r }
     }
-    dropSection = -1
-    dropIndex = -1
+    for (i = 0; i < layouts.length; i++) {
+      L = layouts[i]
+      if (c === L.x + L.w && r >= L.y && r < L.y + L.h && fits({ x: c, y: L.y, w: 1, h: L.h }, layouts, i))
+        return { kind: "widen", sec: i, idx: (r - L.y) * (L.w + 1) + L.w, c: c, r: r }
+      if (r === L.y + L.h && c >= L.x && c < L.x + L.w)
+        return { kind: "below", sec: i, idx: 1e9, c: c, r: r }
+    }
+    return { kind: "new", sec: -1, idx: 0, c: c, r: r }
+  }
+
+  function updateDrop(point) {
+    var plan = planDrop(point)
+    dropPlan = plan
+    dropSection = plan && plan.kind === "insert" ? plan.sec : -1
+    dropIndex = plan && plan.kind === "insert" ? plan.idx : -1
   }
 
   function endDrag() {
-    var entry = dragEntry
-    if (entry && dropSection >= 0 && dropIndex >= 0) placeApp(entry.id, dropSection, dropIndex)
+    var entry = dragEntry, plan = dropPlan, from = dragSection
     dragSection = -1
     dragIndex = -1
     dropSection = -1
     dropIndex = -1
+    dropPlan = null
+    if (!entry || !plan) return
+    if (plan.kind === "insert" || plan.kind === "below") placeApp(entry.id, plan.sec, plan.idx)
+    else if (plan.kind === "widen") { setWidth(plan.sec, layouts[plan.sec].w + 1); placeApp(entry.id, plan.sec, plan.idx) }
+    else if (plan.kind === "new") addGroupAt(plan.c, plan.r, entry.id)
+    if (plan.sec !== from) dropIfEmpty(from)
   }
 
   // Right-click on a tile: a small menu (pin, move to a group, new group).
@@ -685,23 +728,10 @@ Item {
   readonly property var tileMenuItems: {
     var e = tileMenuEntry
     if (!e) return []
-    // A block's "+N": the apps that didn't fit.
-    if (e.overflowOf !== undefined)
-      return sectionEntries[e.overflowOf].slice(shownCount(e.overflowOf))
-        .map(function(x) { return { label: entryName(x), act: "launch", entry: x } })
-    // A block's ⋯: sizes, and for a group rename and delete.
-    if (e.blockMenu !== undefined) {
-      var b = e.blockMenu, L = layouts[b], list = []
-      ;[[2, 2], [3, 2], [2, 3], [3, 3], [4, 2], [6, 1], [6, 2]].forEach(function(sz) {
-        list.push({ label: "Size " + sz[0] + "\u00d7" + sz[1] + (L.w === sz[0] && L.h === sz[1] ? "   \u2713" : ""),
-                    act: "size", sec: b, w: sz[0], h: sz[1] })
-      })
-      if (sections[b].group) {
-        list.push({ label: "Rename", act: "rename", sec: b, gap: true })
-        list.push({ label: "Delete group (apps go back to Pinned)", act: "delete", sec: b })
-      }
-      return list
-    }
+    // A group's ⋯: rename, delete.
+    if (e.blockMenu !== undefined)
+      return [{ label: "Rename", act: "rename", sec: e.blockMenu },
+              { label: "Delete group (apps go back to Pinned)", act: "delete", sec: e.blockMenu }]
     var sec = sectionOf(e.id)
     var items = [{ label: sec === -1 ? "Pin" : "Unpin", act: "pin" }]
     for (var i = 0; i < sections.length; i++)
@@ -720,7 +750,6 @@ Item {
   // Typing and arrows back to the menu (after renaming a group).
   function focusKeys() { keys.forceActiveFocus() }
 
-  function openOverflow(sec, scenePoint) { openTileMenu({ overflowOf: sec }, scenePoint) }
   function openBlockMenu(sec, scenePoint) { openTileMenu({ blockMenu: sec }, scenePoint) }
 
   function openTileMenu(entry, scenePoint) {
@@ -732,12 +761,10 @@ Item {
     if (e && item && item.act === "cycle") { cycleFolderAction(e, item.how); return }   // stays open
     tileMenuEntry = null
     if (!e || !item) return
-    if (item.act === "launch") launch(item.entry, false)
-    else if (item.act === "size") resizeTo(item.sec, item.w, item.h)
-    else if (item.act === "rename") renaming = item.sec
+    if (item.act === "rename") renaming = item.sec
     else if (item.act === "delete") deleteGroup(item.sec)
     else if (item.act === "pin") togglePin(e)
-    else if (item.act === "move") placeApp(e.id, item.sec, 1e9)
+    else if (item.act === "move") { var was = sectionOf(e.id); placeApp(e.id, item.sec, 1e9); if (was !== item.sec) dropIfEmpty(was) }
     else if (item.act === "group") addGroup("New group", e.id)
     else if (item.act === "hide") hideFrequent(e)
   }
@@ -1391,8 +1418,8 @@ Item {
           id: blockCanvas
           visible: menu.query.length === 0
           width: menu.gridWidth
-          // Room below while a block is moved or resized.
-          height: (menu.gridRows + (menu.blockAction !== "" ? 2 : 0)) * menu.rowPitch
+          // Room below while something's dragged (to drop or move it there).
+          height: (menu.gridRows + (menu.blockAction !== "" || menu.dragIndex >= 0 ? 2 : 0)) * menu.rowPitch
 
           Repeater {
             id: blockRepeater
@@ -1410,7 +1437,34 @@ Item {
             }
           }
 
-          // Where the moved or resized block would go: the accent if it fits.
+          // Where a dragged tile would land, if not onto another tile: the
+          // cell, and what it does there.
+          Rectangle {
+            readonly property var plan: menu.dropPlan
+            readonly property bool onTile: !!plan && plan.kind === "insert" && plan.idx < (menu.sectionEntries[plan.sec] || []).length
+            visible: !!plan && !onTile
+            x: plan ? plan.c * menu.colPitch : 0
+            y: plan ? plan.r * menu.rowPitch + menu.bandHeight : 0
+            width: menu.tileWidth
+            height: menu.tileHeight
+            radius: Style.cornerRadius
+            color: Util.alpha(Color.accent, 0.1)
+            border.width: 2
+            border.color: Color.accent
+            Text {
+              anchors.centerIn: parent
+              width: parent.width - Style.space(10)
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.WordWrap
+              text: !parent.plan ? "" : parent.plan.kind === "new" ? "New group"
+                : parent.plan.kind === "widen" ? "Widen " + menu.sections[parent.plan.sec].name : "Add to " + menu.sections[parent.plan.sec].name
+              color: Color.accent
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+
+          // Where the moved block would go: the accent if it fits.
           Rectangle {
             readonly property var g: menu.blockGhost
             visible: g !== null
@@ -1877,7 +1931,7 @@ property real live: 0
               ? menu.folderHint(menu.tiles[menu.selected]).replace(/Enter/g, "click")
             : menu.query.length > 0
             ? "Enter opens (Shift: new window) · Ctrl+Enter asks an agent · + or Ctrl+P pins · Esc closes"
-            : "Drag tiles, or a group's title to move it (corner: resize) · right-click for more · +/− or Ctrl+P to pin"
+            : "Drag a tile beside a group to widen it, into space for a new group · drag a title to move it · right-click for more"
           textFormat: Text.PlainText
           elide: Text.ElideRight
           horizontalAlignment: Text.AlignHCenter
