@@ -12,6 +12,7 @@ import "MediaWindow.js" as MediaWindow
 import "AudioLevels.js" as AudioLevels
 import "taskbar-icons.js" as TaskbarIcons
 import "Visuals.js" as Visuals
+import "IconColors.js" as IconColors
 
 // Super menu: double-tap Super (or Caps Lock, which is Super here) for your
 // common apps in a grid, drawn like Omarchy's own menu.
@@ -1405,6 +1406,23 @@ Item {
   // default) or the desktop's line icon ("line"; apps without one keep
   // their own).
   readonly property bool lineIcons: menu.taskbar.pref("iconsSuperMenu", "app") === "line"
+  // A folder's icon colour, by the same styles as an app's: the group's
+  // shade, the text colour (line), the project's own (coloured, original),
+  // or that moved onto the theme (theme-coloured); default: the Icons setting.
+  readonly property var projectColors: ({ python: "#3776ab", rust: "#dea584", go: "#00add8", typescript: "#3178c6",
+    node: "#5fa04e", deno: "#70ffaf", ruby: "#cc342d", php: "#777bb4", java: "#e76f00", dotnet: "#512bd4",
+    elixir: "#6e4a7e", dart: "#0175c2", cpp: "#00599c", nix: "#7ebae4", docker: "#2496ed", git: "#f05032" })
+  function folderColor(e, style, shadeHex, current) {
+    var mode = style === "shade" ? "shade" : style === "line" ? "mono" : style === "brand" || style === "original" ? "brand"
+      : style === "palette" ? "palette" : (lineIcons ? menu.taskbar.colorModeFor("SuperMenu") : "brand")
+    if (mode === "shade" && shadeHex) return shadeHex
+    var own = e ? (projectColors[e.project] || (e.git ? projectColors.git : "")) : ""
+    var _ = menu.taskbar.iconColorsRevision   // re-read when the theme's palette changes
+    if (mode === "brand" && own) return own
+    if (mode === "palette" && own) return IconColors.onTheme(own) || own
+    return current ? Color.menu.selectedText : Color.menu.text
+  }
+
   // An app's icon: the Icons setting's style, or a block's own (style:
   // "line", "brand", "palette", "original", or "shade" in shadeHex).
   function tileIcon(entry, style, shadeHex) {

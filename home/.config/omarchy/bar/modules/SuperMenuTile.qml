@@ -68,7 +68,7 @@ Rectangle {
         anchors.centerIn: parent
         visible: !!tile.modelData.folder
         text: tile.modelData.folder ? tile.modelData.glyph : ""
-        color: tile.current ? Color.menu.selectedText : Color.menu.text
+        color: tile.owner.folderColor(tile.modelData, tile.iconStyle, tile.shadeHex, tile.current)
         opacity: tile.modelData.missing ? 0.35 : 0.9
         font.family: Style.font.menuFamily
         font.pixelSize: tile.owner.iconSize * 0.78
