@@ -53,10 +53,11 @@ back; your settings files stay).
 - **Super menu** (double-tap Super, or Caps Lock): apps and folders (pinned,
   and in named groups: blocks anywhere on the grid whose tiles stay where
   you drop them, so a group is the shape you arrange: past its edge grows
-  it, open space starts a new one; each pinned folder can set what its
-  click, Shift+click and Ctrl+click do), search (with your zoxide folders,
-  marked by project type and git branch: Enter starts your coding agent in a
-  repo or a folder of repos, Files elsewhere; every key configurable), now
+  it, open space starts a new one; each can be shaded in a theme colour and
+  have its own icon style; each pinned folder can set what its click,
+  Shift+click and Ctrl+click do), search (with your zoxide folders, marked
+  by project type and git branch: Enter starts your coding agent in a repo
+  or a folder of repos, Files elsewhere; every key configurable), now
   playing, a box to ask a coding agent, and lock / restart / shut down.
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
