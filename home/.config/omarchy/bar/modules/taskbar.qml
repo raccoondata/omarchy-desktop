@@ -622,10 +622,11 @@ BarWidget {
     // under way (a corner reached mid-drag is ignored).
     function hotCorner(corner: string): void { desktopFx.ripple(corner) }
     // Double-tap Super / Caps Lock (hypr/desktop/bindings.lua): the super menu.
-    function superMenu(): void { superMenu.toggle() }
+    // The Super menu is its own plugin now; these stay for older callers.
+    function superMenu(): void { Util.execArgv(["omarchy-shell", "-q", "super-menu", "toggle"]) }
     // The same without keyboard focus, for a look (screenshots, tests).
-    function superMenuPreview(text: string): void { superMenu.preview(text) }
-    function superMenuClose(): void { superMenu.close() }
+    function superMenuPreview(text: string): void { Util.execArgv(["omarchy-shell", "-q", "super-menu", "preview", text]) }
+    function superMenuClose(): void { Util.execArgv(["omarchy-shell", "-q", "super-menu", "close"]) }
     // Super+Space > Setup > Taskbar / Hot Corners: the settings window, on a
     // tab (taskbar | windows | desktop | icons | media |
     // screenshots | agents; older names like corners still work).
@@ -736,14 +737,6 @@ BarWidget {
   // The current theme's colours by name (colors.toml: red, blue, accent, ...).
   property var themeColors: ({})
 
-  // For settings (Frequent's hidden apps).
-  readonly property var superMenuPanel: superMenu
-
-  SuperMenu {
-    id: superMenu
-    taskbar: root
-  }
-
   TaskbarSettings {
     id: taskbarSettings
     taskbar: root
@@ -843,19 +836,6 @@ BarWidget {
 
   // For the super menu's "Frequent": count each switch to a different app,
   // by its launcher (desktop) entry.
-  property string lastUsedApp: ""
-
-  function noteAppUse(address) {
-    var toplevel = null
-    for (var i = 0; i < toplevels.length; i++) if (hexAddress(toplevels[i]) === address) toplevel = toplevels[i]
-    var windowClass = classOf(toplevel)
-    if (!windowClass) return
-    var entry = DesktopEntries.heuristicLookup(windowClass)
-    if (!entry || entry.id === lastUsedApp) return
-    lastUsedApp = entry.id
-    superMenu.noteUse(entry.id)
-  }
-
   DesktopFx {
     id: desktopFx
     taskbar: root
@@ -1813,8 +1793,7 @@ BarWidget {
 
   // Keep each window's workspace current when minimize/restore moves it, fetch
   // a new window's class (it isn't known until the next refresh), and follow
-  // window drags and the app you used last. Event data is the address
-  // without "0x".
+  // window drags. Event data is the address without "0x".
   Connections {
     target: Hyprland
     function onRawEvent(event) {
@@ -1835,8 +1814,6 @@ BarWidget {
         root.windowDragPos(data)
       } else if (name === "windowdragend") {
         root.windowDropped(data)
-      } else if (name === "activewindowv2" && data && data !== ",") {
-        root.noteAppUse("0x" + data)
       }
     }
   }

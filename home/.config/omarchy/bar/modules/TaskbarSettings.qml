@@ -733,118 +733,17 @@ Item {
         width: (settings.cardWidth - settings.columnGap) / 2
         spacing: Style.space(6)
         Section { title: "Super menu" }
-        Text {
-          width: parent.width
-          wrapMode: Text.WordWrap
-          text: "Buttons in its footer, beside the power ones"
-          color: Color.menu.text
-          opacity: 0.55
-          font.family: Style.font.menuFamily
-          font.pixelSize: Style.font.caption
-        }
-        Flow {
-          id: folderChips
-          width: parent.width
-          spacing: Style.space(6)
-          readonly property var chosen: {
-            var v = (settings.taskbar.prefs || {}).superMenuFolders
-            return Array.isArray(v) ? v : ["home", "downloads", "documents", "pictures", "settings"]
-          }
-          Repeater {
-            model: [{ key: "home", label: "Home" }, { key: "downloads", label: "Downloads" }, { key: "documents", label: "Documents" },
-                    { key: "pictures", label: "Pictures" }, { key: "music", label: "Music" }, { key: "videos", label: "Videos" },
-                    { key: "settings", label: "Settings" }]
-            Rectangle {
-              id: folderChip
-              required property var modelData
-              readonly property bool on: folderChips.chosen.indexOf(modelData.key) !== -1
-              width: chipText.implicitWidth + Style.space(18)
-              height: Style.space(26)
-              radius: Style.cornerRadius
-              color: on ? Util.alpha(Color.accent, 0.18) : (chipMouse.containsMouse ? Util.alpha(Color.menu.text, 0.06) : "transparent")
-              border.width: 1
-              border.color: on ? Color.accent : Util.alpha(Color.menu.text, 0.2)
-              Text {
-                id: chipText
-                anchors.centerIn: parent
-                text: folderChip.modelData.label
-                color: folderChip.on ? Color.accent : Color.menu.text
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.caption
-              }
-              MouseArea {
-                id: chipMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                  var all = ["home", "downloads", "documents", "pictures", "music", "videos", "settings"]
-                  var next = folderChips.chosen.slice()
-                  var at = next.indexOf(folderChip.modelData.key)
-                  if (at === -1) next.push(folderChip.modelData.key)
-                  else next.splice(at, 1)
-                  next.sort(function(a, b) { return all.indexOf(a) - all.indexOf(b) })
-                  settings.set("superMenuFolders", JSON.stringify(next))
-                }
-              }
-            }
-          }
-        }
-        Repeater {
-          model: [{ key: "superMenuFolderEnter", label: "Folder: Enter", fallback: "smart",
-                    description: "folders in search (zoxide's) and pinned ones; a pinned folder can have its own (right-click it). Repos = a git repo or a folder of them" },
-                  { key: "superMenuFolderShift", label: "Folder: Shift+Enter", fallback: "terminal", description: "" },
-                  { key: "superMenuFolderCtrl", label: "Folder: Ctrl+Enter", fallback: "files", description: "" }]
-          SettingRow {
-            required property var modelData
-            label: modelData.label
-            description: modelData.description
-            Dropdown {
-              width: Style.space(230)
-              showLabel: false
-              fontFamily: Style.font.menuFamily
-              options: [{ value: "smart", label: "Agent for repos, else Files" },
-                        { value: "files", label: "Open in Files" }, { value: "terminal", label: "Terminal there" },
-                        { value: "agent", label: "Coding agent there" }, { value: "editor", label: "Open in editor" },
-                        { value: "copy", label: "Copy the path" }]
-              value: (settings.taskbar.prefs || {})[modelData.key] || modelData.fallback
-              onChanged: function(v) { settings.set(modelData.key, v) }
-            }
-          }
-        }
-        Repeater {
-          model: [{ key: "superMenuBadges", label: "Unread badges", description: "on tiles: an app's unread count, or a dot when it wants you (as on the taskbar)" },
-                  { key: "superMenuRepoStatus", label: "Repo status", description: "on pinned folders: a dot for uncommitted changes, the branch when hovered" },
-                  { key: "superMenuRunning", label: "Open-app dots", description: "a dot under apps with a window open" }]
-          SettingRow {
-            required property var modelData
-            label: modelData.label
-            description: modelData.description
-            ToggleSwitch {
-              readonly property var v: (settings.taskbar.prefs || {})[modelData.key]
-              checked: v !== false && v !== "false"
-              onToggled: settings.set(modelData.key, !checked)
-            }
-          }
-        }
         SettingRow {
-          label: "Frequent apps"
-          description: "the apps you use most that aren't pinned; hover one and click × (or Delete) to take it out"
-          ToggleSwitch {
-            checked: (settings.taskbar.prefs || {}).superMenuFrequent !== false && (settings.taskbar.prefs || {}).superMenuFrequent !== "false"
-            onToggled: settings.set("superMenuFrequent", !checked)
-          }
-        }
-        SettingRow {
-          readonly property int hidden: settings.taskbar.superMenuPanel ? settings.taskbar.superMenuPanel.hiddenFrequent.length : 0
-          visible: hidden > 0
-          label: "Taken out of Frequent"
-          description: hidden + (hidden === 1 ? " app" : " apps") + " kept out of the Frequent row"
+          label: "Super Menu"
+          description: "double-tap Super: the Super Menu plugin's own settings (tiles, Frequent, folders, its key)"
           Button {
-            text: "Show again"
+            text: "Open"
             foreground: Color.menu.text
             fontFamily: Style.font.menuFamily
-            onClicked: settings.taskbar.superMenuPanel.unhideFrequent()
+            onClicked: {
+              settings.close()
+              Util.execArgv(["omarchy-shell", "-q", "super-menu", "settings"])
+            }
           }
         }
       }
@@ -1568,7 +1467,6 @@ Item {
       Repeater {
         model: [
           { place: "Taskbar", style: "iconsTaskbar", styleDefault: "line", label: "Taskbar and switcher", description: "the taskbar, window previews and Super+Tab" },
-          { place: "SuperMenu", style: "iconsSuperMenu", styleDefault: "app", label: "Super menu", description: "the app grid" },
         ]
         Column {
         id: placeCol
@@ -1650,30 +1548,6 @@ Item {
           label: "Taskbar"
           description: "behind the icons of apps playing sound; its style on the right"
           ToggleSwitch { checked: settings.taskbar.audioMarks; onToggled: settings.set("audioMarks", !checked) }
-        }
-        SettingRow {
-          label: "Super menu equalizer"
-          description: "by the song in the Super menu"
-          Dropdown {
-            width: Style.space(180)
-            showLabel: false
-            fontFamily: Style.font.menuFamily
-            options: [{ value: "same", label: "Default" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
-            value: visTab.prefs.superMenuEq || "same"
-            onChanged: function(v) { settings.set("superMenuEq", v) }
-          }
-        }
-        SettingRow {
-          label: "Super menu art effect"
-          description: "on the song's art in the Super menu"
-          Dropdown {
-            width: Style.space(180)
-            showLabel: false
-            fontFamily: Style.font.menuFamily
-            options: Visuals.artEffects
-            value: visTab.prefs.superMenuArtFx || "off"
-            onChanged: function(v) { settings.set("superMenuArtFx", v) }
-          }
         }
 
         Section { title: "Battery (every plugin)" }

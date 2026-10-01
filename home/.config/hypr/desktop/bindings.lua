@@ -209,29 +209,8 @@ if ALL then
   end
 end
 
-if NEW then
-  -- Double-tap SUPER (or Caps Lock, which is Super here via caps:super) for the
-  -- super menu: pinned and frequent apps in a grid, type to search (taskbar's
-  -- bar/modules/SuperMenu.qml). Two taps of Super on its own within 350ms.
-  do
-    local last_tap = nil
-
-    o.bind("SUPER + SUPER_L", "Super menu (double-tap Super or Caps Lock)", function()
-      local tap = {}
-      if last_tap then
-        last_tap = nil
-        hl.exec_cmd("omarchy-shell -q taskbar superMenu")
-        return
-      end
-      last_tap = tap
-      hl.timer(function()
-        if last_tap == tap then
-          last_tap = nil
-        end
-      end, { timeout = 350, type = "oneshot" })
-    end, { release = true })
-  end
-end
+-- The Super menu (double-tap Super) is the Super Menu plugin's: it adds its
+-- own key (plugins/super-menu/hypr/super_menu.lua).
 
 if ALL then
   -- SUPER+RETURN opens a terminal as in Omarchy, after a 300ms pause: a second

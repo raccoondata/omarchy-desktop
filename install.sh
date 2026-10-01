@@ -120,6 +120,7 @@ need_plugin() {  # need_plugin <id> <name> <repo> [widget]
 need_plugin desktop-core "Desktop Core" omarchy-desktop-core
 need_plugin line-icons "Line Icons" omarchy-line-icons
 need_plugin now-playing "Now Playing" omarchy-now-playing widget
+need_plugin super-menu "Super Menu" omarchy-super-menu
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
