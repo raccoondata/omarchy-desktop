@@ -1825,10 +1825,20 @@ BarWidget {
     return String(pref("iconColors" + place, pref("iconColors", "mono")))
   }
   readonly property string iconColorMode: colorModeFor("Taskbar")
+  // One colour for every line icon instead of the theme's (Icons tab, with
+  // "Line"), per place: "" (the theme's), a theme colour's name ("accent",
+  // "blue", ...) or "#rrggbb". IconColors.chosen.
+  function lineColorChoice(place) {
+    return String(pref("iconLineColor" + place, ""))
+  }
+  readonly property string iconLineColor: lineColorChoice("Taskbar")
   property int iconColorsRevision: 0
-  function lineColor(name, fallback, mode) {
+  // A line icon's colour; `solid` (a lineColorChoice) defaults to the
+  // taskbar's when no mode is given.
+  function lineColor(name, fallback, mode, solid) {
     var revision = iconColorsRevision
-    return IconColors.colorFor(name, mode || iconColorMode, String(fallback))
+    return IconColors.colorFor(name, mode || iconColorMode, String(fallback),
+                               solid !== undefined ? solid : (mode ? "" : iconLineColor))
   }
   FileView {
     path: root.omarchyDir + "/plugins/line-icons/lib/icon-colors.json"

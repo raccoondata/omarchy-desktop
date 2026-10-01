@@ -1467,7 +1467,7 @@ Item {
     var _ = menu.taskbar.iconColorsRevision   // re-read when the theme's palette changes
     if (mode === "brand" && own) return own
     if (mode === "palette" && own) return IconColors.onTheme(own) || own
-    return current ? Color.menu.selectedText : Color.menu.text
+    return IconColors.chosen(menu.taskbar.lineColorChoice("SuperMenu")) || (current ? Color.menu.selectedText : Color.menu.text)
   }
 
   // An app's icon: the Icons setting's style, or a block's own (style:
@@ -1478,14 +1478,15 @@ Item {
     if (name) {
       var tint = style === "shade" && shadeHex ? shadeHex
         : menu.taskbar.lineColor(name, Color.menu.text, style === "line" ? "mono" : style === "brand" || style === "palette" ? style
-                                                       : menu.taskbar.colorModeFor("SuperMenu"))
+                                                       : menu.taskbar.colorModeFor("SuperMenu"),
+                                 menu.taskbar.lineColorChoice("SuperMenu"))
       return TaskbarIcons.svg(name, tint)
     }
     // The app's own icon, skipping the launcher's line icons (Icons > App
     // launcher puts them where Omarchy's icon index looks first).
     var icon = entry ? String(entry.icon || "") : ""
     var indexed = menu.library.iconIndex ? String(menu.library.iconIndex[icon] || "") : ""
-    if (indexed.indexOf("/omarchy-desktop-launcher-") !== -1) {
+    if (indexed.indexOf("/line-icons-launcher-") !== -1 || indexed.indexOf("/omarchy-desktop-launcher-") !== -1) {
       var themed = Quickshell.iconPath(icon, true)
       if (themed) return themed
     }

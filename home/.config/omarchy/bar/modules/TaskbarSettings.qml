@@ -309,6 +309,106 @@ Item {
   }
 
   // A small section title with a hairline under it.
+  // Line icons' colour (Icons tab): the theme's ("", the default), one of
+  // the theme's colours by name, or a hex you type. iconLineColor<Place>.
+  component LineColorRow: Row {
+    id: lc
+    property string place: ""
+    property string value: ""
+    property string hoverName: ""
+    spacing: Style.space(6)
+    height: Style.space(28)
+    readonly property bool custom: /^#[0-9a-fA-F]{6}$/.test(value)
+    // The theme's colours worth picking, without repeats.
+    readonly property var swatches: {
+      var colors = settings.taskbar.themeColors || {}, keys = ["foreground", "accent", "red", "orange", "yellow", "green",
+        "cyan", "blue", "magenta", "brown", "light_foreground", "bright_blue", "bright_magenta"]
+      var out = [], seen = {}
+      for (var i = 0; i < keys.length; i++) {
+        var hex = String(colors[keys[i]] || "").toLowerCase()
+        if (!hex || seen[hex]) continue
+        seen[hex] = true
+        out.push({ name: keys[i], hex: hex })
+      }
+      return out
+    }
+    function pick(v) { settings.set("iconLineColor" + place, v) }
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      width: Style.space(96)
+      text: lc.hoverName || "Colour"
+      elide: Text.ElideRight
+      color: Color.menu.text
+      opacity: 0.55
+      font.family: Style.font.menuFamily
+      font.pixelSize: Style.font.caption
+    }
+    Rectangle {
+      anchors.verticalCenter: parent.verticalCenter
+      width: themeLabel.implicitWidth + Style.space(14)
+      height: Style.space(22)
+      radius: Style.cornerRadius
+      color: lc.value === "" ? Util.alpha(Color.accent, 0.18) : "transparent"
+      border.width: 1
+      border.color: lc.value === "" ? Color.accent : Util.alpha(Color.menu.text, 0.25)
+      Text {
+        id: themeLabel
+        anchors.centerIn: parent
+        text: "Theme"
+        color: lc.value === "" ? Color.accent : Color.menu.text
+        font.family: Style.font.menuFamily
+        font.pixelSize: Style.font.caption
+      }
+      MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lc.pick("") }
+    }
+    Repeater {
+      model: lc.swatches
+      Rectangle {
+        required property var modelData
+        readonly property bool selected: lc.value === modelData.name
+        anchors.verticalCenter: parent.verticalCenter
+        width: Style.space(18)
+        height: width
+        radius: width / 2
+        color: modelData.hex
+        border.width: selected ? 2 : 1
+        border.color: selected ? Color.menu.text : Util.alpha(Color.menu.text, 0.25)
+        Rectangle {
+          visible: parent.selected
+          anchors.centerIn: parent
+          width: parent.width + Style.space(6)
+          height: width
+          radius: width / 2
+          color: "transparent"
+          border.width: 1
+          border.color: Color.accent
+        }
+        MouseArea {
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onEntered: lc.hoverName = parent.modelData.name.replace(/_/g, " ")
+          onExited: lc.hoverName = ""
+          onClicked: lc.pick(parent.modelData.name)
+        }
+      }
+    }
+    TextField {
+      anchors.verticalCenter: parent.verticalCenter
+      width: Style.space(84)
+      placeholderText: "#hex"
+      foreground: lc.custom ? Color.accent : Color.menu.text
+      font.family: Style.font.menuFamily
+      text: lc.custom ? lc.value : ""
+      onEditingFinished: {
+        var v = text.trim()
+        if (/^[0-9a-fA-F]{6}$/.test(v)) v = "#" + v
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) lc.pick(v.toLowerCase())
+      }
+    }
+  }
+
   component Section: Column {
     objectName: "settingSection"
     property string title: ""
@@ -1438,7 +1538,7 @@ Item {
       Text {
         width: parent.width
         wrapMode: Text.WordWrap
-        text: "Line: the desktop's icons in the theme's colours. Coloured: each in its app's colour. Theme-coloured: that colour matched to your theme. Original: each app's own icon. Apps without a line icon keep their own."
+        text: "Line: the desktop's icons in the theme's colours, or one colour you pick. Coloured: each in its app's colour. Theme-coloured: that colour matched to your theme. Original: each app's own icon. Apps without a line icon keep their own."
         color: Color.menu.text
         opacity: 0.55
         font.family: Style.font.menuFamily
@@ -1451,9 +1551,16 @@ Item {
           { place: "SuperMenu", style: "iconsSuperMenu", styleDefault: "app", label: "Super menu", description: "the app grid" },
           { place: "NowPlaying", style: "iconsNowPlaying", styleDefault: "app", label: "Now playing", description: "the card and its volume mixer" }
         ]
+        Column {
+        id: placeCol
+        required property var modelData
+        width: icTab.width
+        spacing: Style.space(2)
+        readonly property string choice: placeRow.style === "app" ? "app" : (["brand", "palette"].indexOf(placeRow.colors) !== -1 ? placeRow.colors : "mono")
         SettingRow {
           id: placeRow
-          required property var modelData
+          readonly property var modelData: placeCol.modelData
+          width: parent.width
           readonly property string style: icTab.prefs[modelData.style] || modelData.styleDefault
           readonly property string colors: icTab.prefs["iconColors" + modelData.place] || icTab.prefs.iconColors || "mono"
           label: modelData.label
@@ -1477,6 +1584,12 @@ Item {
               settings.setMany(pairs)
             }
           }
+        }
+        LineColorRow {
+          visible: placeCol.choice === "mono"
+          place: placeCol.modelData.place
+          value: icTab.prefs["iconLineColor" + placeCol.modelData.place] || ""
+        }
         }
       }
       SettingRow {

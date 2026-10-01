@@ -217,7 +217,7 @@ BarWidget {
   function playerAppIcon() {
     if (webApp) {
       var line = lineIcons ? TaskbarMatch.forEntry(webApp) : ""
-      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text)))
+      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text), iconLineColor))
       if (webApp.icon) return Quickshell.iconPath(webApp.icon, true)
     }
     return root.playerStream ? root.streamIcon(root.playerStream) : ""
@@ -347,6 +347,7 @@ BarWidget {
     return next
   }
   property string iconColorMode: "mono"
+  property string iconLineColor: ""   // Icons tab: one colour for every line icon
   FileView {
     path: root.omarchyDir + "/taskbar-settings.json"
     watchChanges: true
@@ -366,6 +367,7 @@ BarWidget {
       root.cardEq = String(o.nowPlayingCardEq || "same")
       root.mediaSaver = ["battery", "saver", "off"].indexOf(o.mediaSaver) !== -1 ? o.mediaSaver : "battery"
       root.iconColorMode = String(o.iconColorsNowPlaying || o.iconColors || "mono")
+      root.iconLineColor = String(o.iconLineColorNowPlaying || "")
       root.scrollMode = ["track", "volume", "off"].indexOf(o.nowPlayingScroll) !== -1 ? o.nowPlayingScroll : "volume"
       root.showTitle = o.nowPlayingTitle !== false && o.nowPlayingTitle !== "false"
       root.mixerOpen = o.nowPlayingMixer === true || o.nowPlayingMixer === "true"
@@ -412,7 +414,7 @@ BarWidget {
     var entry = DesktopEntries.heuristicLookup(binary || String(p["application.name"] || ""))
     if (lineIcons) {
       var line = TaskbarMatch.forApp(p["application.icon-name"], p["application.name"], binary, entry)
-      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text)))
+      if (line) return TaskbarIcons.svg(line, IconColors.colorFor(line, iconColorMode, String(Color.popups.text), iconLineColor))
     }
     var name = p["application.icon-name"] || (entry ? entry.icon : "")
     return name ? Quickshell.iconPath(name, true) : ""
