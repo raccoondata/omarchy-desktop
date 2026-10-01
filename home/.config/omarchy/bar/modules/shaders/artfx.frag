@@ -3,23 +3,20 @@
 // following the music (AudioLevels.js, from cava: the spectrum, loudness and
 // the bass's pulse); without it, a generated beat. The CPU only hands those
 // over and advances `tick` ~15 times a second while shown and playing.
-// Compile: shaders/build. Modes:
+// Compile: shaders/build. Modes (Visuals.js artEffects):
 //   1 glitch  slices jump sideways on the treble, channels split on the bass,
 //             blocks corrupt with the mids
-//   2 chroma  red / green / blue pushed apart by the bass, swirling
-//   3 pixel   a mosaic coarser the louder it is, in few colours
-//   4 crt     scanlines, a rolling band, a screen bulging with the bass
-//   5 melt    each column of the picture drips as far as its band
-//   6 solar   solarized flashes and a posterized, inverted bloom on the bass
-//   7 datamosh  blocks slide off along their own motion and smear sideways,
+//   2 crt     scanlines, a rolling band, a screen bulging with the bass
+//   3 melt    each column of the picture drips as far as its band
+//   4 datamosh  blocks slide off along their own motion and smear sideways,
 //               more of them on the bass
-//   8 tear    the picture's rows torn sideways and wrapped, each row as far
+//   5 tear    the picture's rows torn sideways and wrapped, each row as far
 //             as its band (bass at the bottom), its colours split
-//   9 sort    pixel sorting: bright pixels drag down their columns, as far
+//   6 sort    pixel sorting: bright pixels drag down their columns, as far
 //             as the band at that column; more of them when it's loud
-//   10 bitcrush  few colours, dithered, coarser the louder it is; rows with
-//                flipped bits on the treble
-//   11 vhs    a worn tape: colour bleeding sideways, a rolling tracking
+//   7 bitcrush  few colours, dithered, coarser the louder it is; rows with
+//               flipped bits on the treble
+//   8 vhs     a worn tape: colour bleeding sideways, a rolling tracking
 //             band, wobbling lines, hiss on the treble
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -102,17 +99,7 @@ void main() {
         if (hash(block + floor(t / 2.0)) > 1.0 - 0.25 * mids * mids - 0.1 * b) c.rgb = tex(fract(uv + vec2(hash(block), hash(block.yx)) * 0.3)).rgb * vec3(1.1, 0.9, 1.2);
         // A bright noise line now and then.
         if (abs(uv.y - hash(vec2(floor(t), 9.0))) < 0.004 && hash(vec2(t, 4.0)) < 0.5 * highs) c.rgb = vec3(hash(uv * t));
-    } else if (m == 2) {  // chroma
-        float a = t * 0.15;
-        vec2 dir = vec2(cos(a), sin(a)) * (0.003 + 0.05 * pm + 0.02 * b);
-        c = vec4(tex(uv + dir).r, tex(uv - dir * 0.5).g, tex(uv - dir).b, tex(uv).a);
-    } else if (m == 3) {  // pixel
-        float cells = mix(72.0, 8.0, clamp(loud * 1.5 + 0.4 * b, 0.0, 1.0));
-        vec2 cell = vec2(cells, cells / aspect);
-        vec2 p = (floor(uv * cell) + 0.5) / cell;
-        c = tex(p);
-        c.rgb = floor(c.rgb * 5.0 + 0.5) / 5.0;
-    } else if (m == 4) {  // crt
+    } else if (m == 2) {  // crt
         vec2 q = uv * 2.0 - 1.0;
         q *= 1.0 + (0.02 + 0.14 * pm) * dot(q, q);  // bulge, with the bass
         vec2 p = q * 0.5 + 0.5;
@@ -124,20 +111,14 @@ void main() {
         c.rgb *= 0.55 + 0.6 * loud + 0.3 * highs * hash(vec2(t, 2.0)) + 0.2 * b;  // brighter, flickering with the music
         c.rgb *= 1.0 - 0.35 * dot(q, q) * 0.5;                            // vignette
         c.a = tex(p).a;
-    } else if (m == 5) {  // melt
+    } else if (m == 3) {  // melt
         // Each column drips as far as its band (32 columns over 16 bands).
         float col = floor(uv.x * 32.0);
         float drip = 0.5 + 0.5 * hash(vec2(col, 5.0));
         float fall = drip * (0.01 + 0.3 * spec(col / 31.0, t)) * (1.0 + b) * smoothstep(0.0, 1.0, uv.y);
         vec2 p = uv - vec2(0.012 * sin(uv.y * 14.0 + t * 0.35) * (0.4 + b), fall);
         c = tex(p);
-    } else if (m == 6) {  // solar
-        c = tex(uv);
-        float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-        vec3 sol = abs(c.rgb - vec3(step(0.5, l)));        // solarize
-        vec3 post = floor(c.rgb * 4.0) / 4.0;
-        c.rgb = mix(post, 1.0 - sol, smoothstep(0.2, 0.85, max(b, pm * pm)));
-    } else if (m == 7) {  // datamosh
+    } else if (m == 4) {  // datamosh
         vec2 bs = vec2(14.0, 14.0 / aspect);
         vec2 block = floor(uv * bs);
         float k = floor(t / 3.0);
@@ -157,7 +138,7 @@ void main() {
         }
         c = tex(p);
         if (moved) c.rgb = vec3(c.r, tex(p + vec2(0.012, 0.0)).g, c.b) * vec3(1.05, 1.0, 1.1);
-    } else if (m == 8) {  // tear
+    } else if (m == 5) {  // tear
         float row = floor(uv.y * 40.0);
         float f = spec(1.0 - row / 39.0, t);
         float dir = hash(vec2(row, floor(t / 2.0))) > 0.5 ? 1.0 : -1.0;
@@ -165,7 +146,7 @@ void main() {
         float split = 0.004 + 0.06 * abs(shift);
         vec2 p = vec2(fract(uv.x + shift), uv.y);
         c = vec4(tex(vec2(fract(p.x + split), p.y)).r, tex(p).g, tex(vec2(fract(p.x - split), p.y)).b, tex(p).a);
-    } else if (m == 9) {  // pixel sort
+    } else if (m == 6) {  // pixel sort
         c = tex(uv);
         float col = floor(uv.x * 64.0);
         float f = spec(col / 63.0, t);
@@ -180,7 +161,7 @@ void main() {
                 if (l > thr && l > best) { c = s; best = l; }
             }
         }
-    } else if (m == 10) {  // bitcrush
+    } else if (m == 7) {  // bitcrush
         float cells = mix(110.0, 26.0, clamp(loud * 1.6, 0.0, 1.0));
         vec2 cell = vec2(cells, cells / aspect);
         vec2 q = floor(uv * cell);
@@ -195,7 +176,7 @@ void main() {
         if (hr > 1.0 - 0.12 * highs - 0.05 * b) c.rgb = c.gbr;
         else if (hr < 0.06 * highs) c.rgb = fract(c.rgb + 0.5);
         c.rgb = clamp(c.rgb, 0.0, 1.0);
-    } else if (m == 11) {  // vhs
+    } else if (m == 8) {  // vhs
         vec2 p = uv;
         float roll = fract(t * 0.008);
         float inBand = smoothstep(0.12, 0.0, abs(uv.y - roll));
