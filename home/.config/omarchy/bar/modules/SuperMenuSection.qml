@@ -251,9 +251,19 @@ Column {
             height: section.owner.iconSize
             sourceSize.width: Math.round(section.owner.iconSize * Screen.devicePixelRatio)
             sourceSize.height: Math.round(section.owner.iconSize * Screen.devicePixelRatio)
-            source: section.owner.library ? section.owner.tileIcon(tile.modelData) : ""
+            source: section.owner.library && !tile.modelData.folder ? section.owner.tileIcon(tile.modelData) : ""
             smooth: true
             asynchronous: true
+            // A folder: its project's (or git's, or a folder's) icon.
+            Text {
+              anchors.centerIn: parent
+              visible: !!tile.modelData.folder
+              text: tile.modelData.folder ? tile.modelData.glyph : ""
+              color: tile.current ? Color.menu.selectedText : Color.menu.text
+              opacity: tile.modelData.missing ? 0.35 : 0.9
+              font.family: Style.font.menuFamily
+              font.pixelSize: section.owner.iconSize * 0.78
+            }
           }
 
           Text {
@@ -270,7 +280,7 @@ Column {
               radius: width / 2
               color: Color.accent
             }
-            text: section.owner.library ? section.owner.library.entryName(tile.modelData) : tile.modelData.name
+            text: section.owner.entryName(tile.modelData)
             textFormat: Text.PlainText
             elide: Text.ElideRight
             color: tile.current ? Color.menu.selectedText : Color.menu.text
@@ -295,6 +305,9 @@ Column {
           }
           onClicked: function(event) {
             if (event.button === Qt.RightButton) section.owner.openTileMenu(tile.modelData, tileMouse.mapToItem(null, event.x, event.y))
+            else if (tile.modelData.folder)
+              section.owner.openFolderRow(tile.modelData, (event.modifiers & Qt.ControlModifier) ? "ctrl"
+                                          : (event.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
             else section.owner.launch(tile.modelData, (event.modifiers & Qt.ShiftModifier) !== 0)
           }
         }
@@ -305,8 +318,8 @@ Column {
           interval: 500
           onTriggered: {
             var e = tile.modelData
-            var name = section.owner.library ? section.owner.library.entryName(e) : String(e.name || "")
-            var about = String(e.comment || e.genericName || "")
+            var name = section.owner.entryName(e)
+            var about = e.folder ? (e.missing ? "gone: " : "") + e.path : String(e.comment || e.genericName || "")
             section.owner.hoverDetail = about ? name + "  —  " + about : ""
           }
         }

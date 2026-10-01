@@ -685,7 +685,7 @@ Item {
         }
         Repeater {
           model: [{ key: "superMenuFolderEnter", label: "Folder: Enter", fallback: "smart",
-                    description: "in search, zoxide's folders (the ones you cd into most); repos = a git repo or a folder of them" },
+                    description: "folders in search (zoxide's) and pinned ones; a pinned folder can have its own (right-click it). Repos = a git repo or a folder of them" },
                   { key: "superMenuFolderShift", label: "Folder: Shift+Enter", fallback: "terminal", description: "" },
                   { key: "superMenuFolderCtrl", label: "Folder: Ctrl+Enter", fallback: "files", description: "" }]
           SettingRow {

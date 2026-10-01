@@ -18,6 +18,11 @@ import "Visuals.js" as Visuals
 //
 //   Pinned    ~/.config/omarchy/supermenu.json {"pinned": [desktop ids]};
 //             right-click a tile for pin / unpin / move to a group
+//   Folders   pin one from search (right-click a folder row, or Ctrl+P): a
+//             tile like an app's, in Pinned or a group ("folder:<path>" among
+//             the ids); its right-click menu sets what Click / Shift+click /
+//             Ctrl+click (or Enter with those) do for that folder alone
+//             ("folderActions" in supermenu.json; else the folder settings)
 //   Groups    named sections after Pinned, for tasks ("groups": [{name, apps,
 //             collapsed}]): "+ New group", drag tiles between sections (or
 //             right-click > Move to), click a title to fold it, double-click
@@ -89,26 +94,68 @@ Item {
     property string forQuery: ""
     stdout: StdioCollector {
       onStreamFinished: {
-        var home = Quickshell.env("HOME")
         var lines = this.text.split("\n").filter(function(l) { return l !== "" })
         menu.folderQuery = folderProc.forQuery
-        menu.folderResults = lines.map(function(line) {
-          var f = line.split("\t")
-          var p = f[0], branch = f[1] || "", kind = f[2] || "", repos = parseInt(f[3], 10) || 0
-          var cut = p.lastIndexOf("/")
-          var parent = p.slice(0, cut) || "/"
-          var where = parent.indexOf(home) === 0 ? "~" + parent.slice(home.length) : parent
-          // The project's icon, else git's if it's a repo, else a folder of
-          // repos', else a folder; a repo's branch (or how many repos it
-          // holds) follows the place.
-          return { kind: "folder", label: p.slice(cut + 1), path: p, git: branch !== "", repos: repos, project: kind,
-                   glyph: menu.projectGlyphs[kind] || (branch !== "" ? "" : repos > 0 ? "" : ""),
-                   detail: branch !== "" ? where + "     " + (branch === "-" ? "detached" : branch)
-                         : repos > 0 ? where + "    " + repos + (repos === 1 ? " repo" : " repos") : where }
-        })
+        menu.folderResults = lines.map(function(line) { return menu.folderRow(line) })
       }
     }
   }
+
+  // A folder-search line as a folder: its search row (kind "folder") and,
+  // with its id "folder:<path>", what a pinned tile of it shows.
+  function folderRow(line) {
+    var home = Quickshell.env("HOME")
+    var f = line.split("\t")
+    var p = f[0], branch = f[1] || "", kind = f[2] || "", repos = parseInt(f[3], 10) || 0
+    var cut = p.lastIndexOf("/")
+    var parent = p.slice(0, cut) || "/"
+    var where = parent.indexOf(home) === 0 ? "~" + parent.slice(home.length) : parent
+    // The project's icon, else git's if it's a repo, else a folder of
+    // repos', else a folder; a repo's branch (or how many repos it holds)
+    // follows the place.
+    return { kind: "folder", folder: true, id: "folder:" + p, name: p.slice(cut + 1), label: p.slice(cut + 1), path: p,
+             git: branch !== "", repos: repos, project: kind, missing: f[3] === "missing",
+             glyph: menu.projectGlyphs[kind] || (branch !== "" ? "" : repos > 0 ? "" : ""),
+             detail: branch !== "" ? where + "     " + (branch === "-" ? "detached" : branch)
+                   : repos > 0 ? where + "    " + repos + (repos === 1 ? " repo" : " repos") : where }
+  }
+
+  // Pinned folders: what each is (repo, project, ...), looked up when the
+  // menu opens. Until then (or if it's gone) a plain folder.
+  property var folderInfo: ({})
+  readonly property var pinnedFolderPaths: groupedIds.filter(function(id) { return id.indexOf("folder:") === 0 })
+    .map(function(id) { return id.slice(7) })
+  function refreshFolderInfo() {
+    if (pinnedFolderPaths.length === 0 || folderInfoProc.running) return
+    folderInfoProc.command = [taskbar.omarchyDir + "/folder-search", "--info"].concat(pinnedFolderPaths)
+    folderInfoProc.running = true
+  }
+  onPinnedFolderPathsChanged: if (opened) refreshFolderInfo()
+  Process {
+    id: folderInfoProc
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var next = {}
+        this.text.split("\n").forEach(function(line) {
+          if (line === "") return
+          var row = menu.folderRow(line)
+          next[row.path] = row
+        })
+        menu.folderInfo = next
+      }
+    }
+  }
+  function folderEntry(path) {
+    return folderInfo[path] || folderRow(path + "\t\t\t0")
+  }
+
+  // An app's name, or a folder's.
+  function entryName(e) {
+    if (!e) return ""
+    if (e.folder) return e.name
+    return library ? library.entryName(e) : String(e.name || "")
+  }
+
 
   // What Enter / Shift+Enter / Ctrl+Enter (or click, with the same keys) do
   // on a folder row (settings superMenuFolderEnter/Shift/Ctrl).
@@ -119,13 +166,48 @@ Item {
 
   // "smart": the agent in a git repo or a folder of repos, Files elsewhere.
   readonly property var folderActionNames: ({ smart: "Smart", files: "Files", terminal: "Terminal", agent: "Agent", editor: "Editor", copy: "Copy path" })
-  // The action for a key on a row (smart resolved by whether it's a repo).
-  function folderAction(how, row) {
+  // The action for a key on a folder: its own (a pinned folder's, set from
+  // its right-click menu), else the folder settings'; smart resolved by
+  // whether it's a repo (or holds some).
+  property var folderActions: ({})
+  function globalFolderAction(how) {
     var key = how === "ctrl" ? "superMenuFolderCtrl" : how === "shift" ? "superMenuFolderShift" : "superMenuFolderEnter"
     var fallback = how === "ctrl" ? "files" : how === "shift" ? "terminal" : "smart"
     var v = String(taskbar.pref(key, fallback))
-    if (!folderActionNames[v]) v = fallback
+    return folderActionNames[v] ? v : fallback
+  }
+  function ownFolderAction(row, how) {
+    var own = row && folderActions[row.path] ? folderActions[row.path][how] : ""
+    return own && folderActionNames[own] ? own : ""
+  }
+  function folderAction(how, row) {
+    var v = ownFolderAction(row, how) || globalFolderAction(how)
     return v === "smart" ? (row && (row.git || row.repos > 0) ? "agent" : "files") : v
+  }
+  // Step a folder's own action for a key: default (the settings'), smart,
+  // files, terminal, agent, editor, copy, then back to default.
+  readonly property var folderActionOrder: ["", "smart", "files", "terminal", "agent", "editor", "copy"]
+  function cycleFolderAction(row, how) {
+    var cur = ownFolderAction(row, how)
+    var next = folderActionOrder[(folderActionOrder.indexOf(cur) + 1) % folderActionOrder.length]
+    var all = Object.assign({}, folderActions)
+    var mine = Object.assign({}, all[row.path] || {})
+    if (next === "") delete mine[how]
+    else mine[how] = next
+    if (Object.keys(mine).length) all[row.path] = mine
+    else delete all[row.path]
+    folderActions = all
+    saveConfig()
+  }
+  function folderActionText(a) {
+    return a === "smart" ? "Agent for repos, else Files" : a === "agent" && askAgents.length ? askAgents[0].name
+      : a === "files" ? "Files" : a === "terminal" ? "Terminal" : a === "editor" ? "Editor" : a === "copy" ? "Copy path" : a
+  }
+  // "Click: Terminal" / "Click: default (Files)", for the tile menu.
+  function folderActionLine(row, how) {
+    var key = how === "ctrl" ? "Ctrl+click" : how === "shift" ? "Shift+click" : "Click"
+    var own = ownFolderAction(row, how)
+    return key + ":  " + (own ? folderActionText(own) : "default (" + folderActionText(globalFolderAction(how)) + ")")
   }
   function folderActionLabel(how, row) {
     var a = folderAction(how, row)
@@ -173,6 +255,7 @@ Item {
         menu.pinnedIds = Array.isArray(data.pinned) ? data.pinned : []
         menu.hiddenFrequent = Array.isArray(data.hiddenFrequent) ? data.hiddenFrequent : []
         menu.pinnedCollapsed = data.pinnedCollapsed === true
+        menu.folderActions = data.folderActions && typeof data.folderActions === "object" ? data.folderActions : ({})
         menu.groups = Array.isArray(data.groups) ? data.groups.filter(function(g) { return g && typeof g.name === "string" })
           .map(function(g) { return { name: g.name, apps: Array.isArray(g.apps) ? g.apps : [], collapsed: g.collapsed === true } }) : []
       } catch (e) {
@@ -227,6 +310,7 @@ Item {
   readonly property var allEntries: opened ? entriesFor("") : []
 
   function entryById(id) {
+    if (String(id).indexOf("folder:") === 0) return folderEntry(String(id).slice(7))
     for (var i = 0; i < allEntries.length; i++) if (allEntries[i].id === id) return allEntries[i]
     return null
   }
@@ -394,6 +478,7 @@ Item {
     if (pinnedCollapsed) data.pinnedCollapsed = true
     if (groups.length) data.groups = groups
     if (hiddenFrequent.length) data.hiddenFrequent = hiddenFrequent
+    if (Object.keys(folderActions).length) data.folderActions = folderActions
     configFile.setText(JSON.stringify(data, null, 2) + "\n")
   }
 
@@ -480,9 +565,16 @@ Item {
     var sec = sectionOf(e.id)
     var items = [{ label: sec === -1 ? "Pin" : "Unpin", act: "pin" }]
     for (var i = 0; i < sections.length; i++)
-      if (i !== sec) items.push({ label: "Move to " + sections[i].name, act: "move", sec: i })
-    items.push({ label: "New group with this app", act: "group" })
+      if (i !== sec) items.push({ label: (sec === -1 ? "Pin to " : "Move to ") + sections[i].name, act: "move", sec: i })
+    items.push({ label: e.folder ? "New group with this folder" : "New group with this app", act: "group" })
     if (isFrequent(e)) items.push({ label: "Remove from Frequent", act: "hide" })
+    // A pinned folder: what each click does for it (click a line to step it).
+    if (e.folder && sec !== -1) {
+      var _ = folderActions   // re-read when they change
+      items.push({ label: folderActionLine(e, "enter"), act: "cycle", how: "enter", gap: true })
+      items.push({ label: folderActionLine(e, "shift"), act: "cycle", how: "shift" })
+      items.push({ label: folderActionLine(e, "ctrl"), act: "cycle", how: "ctrl" })
+    }
     return items
   }
   // Typing and arrows back to the menu (after renaming a group).
@@ -494,6 +586,7 @@ Item {
   }
   function runTileMenu(item) {
     var e = tileMenuEntry
+    if (e && item && item.act === "cycle") { cycleFolderAction(e, item.how); return }   // stays open
     tileMenuEntry = null
     if (!e || !item) return
     if (item.act === "pin") togglePin(e)
@@ -731,6 +824,7 @@ Item {
     query = ""
     selected = 0
     opened = true
+    refreshFolderInfo()
   }
 
   // Opened for a look only (superMenuPreview IPC, for screenshots and
@@ -759,6 +853,7 @@ Item {
   // one class, e.g. microsoft-edge and com.microsoft.Edge.)
   function windowsOf(entry) {
     var list = []
+    if (!entry || entry.folder) return list
     var toplevels = taskbar.toplevels
     var startup = String(entry.startupClass || "").toLowerCase()
     var id = String(entry.id || "").toLowerCase()
@@ -776,6 +871,7 @@ Item {
   }
 
   function launch(entry, forceNew) {
+    if (entry && entry.folder) { openFolderRow(entry, forceNew ? "shift" : "enter"); return }
     if (!entry || !library) return
     close()
     noteUse(entry.id)
@@ -1035,7 +1131,8 @@ Item {
             else if (to >= count && other < menu.sections.length) menu.placeApp(current.id, other, 0)
             else menu.placeApp(current.id, spot.sec, Math.max(0, Math.min(count - 1, to)))
           } else if (ctrl && event.key === Qt.Key_P) {
-            menu.togglePin(current)
+            var row = menu.selected >= menu.tiles.length ? menu.extraResults[menu.selected - menu.tiles.length] : null
+            menu.togglePin(row && row.kind === "folder" ? row : current)
           } else if (event.key === Qt.Key_Delete && menu.isPinned(current)) {
             menu.togglePin(current)
             menu.selected = Math.max(0, Math.min(menu.selected, menu.tiles.length - 1))
@@ -1049,6 +1146,10 @@ Item {
             // A folder row: its Enter / Shift+Enter / Ctrl+Enter actions.
             menu.runExtra(menu.extraResults[menu.selected - menu.tiles.length],
                           ctrl ? "ctrl" : (event.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
+          } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && current && current.folder
+                     && menu.selected < menu.tiles.length) {
+            // A pinned folder: its Enter / Shift+Enter / Ctrl+Enter actions.
+            menu.openFolderRow(current, ctrl ? "ctrl" : (event.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
           } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && menu.query.trim() !== "") {
             // Ctrl+Enter: ask the first agent.
             menu.ask("")
@@ -1244,7 +1345,12 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onEntered: menu.selected = menu.tiles.length + extraRow.index
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onClicked: function(mouse) {
+                  if (mouse.button === Qt.RightButton) {
+                    if (extraRow.modelData.kind === "folder") menu.openTileMenu(extraRow.modelData, extraMouse.mapToItem(null, mouse.x, mouse.y))
+                    return
+                  }
                   menu.runExtra(extraRow.modelData, (mouse.modifiers & Qt.ControlModifier) ? "ctrl"
                                 : (mouse.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
                 }
@@ -1606,6 +1712,8 @@ property real live: 0
           readonly property var selectedExtra: menu.selected >= menu.tiles.length ? menu.extraResults[menu.selected - menu.tiles.length] : null
           text: menu.hoverDetail !== "" ? menu.hoverDetail
             : selectedExtra && selectedExtra.kind === "folder" ? menu.folderHint(selectedExtra)
+            : menu.selected < menu.tiles.length && menu.tiles[menu.selected] && menu.tiles[menu.selected].folder
+              ? menu.folderHint(menu.tiles[menu.selected]).replace(/Enter/g, "click")
             : menu.query.length > 0
             ? "Enter opens (Shift: new window) · Ctrl+Enter asks an agent · + or Ctrl+P pins · Esc closes"
             : "Drag or Ctrl+Arrows to rearrange · right-click for groups · +/− or Ctrl+P to pin · type to find more"
@@ -1630,8 +1738,16 @@ property real live: 0
       y: menu.dragPoint.y - height / 2
       sourceSize.width: Math.round(menu.iconSize * Screen.devicePixelRatio)
       sourceSize.height: Math.round(menu.iconSize * Screen.devicePixelRatio)
-      source: menu.dragEntry ? menu.tileIcon(menu.dragEntry) : ""
+      source: menu.dragEntry && !menu.dragEntry.folder ? menu.tileIcon(menu.dragEntry) : ""
       opacity: 0.9
+      Text {
+        anchors.centerIn: parent
+        visible: !!menu.dragEntry && !!menu.dragEntry.folder
+        text: menu.dragEntry && menu.dragEntry.folder ? menu.dragEntry.glyph : ""
+        color: Color.menu.text
+        font.family: Style.font.menuFamily
+        font.pixelSize: menu.iconSize * 0.8
+      }
     }
 
     // A tile's right-click menu; a click anywhere else closes it.
@@ -1664,13 +1780,22 @@ property real live: 0
           Rectangle {
             required property var modelData
             width: tileMenuColumn.width
-            height: Style.space(28)
+            height: Style.space(28) + (modelData.gap ? Style.space(9) : 0)
+            Rectangle {
+              visible: !!parent.modelData.gap
+              anchors.top: parent.top
+              anchors.topMargin: Style.space(4)
+              width: parent.width
+              height: 1
+              color: Util.alpha(Color.menu.text, 0.15)
+            }
             radius: Style.cornerRadius
             color: itemMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
             Text {
               anchors.left: parent.left
               anchors.leftMargin: Style.space(10)
-              anchors.verticalCenter: parent.verticalCenter
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Style.space(6)
               text: parent.modelData.label
               textFormat: Text.PlainText
               color: itemMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
