@@ -1,5 +1,7 @@
 # Files (Nautilus) right-click menu for coding agents (~/.config/omarchy/agents:
-# the installed ones, two primaries, the rest under "More Agents").
+# the installed ones, two primaries, the rest under "More Agents"), all under
+# one Agents ▸ submenu, or at the top of the menu (Taskbar & Desktop > Agents >
+# Files right-click: filesAgentMenu "grouped" (default) | "flat"):
 #
 #   files:              Ask <primary>… (x2)   Send to Session ▸   More Agents ▸
 #   a folder:           Open <primary> Here (x2)   Send to Session ▸   More Agents ▸
@@ -21,6 +23,16 @@ HOME = os.path.expanduser("~")
 OMARCHY = os.path.join(HOME, ".config", "omarchy")
 AGENTS = os.path.join(OMARCHY, "agents")
 ASK = os.path.join(OMARCHY, "ask-agent")
+SETTINGS = os.path.join(OMARCHY, "taskbar-settings.json")
+
+
+def grouped():
+    """Agent items under one Agents submenu (the default), or flat."""
+    try:
+        with open(SETTINGS) as f:
+            return json.load(f).get("filesAgentMenu", "grouped") != "flat"
+    except Exception:
+        return True
 
 
 def run_json(args, fallback):
@@ -121,7 +133,7 @@ class OmarchyAgentsMenu(GObject.GObject, Nautilus.MenuProvider):
             top.append(self._submenu("sessions", "Send to Session", sessions))
         if more:
             top.append(self._submenu("more", "More Agents", more))
-        return top
+        return [self._submenu("agents", "Agents", top)] if grouped() else top
 
     def get_background_items(self, *args):
         folder_info = args[-1]
@@ -137,4 +149,4 @@ class OmarchyAgentsMenu(GObject.GObject, Nautilus.MenuProvider):
                                        [self._item("bg-open-" + a["id"], "Open %s Here" % a["name"],
                                                    "Start a %s session in this folder" % a["name"],
                                                    self.open_here, a["id"], folder) for a in others]))
-        return items
+        return [self._submenu("bg-agents", "Agents", items)] if grouped() and items else items

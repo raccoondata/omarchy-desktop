@@ -1239,6 +1239,20 @@ Item {
           }
         }
       }
+      SettingRow {
+        label: "Files right-click"
+        description: (settings.taskbar.prefs || {}).filesAgentMenu === "flat"
+          ? "the agent items sit at the top of the menu" : "the agent items are under one Agents submenu"
+        ButtonGroup {
+          options: [{ value: "grouped", label: "Agents submenu" }, { value: "flat", label: "Top of the menu" }]
+          value: (settings.taskbar.prefs || {}).filesAgentMenu === "flat" ? "flat" : "grouped"
+          foreground: Color.menu.text
+          background: Color.menu.background
+          fontFamily: Style.font.menuFamily
+          fontSize: Style.font.bodySmall
+          onChanged: function(v) { settings.set("filesAgentMenu", v) }
+        }
+      }
       Text {
         width: parent.width
         wrapMode: Text.WordWrap
