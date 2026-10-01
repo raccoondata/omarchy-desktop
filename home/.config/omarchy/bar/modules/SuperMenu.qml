@@ -121,8 +121,14 @@ Item {
     // The project's icon, else git's if it's a repo, else a folder of
     // repos', else a folder; a repo's branch (or how many repos it holds)
     // follows the place.
+    // A pinned repo's state (folder-search --info): files changed, commits
+    // ahead of / behind its upstream.
+    var changed = parseInt(f[4], 10) || 0, ahead = parseInt(f[5], 10) || 0, behind = parseInt(f[6], 10) || 0
+    var state = [changed ? changed + " changed" : "", ahead ? "\u2191" + ahead : "", behind ? "\u2193" + behind : ""]
+      .filter(function(x) { return x !== "" }).join("  ")
     return { kind: "folder", folder: true, id: "folder:" + p, name: p.slice(cut + 1), label: p.slice(cut + 1), path: p,
              git: branch !== "", repos: repos, project: kind, missing: f[3] === "missing",
+             branch: branch === "-" ? "detached" : branch, changed: changed, ahead: ahead, behind: behind, state: state,
              glyph: menu.projectGlyphs[kind] || (branch !== "" ? "" : repos > 0 ? "" : ""),
              detail: branch !== "" ? where + "     " + (branch === "-" ? "detached" : branch)
                    : repos > 0 ? where + "    " + repos + (repos === 1 ? " repo" : " repos") : where }
@@ -195,6 +201,7 @@ Item {
   // A folder's own action for a key ("": back to the settings' default).
   readonly property var folderActionOrder: ["", "smart", "files", "terminal", "agent", "editor", "copy"]
   function setFolderAction(row, how, next) {
+    remember()
     var all = Object.assign({}, folderActions)
     var mine = Object.assign({}, all[row.path] || {})
     if (next === "") delete mine[how]
@@ -496,7 +503,38 @@ Item {
       return { name: sec.name, ids: sec.ids.slice(), x: all[i].x, y: all[i].y, cells: cells, shade: sec.shade || "", icons: sec.icons || "" }
     })
   }
+  // ---------------------------------------------------------------- undo
+  // Every change to the blocks, pins, shades, folder actions or Frequent
+  // remembers what was there; Ctrl+Z steps back (30 steps, this session).
+  property var undoStack: []
+  function remember() {
+    undoStack = undoStack.concat([JSON.stringify({ pinned: pinnedIds, pinnedLayout: pinnedLayout, groups: groups,
+                                                   folderActions: folderActions, hiddenFrequent: hiddenFrequent })]).slice(-30)
+  }
+  function undo() {
+    if (!undoStack.length) { flashHint("Nothing to undo"); return }
+    var st = JSON.parse(undoStack[undoStack.length - 1])
+    undoStack = undoStack.slice(0, -1)
+    pinnedIds = st.pinned || []
+    pinnedLayout = st.pinnedLayout || null
+    groups = st.groups || []
+    folderActions = st.folderActions || ({})
+    hiddenFrequent = st.hiddenFrequent || []
+    renaming = -1
+    tileMenuEntry = null
+    saveConfig()
+    selected = Math.max(0, Math.min(selected, tiles.length - 1))
+    flashHint(undoStack.length ? "Undone (Ctrl+Z again: " + undoStack.length + " more)" : "Undone")
+  }
+  // A word in the hint line for a moment.
+  function flashHint(text) {
+    hoverDetail = text
+    hintFlash.restart()
+  }
+  Timer { id: hintFlash; interval: 1800; onTriggered: if (menu.hoverDetail.indexOf("ndo") !== -1) menu.hoverDetail = "" }
+
   function commit(secs) {
+    remember()
     pinnedIds = secs[0].ids
     pinnedLayout = { x: secs[0].x, y: secs[0].y, cells: secs[0].cells }
     if (secs[0].shade) pinnedLayout.shade = secs[0].shade
@@ -819,6 +857,7 @@ Item {
   }
 
   function savePinned(ids) {
+    remember()
     pinnedIds = ids
     saveConfig()
   }
@@ -830,12 +869,14 @@ Item {
 
   function hideFrequent(entry) {
     if (!entry || hiddenFrequent.indexOf(entry.id) !== -1) return
+    remember()
     hiddenFrequent = hiddenFrequent.concat([entry.id])
     saveConfig()
     selected = Math.max(0, Math.min(selected, tiles.length - 1))
   }
 
   function unhideFrequent() {
+    remember()
     hiddenFrequent = []
     saveConfig()
   }
@@ -1593,7 +1634,9 @@ Item {
           var ctrl = event.modifiers & Qt.ControlModifier
           var current = menu.tiles[menu.selected]
           var spot = menu.query.length === 0 ? menu.locate(menu.selected) : null
-          if (menu.tileMenuEntry && event.key === Qt.Key_Escape) {
+          if (ctrl && event.key === Qt.Key_Z) {
+            menu.undo()
+          } else if (menu.tileMenuEntry && event.key === Qt.Key_Escape) {
             menu.tileMenuEntry = null
           } else if (ctrl && spot && (event.key === Qt.Key_Left || event.key === Qt.Key_Right
                                || event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {

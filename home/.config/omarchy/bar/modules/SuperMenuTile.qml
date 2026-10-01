@@ -19,7 +19,12 @@ Rectangle {
   property string shadeHex: ""       // its block's shade (for the "shade" style)
   readonly property bool current: tile.owner.selected === flatIndex
   readonly property bool pinned: tile.owner.isPinned(modelData)
-  readonly property bool running: tile.owner.opened && tile.owner.windowsOf(modelData).length > 0
+  readonly property var windows: tile.owner.opened ? tile.owner.windowsOf(modelData) : []
+  readonly property bool running: windows.length > 0
+  // The taskbar's marks for its windows: an unread count, or a dot when one
+  // wants you.
+  readonly property int unread: windows.reduce(function(n, w) { return n + tile.owner.taskbar.unreadOf(w) }, 0)
+  readonly property bool wantsYou: windows.some(function(w) { return tile.owner.taskbar.wantsYou(w) })
   readonly property bool dragging: tile.owner.dragIndex === index && tile.owner.dragSection === sectionIndex
     && sectionIndex !== -1
   readonly property bool dropTarget: tile.owner.dragIndex >= 0 && sectionIndex >= 0 && tile.owner.dropSection === sectionIndex
@@ -70,6 +75,19 @@ Rectangle {
         text: tile.modelData.folder ? tile.modelData.glyph : ""
         color: tile.owner.folderColor(tile.modelData, tile.iconStyle, tile.shadeHex, tile.current)
         opacity: tile.modelData.missing ? 0.35 : 0.9
+        // A repo with uncommitted changes: a dot (ahead / behind only: a ring).
+        Rectangle {
+          visible: !!tile.modelData.folder && (tile.modelData.changed > 0 || tile.modelData.ahead > 0 || tile.modelData.behind > 0)
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.rightMargin: -Style.space(4)
+          width: Style.space(9)
+          height: width
+          radius: width / 2
+          color: tile.modelData.changed > 0 ? Color.accent : "transparent"
+          border.width: tile.modelData.changed > 0 ? 0 : 2
+          border.color: Color.accent
+        }
         font.family: Style.font.menuFamily
         font.pixelSize: tile.owner.iconSize * 0.78
       }
@@ -128,7 +146,9 @@ Rectangle {
     onTriggered: {
       var e = tile.modelData
       var name = tile.owner.entryName(e)
-      var about = e.folder ? (e.missing ? "gone: " : "") + e.path : String(e.comment || e.genericName || "")
+      var about = e.folder ? (e.missing ? "gone: " : "") + e.path
+          + (e.git ? "  \u00b7  " + e.branch + (e.state ? "  \u00b7  " + e.state : "  \u00b7  clean") : "")
+        : String(e.comment || e.genericName || "")
       tile.owner.hoverDetail = about ? name + "  —  " + about : ""
     }
   }
@@ -194,6 +214,19 @@ Rectangle {
       onExited: tile.owner.hoverDetail = ""
       onClicked: tile.owner.hideFrequent(tile.modelData)
     }
+  }
+
+  // Unread / wants you, as on the taskbar (out of the pin button's way).
+  StatusBadge {
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.topMargin: Style.space(5)
+    anchors.rightMargin: Style.space(5)
+    visible: tile.owner.taskbar.showBadges && !pinButton.shown
+    unread: tile.unread
+    attention: tile.wantsYou
+    size: Style.space(11)
+    fontFamily: Style.font.menuFamily
   }
 
   // Pin (+) or unpin (−), in the corner while hovered or selected.

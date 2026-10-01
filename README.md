@@ -54,11 +54,13 @@ back; your settings files stay).
   and in named groups: blocks anywhere on the grid whose tiles stay where
   you drop them, so a group is the shape you arrange: past its edge grows
   it, open space starts a new one; each can be shaded in a theme colour and
-  have its own icon style; each pinned folder can set what its click,
-  Shift+click and Ctrl+click do), search (with your zoxide folders, marked
-  by project type and git branch: Enter starts your coding agent in a repo
-  or a folder of repos, Files elsewhere; every key configurable), now
-  playing, a box to ask a coding agent, and lock / restart / shut down.
+  have its own icon style; unread badges as on the taskbar, a dot on pinned
+  repos with uncommitted changes, Ctrl+Z to undo a change; each pinned
+  folder can set what its click, Shift+click and Ctrl+click do), search
+  (with your zoxide folders, marked by project type and git branch: Enter
+  starts your coding agent in a repo or a folder of repos, Files elsewhere;
+  every key configurable), now playing, a box to ask a coding agent, and
+  lock / restart / shut down.
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
   and maximize buttons, hot corners.
@@ -96,7 +98,8 @@ back; your settings files stay).
   Super menu, Omarchy's app launcher, now playing, Omarchy's menu): line
   icons in the theme's colours, in each app's colour, or in that colour
   matched to your theme, or the apps' original icons. Defaults: line on the
-  taskbar, originals elsewhere.
+  taskbar, originals elsewhere. When an app without a line icon is installed, a notification offers to have
+  your coding agent draw one (Taskbar & Desktop > Icons > New apps).
 
 Settings: **Super+Alt+Space > Setup > Taskbar & Desktop** (type to search
 them). Health check: `omarchy-desktop check`.
