@@ -40,6 +40,21 @@ ShaderEffect {
   property vector4d bandsC: Qt.vector4d(0, 0, 0, 0)
   property vector4d bandsD: Qt.vector4d(0, 0, 0, 0)
   property int seenFrame: -1
+  // Signal loss's 8 waves: how far each has travelled. Each moves only while
+  // its band of the music plays (bass waves roll with the bass, treble
+  // wiggles with the highs), and the kicks shove them all.
+  property vector4d wavePhaseA: Qt.vector4d(0, 0, 0, 0)
+  property vector4d wavePhaseB: Qt.vector4d(0, 0, 0, 0)
+  function moveWaves() {
+    var p = [wavePhaseA.x, wavePhaseA.y, wavePhaseA.z, wavePhaseA.w, wavePhaseB.x, wavePhaseB.y, wavePhaseB.z, wavePhaseB.w]
+    for (var i = 0; i < 8; i++) {
+      var step = live ? AudioLevels.bands[Math.round(i / 7 * 15)] * (0.16 + 0.06 * i) + 0.1 * AudioLevels.beat
+                      : (1.2 + 0.35 * i) / 15   // without cava: the clock, as before
+      p[i] = (p[i] + step) % (2 * Math.PI)
+    }
+    wavePhaseA = Qt.vector4d(p[0], p[1], p[2], p[3])
+    wavePhaseB = Qt.vector4d(p[4], p[5], p[6], p[7])
+  }
 
   fragmentShader: Qt.resolvedUrl("shaders/visualizer.frag.qsb")
 
@@ -51,6 +66,7 @@ ShaderEffect {
       AudioLevels.feed(vis)
       // Faster when louder.
       vis.tick += vis.live ? 0.5 + 1.5 * AudioLevels.level : 1
+      if (vis.scene === "signal") vis.moveWaves()
     }
   }
 }

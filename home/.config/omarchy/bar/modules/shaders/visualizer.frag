@@ -24,8 +24,9 @@
 // The glitch family:
 //   8 glitch      a spectrum torn into slices that jump on the kicks, split
 //                 into two colours, with blocks flipping and dropping out
-//   9 signal      signal loss: a waveform built from the bands, tearing,
-//                 rolling on the kicks, lost in snow when the music is quiet
+//   9 signal      signal loss: a waveform built from the bands (each wave
+//                 as tall as its band, travelling only while it plays),
+//                 tearing, rolling on the kicks, lost in snow when quiet
 //   10 blocks     macroblocks: the spectrum as compressed-video blocks,
 //                 moshed sideways and smeared, more so on the bass
 //   11 sorted     pixel sort: streaks dripping from the top, each as long
@@ -52,6 +53,10 @@ layout(std140, binding = 0) uniform buf {
     vec4 bandsB;
     vec4 bandsC;
     vec4 bandsD;
+    // Signal loss: how far each of its 8 waves has travelled, moved by the
+    // music (Visualizer.qml), not the clock.
+    vec4 wavePhaseA;
+    vec4 wavePhaseB;
 };
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -80,13 +85,20 @@ float spec(float x, float t) {
 // bass's swell some. Every glitch below happens only as often as this says.
 float hitOf(float b, float pm) { return clamp(b * 0.9 + pm * pm * 0.5, 0.0, 1.0); }
 
-// Signal loss's waveform at x: the spectrum as harmonics, about -0.8..0.8.
+float wavePhase(int i) {
+    vec4 q = i < 4 ? wavePhaseA : wavePhaseB;
+    int j = i - (i / 4) * 4;
+    return j == 0 ? q.x : (j == 1 ? q.y : (j == 2 ? q.z : q.w));
+}
+
+// Signal loss's waveform at x: 8 waves, each as tall as its band and as far
+// along as the music has pushed it (wavePhase), about -0.8..0.8.
 float signalWave(float x, float t) {
     float wv = 0.0, total = 0.0;
     for (int i = 0; i < 8; i++) {
         float fi = float(i);
         float weight = 1.0 / (1.0 + fi * 0.4);
-        wv += spec(fi / 7.0, t) * sin(x * 6.2832 * (1.0 + fi * 1.5) + t * (1.2 + fi * 0.35)) * weight;
+        wv += spec(fi / 7.0, t) * sin(x * 6.2832 * (1.0 + fi * 1.5) + wavePhase(i)) * weight;
         total += weight;
     }
     return wv / total * 2.2;
