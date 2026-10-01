@@ -1327,7 +1327,7 @@ Item {
         }
         SettingRow {
           label: "Card header"
-          description: "by NOW PLAYING in the card, when the card visualizer is off"
+          description: "by NOW PLAYING in the card, when the card visualizer is off; click it to change it"
           Dropdown {
             width: Style.space(180)
             showLabel: false
@@ -1339,7 +1339,7 @@ Item {
         }
       SettingRow {
         label: "Card visualizer"
-        description: "under the art; right-click the art to step through them"
+        description: "under the art; click it to step through them (right-click: back)"
         Dropdown {
           width: Style.space(180)
           showLabel: false
@@ -1367,7 +1367,7 @@ Item {
         }
       SettingRow {
         label: "Album art effect"
-        description: "moves with the music; middle-click the art to step through them"
+        description: "moves with the music; right-click the art to step through them"
         Dropdown {
           width: Style.space(180)
           showLabel: false

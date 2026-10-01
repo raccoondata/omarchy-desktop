@@ -336,8 +336,9 @@ BarWidget {
   readonly property var visualNames: ({ pixel: "Pixel equalizer", tunnel: "Tunnel", kaleido: "Kaleidoscope", starfield: "Starfield",
     battery: "Battery", lava: "Lava", lissajous: "Lissajous", aurora: "Aurora", woods: "Digital woods", off: "No visualizer" })
   readonly property var artEffectNames: ({ off: "No art effect", glitch: "Glitch", chroma: "Chroma", pixel: "Pixelate", crt: "CRT", melt: "Melt", solar: "Solar", night: "Night vision", torch: "Flashlight" })
-  function stepSetting(key, list, current) {
-    var next = list[(list.indexOf(current) + 1) % list.length]
+  // The next (step 1) or previous (-1) of list after current, saved as key.
+  function stepSetting(key, list, current, step) {
+    var next = list[(list.indexOf(current) + (step || 1) + list.length) % list.length]
     Util.execArgv([root.omarchyDir + "/taskbar-setting", "set", key, next])
     return next
   }
@@ -857,6 +858,37 @@ BarWidget {
 
   // A square-pixel bar (seek and volume): `value` 0..1 filled in the accent,
   // `ghost` (hover) previewed faintly.
+  // A name shown briefly over what was just clicked (an art effect, a
+  // visualizer), then fading.
+  component Toast: Rectangle {
+    id: toast
+    property string text: ""
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    anchors.bottomMargin: Style.space(8)
+    width: toastText.implicitWidth + Style.space(14)
+    height: toastText.implicitHeight + Style.space(6)
+    radius: Style.cornerRadius
+    color: root.tint(Color.popups.background, 0.85)
+    opacity: 0
+    z: 5
+    function show(t) { text = t; toastAnim.restart() }
+    Text {
+      id: toastText
+      anchors.centerIn: parent
+      text: toast.text
+      color: root.text
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+    SequentialAnimation {
+      id: toastAnim
+      NumberAnimation { target: toast; property: "opacity"; to: 1; duration: 120 }
+      PauseAnimation { duration: 900 }
+      NumberAnimation { target: toast; property: "opacity"; to: 0; duration: 300 }
+    }
+  }
+
   component PixelBar: Item {
     id: pixels
     property real value: 0
@@ -1282,35 +1314,8 @@ BarWidget {
                 }
               }
             }
-            // What right / middle click just switched to.
-            Rectangle {
-              id: fxToast
-              property string text: ""
-              anchors.horizontalCenter: parent.horizontalCenter
-              anchors.bottom: parent.bottom
-              anchors.bottomMargin: Style.space(8)
-              width: toastText.implicitWidth + Style.space(14)
-              height: toastText.implicitHeight + Style.space(6)
-              radius: Style.cornerRadius
-              color: root.tint(Color.popups.background, 0.85)
-              opacity: 0
-              z: 5
-              function show(t) { text = t; toastAnim.restart() }
-              Text {
-                id: toastText
-                anchors.centerIn: parent
-                text: fxToast.text
-                color: root.text
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-              SequentialAnimation {
-                id: toastAnim
-                NumberAnimation { target: fxToast; property: "opacity"; to: 1; duration: 120 }
-                PauseAnimation { duration: 900 }
-                NumberAnimation { target: fxToast; property: "opacity"; to: 0; duration: 300 }
-              }
-            }
+            // The art effect a click just switched to (or the output).
+            Toast { id: fxToast }
             Rectangle {
               id: artMask
               anchors.fill: parent
@@ -1378,15 +1383,12 @@ BarWidget {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-              // Left: go to the app. Right: next visualizer. Middle: next art effect.
+              // Left: go to the app. Right: the next art effect, middle: the
+              // one before. (The visualizer changes by clicking it.)
               onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) {
-                  root.cardVisual = root.stepSetting("nowPlayingVisual", root.visuals, root.cardVisual)
-                  fxToast.show(root.visualNames[root.cardVisual])
-                } else if (mouse.button === Qt.MiddleButton) {
-                  root.artEffect = root.stepSetting("nowPlayingArtFx", root.artEffects, root.artEffect)
-                  fxToast.show(root.artEffectNames[root.artEffect])
-                } else root.raiseApp()
+                if (mouse.button === Qt.LeftButton) { root.raiseApp(); return }
+                root.artEffect = root.stepSetting("nowPlayingArtFx", root.artEffects, root.artEffect, mouse.button === Qt.MiddleButton ? -1 : 1)
+                fxToast.show(root.artEffectNames[root.artEffect])
               }
             }
           }
@@ -1422,12 +1424,28 @@ BarWidget {
                 // One per card: only when the card visualizer below is off.
                 visible: root.headerEq !== "off" && root.cardVisual === "off"
                 color: root.accent
+                // Click: its next style (right-click: the one before), named
+                // for a moment where NOW PLAYING is.
+                MouseArea {
+                  anchors.fill: parent
+                  anchors.margins: -Style.space(4)
+                  cursorShape: Qt.PointingHandCursor
+                  acceptedButtons: Qt.LeftButton | Qt.RightButton
+                  onClicked: function(mouse) {
+                    var list = eq.styles.concat(["shuffle"])
+                    root.headerEq = root.stepSetting("nowPlayingHeaderEq", list, root.eqStyle(root.headerEq), mouse.button === Qt.RightButton ? -1 : 1)
+                    statusLabel.flash = root.headerEq.toUpperCase()
+                    statusFlash.restart()
+                  }
+                }
               }
               Text {
                 id: statusLabel
+                property string flash: ""
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: root.playing ? "NOW PLAYING" : "PAUSED"
+                text: flash !== "" ? flash : (root.playing ? "NOW PLAYING" : "PAUSED")
+                Timer { id: statusFlash; interval: 1400; onTriggered: statusLabel.flash = "" }
                 color: root.tint(root.text, 0.55)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -1518,6 +1536,19 @@ BarWidget {
             style: root.eqStyle(root.cardEq)
             color: root.accent
           }
+          // Click: the next visualizer, right-click: the one before (Off
+          // only from settings, so it can't vanish under the pointer).
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: function(mouse) {
+              var shown = root.visuals.filter(function(v) { return v !== "off" })
+              root.cardVisual = root.stepSetting("nowPlayingVisual", shown, root.cardVisual, mouse.button === Qt.RightButton ? -1 : 1)
+              visToast.show(root.visualNames[root.cardVisual])
+            }
+          }
+          Toast { id: visToast }
         }
 
         // Seek: elapsed · pixels · remaining. A stream with no length says so.
