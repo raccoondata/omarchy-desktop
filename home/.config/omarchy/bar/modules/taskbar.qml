@@ -684,6 +684,52 @@ BarWidget {
   // The current theme's colours by name (colors.toml: red, blue, accent, ...).
   property var themeColors: ({})
 
+  // ------------------------------------------------ new apps: line icons
+  // An app installed without a line icon: a notification offers to have
+  // the coding agent draw one with the taskbar-icons skill (new-app-icon).
+  // The apps here when this first runs are only noted, and each new one is
+  // offered once (~/.local/state/omarchy/known-apps.json); setting newAppIcons.
+  readonly property bool newAppIcons: pref("newAppIcons", true) !== false && pref("newAppIcons", true) !== "false"
+  property var knownApps: null
+  Connections {
+    target: DesktopEntries.applications
+    function onValuesChanged() { newAppsCheck.restart() }
+  }
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/known-apps.json"
+    id: knownAppsFile
+    printErrors: false
+    atomicWrites: true
+    onLoaded: {
+      try { root.knownApps = JSON.parse(text()) || { ids: [] } } catch (e) { root.knownApps = { ids: [] } }
+      newAppsCheck.restart()
+    }
+    onLoadFailed: { root.knownApps = { ids: [] }; newAppsCheck.restart() }
+  }
+  // A while after the app list settles (an install adds several at once).
+  Timer {
+    id: newAppsCheck
+    interval: 6000
+    onTriggered: root.checkNewApps()
+  }
+  function checkNewApps() {
+    if (!knownApps) return
+    var apps = DesktopEntries.applications.values.filter(function(e) { return !e.noDisplay })
+    if (apps.length === 0) return
+    var known = Array.isArray(knownApps.ids) ? knownApps.ids : []
+    var fresh = apps.filter(function(e) { return known.indexOf(e.id) === -1 })
+    if (known.length > 0 && newAppIcons) {
+      fresh.filter(function(e) { return TaskbarMatch.forEntry(e) === "" }).slice(0, 3).forEach(function(e) {
+        Util.execArgv([omarchyDir + "/new-app-icon", String(e.id), String(e.name || e.id),
+                       String(e.startupClass || ""), String(e.icon || "")])
+      })
+    }
+    if (fresh.length > 0 || known.length === 0) {
+      knownApps = { ids: known.concat(fresh.map(function(e) { return e.id })) }
+      knownAppsFile.setText(JSON.stringify(knownApps) + "\n")
+    }
+  }
+
   // For settings (Frequent's hidden apps).
   readonly property var superMenuPanel: superMenu
 

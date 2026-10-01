@@ -1325,6 +1325,14 @@ Item {
           }
         }
       }
+      SettingRow {
+        label: "New apps"
+        description: "when an app without a line icon is installed, a notification offers to have your coding agent draw one"
+        ToggleSwitch {
+          checked: icTab.prefs.newAppIcons !== false && icTab.prefs.newAppIcons !== "false"
+          onToggled: settings.set("newAppIcons", !checked)
+        }
+      }
     }
   }
 

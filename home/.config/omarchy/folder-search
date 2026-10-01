@@ -5,8 +5,11 @@ set -uo pipefail
 # (bar/modules/SuperMenu.qml): up to 3, home itself left out.
 #
 #   folder-search <word>...        one line each: path <TAB> branch <TAB> kind <TAB> repos
-#   folder-search --info <path>... the same for given folders (pinned ones);
-#                                  a folder that's gone: just path <TAB> <TAB> <TAB> missing
+#   folder-search --info <path>... the same for given folders (pinned ones),
+#                                  plus <TAB> changed <TAB> ahead <TAB> behind for
+#                                  a repo (files changed, commits ahead of and
+#                                  behind its upstream); a folder that's gone:
+#                                  just path <TAB> <TAB> <TAB> missing
 #
 # branch: the git branch if the folder is in a repo ("-" when detached),
 # empty if not. kind: the project type from its marker files (in the folder,
@@ -51,7 +54,7 @@ kind_below() {
 }
 
 describe() {
-  local p=$1 branch="" kind="" top repos=0 g
+  local p=$1 status=${2:-} branch="" kind="" top repos=0 g changed="" ahead="" behind="" line
   if top=$(git -C "$p" rev-parse --show-toplevel 2>/dev/null); then
     branch=$(git -C "$p" branch --show-current 2>/dev/null)
     branch=${branch:--}
@@ -63,13 +66,24 @@ describe() {
     kind=$(kind_of "$p")
   fi
   for g in "$p"/*/.git; do [[ -e $g ]] && repos=$((repos + 1)); done
-  printf '%s\t%s\t%s\t%s\n' "$p" "$branch" "$kind" "$repos"
+  # A pinned repo's state: one `git status` (untracked files in normal mode).
+  if [[ -n $status && -n $branch ]]; then
+    changed=0 ahead=0 behind=0
+    while IFS= read -r line; do
+      case $line in
+        "# branch.ab "*) line=${line#\# branch.ab +}; ahead=${line%% *}; behind=${line##*-} ;;
+        "#"*) ;;
+        *) changed=$((changed + 1)) ;;
+      esac
+    done < <(timeout 3 git -C "$p" status --porcelain=v2 --branch 2>/dev/null)
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$p" "$branch" "$kind" "$repos" "$changed" "$ahead" "$behind"
 }
 
 if [[ ${1:-} == --info ]]; then
   shift
   for p in "$@"; do
-    if [[ -d $p ]]; then describe "$p"; else printf '%s\t\t\tmissing\n' "$p"; fi
+    if [[ -d $p ]]; then describe "$p" status; else printf '%s\t\t\tmissing\n' "$p"; fi
   done
   exit 0
 fi
