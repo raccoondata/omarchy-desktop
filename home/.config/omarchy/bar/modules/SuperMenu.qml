@@ -31,7 +31,9 @@ import "Visuals.js" as Visuals
 //             block's right, bottom or left edge to grow it, in open space
 //             for a new group. A block that grows into one below pushes it
 //             down; a group left empty goes. Drag a title to move a block;
-//             ⋯ renames or deletes a group (its apps go back to Pinned)
+//             ⋯ renames or deletes a group (its apps go back to Pinned) and
+//             shades it (any block): a soft fill in one of the theme's colours,
+//             saved by name ("shade": "blue"), so a new theme recolours it
 //   Frequent  the apps you use most lately that aren't pinned, from
 //             ~/.local/state/omarchy/app-usage.json (the taskbar counts every
 //             switch to an app, and launches from here). Optional (setting
@@ -262,7 +264,7 @@ Item {
         menu.pinnedLayout = data.pinnedLayout || null
         menu.folderActions = data.folderActions && typeof data.folderActions === "object" ? data.folderActions : ({})
         menu.groups = Array.isArray(data.groups) ? data.groups.filter(function(g) { return g && typeof g.name === "string" })
-          .map(function(g) { return { name: g.name, apps: Array.isArray(g.apps) ? g.apps : [], x: g.x, y: g.y, w: g.w, cells: g.cells || null } }) : []
+          .map(function(g) { return { name: g.name, apps: Array.isArray(g.apps) ? g.apps : [], x: g.x, y: g.y, w: g.w, cells: g.cells || null, shade: g.shade || "", icons: g.icons || "" } }) : []
       } catch (e) {
         menu.pinnedIds = []
         menu.hiddenFrequent = []
@@ -336,8 +338,8 @@ Item {
 
   readonly property var sections: {
     var pl = pinnedLayout || {}
-    return [{ name: "Pinned", ids: pinnedIds, group: false, x: pl.x, y: pl.y, w: pl.w, cells: pl.cells || null }]
-      .concat(groups.map(function(g) { return { name: g.name, ids: g.apps, group: true, x: g.x, y: g.y, w: g.w, cells: g.cells } }))
+    return [{ name: "Pinned", ids: pinnedIds, group: false, x: pl.x, y: pl.y, w: pl.w, cells: pl.cells || null, shade: pl.shade || "", icons: pl.icons || "" }]
+      .concat(groups.map(function(g) { return { name: g.name, ids: g.apps, group: true, x: g.x, y: g.y, w: g.w, cells: g.cells, shade: g.shade || "", icons: g.icons || "" } }))
   }
 
   // Each section's shown tiles at their cells, in reading order:
@@ -498,13 +500,20 @@ Item {
       var cells = {}
       ;(sectionTiles[i] || []).forEach(function(t) { cells[t.entry.id] = [t.c, t.r] })
       sec.ids.forEach(function(id) { if (!cells[id] && sec.cells && sec.cells[id]) cells[id] = sec.cells[id] })
-      return { name: sec.name, ids: sec.ids.slice(), x: all[i].x, y: all[i].y, cells: cells }
+      return { name: sec.name, ids: sec.ids.slice(), x: all[i].x, y: all[i].y, cells: cells, shade: sec.shade || "", icons: sec.icons || "" }
     })
   }
   function commit(secs) {
     pinnedIds = secs[0].ids
     pinnedLayout = { x: secs[0].x, y: secs[0].y, cells: secs[0].cells }
-    groups = secs.slice(1).map(function(sec) { return { name: sec.name, apps: sec.ids, x: sec.x, y: sec.y, cells: sec.cells } })
+    if (secs[0].shade) pinnedLayout.shade = secs[0].shade
+    if (secs[0].icons) pinnedLayout.icons = secs[0].icons
+    groups = secs.slice(1).map(function(sec) {
+      var g = { name: sec.name, apps: sec.ids, x: sec.x, y: sec.y, cells: sec.cells }
+      if (sec.shade) g.shade = sec.shade
+      if (sec.icons) g.icons = sec.icons
+      return g
+    })
     saveConfig()
   }
   // Shift a section's cells so its top-left tile is at 0,0, moving the block
@@ -659,6 +668,45 @@ Item {
   function addGroup(name, withId) {
     var spot = firstSpot(1, 1, layouts)
     newGroupAt(spot.x, spot.y, withId, name)
+  }
+
+  // ------------------------------------------------------------- shades
+  // A block's shade: one of the theme's colours, by name ("" for none).
+  readonly property var shadeSlots: ["accent", "red", "yellow", "green", "cyan", "blue", "magenta"]
+  function shadeColor(slot) {
+    if (!slot) return ""
+    if (slot === "accent") return String(Color.accent)
+    return taskbar.themeColors[slot] || ""
+  }
+  // The slots worth offering in this theme (a colour it doesn't have, or
+  // one it repeats, is left out).
+  readonly property var shadeChoices: {
+    var seen = {}, out = []
+    for (var i = 0; i < shadeSlots.length; i++) {
+      var hex = shadeColor(shadeSlots[i]).toLowerCase()
+      if (!hex || seen[hex]) continue
+      seen[hex] = true
+      out.push(shadeSlots[i])
+    }
+    return out
+  }
+  function setShade(sec, slot) {
+    var secs = snapshot()
+    if (sec < 0 || sec >= secs.length) return
+    secs[sec].shade = slot
+    if (!slot && secs[sec].icons === "shade") secs[sec].icons = ""
+    commit(secs)
+  }
+
+  // A block's own icon style (over the Icons setting): stepped from its ⋯.
+  readonly property var iconStyleNames: ({ "": "default", line: "line", brand: "coloured", palette: "theme-coloured",
+                                           original: "the apps' own", shade: "in the group's shade" })
+  function cycleIcons(sec) {
+    var secs = snapshot()
+    if (sec < 0 || sec >= secs.length) return
+    var order = ["", "line", "brand", "palette", "original"].concat(secs[sec].shade ? ["shade"] : [])
+    secs[sec].icons = order[(order.indexOf(secs[sec].icons || "") + 1) % order.length]
+    commit(secs)
   }
 
   function renameGroup(sec, name) {
@@ -835,10 +883,17 @@ Item {
   readonly property var tileMenuItems: {
     var e = tileMenuEntry
     if (!e) return []
-    // A group's ⋯: rename, delete.
-    if (e.blockMenu !== undefined)
-      return [{ label: "Rename", act: "rename", sec: e.blockMenu },
-              { label: "Delete group (apps go back to Pinned)", act: "delete", sec: e.blockMenu }]
+    // A block's ⋯: its shade; for a group, rename and delete too.
+    if (e.blockMenu !== undefined) {
+      var cur = sections[e.blockMenu] ? sections[e.blockMenu].icons || "" : ""
+      var list = [{ label: "Shade", act: "shades", sec: e.blockMenu, swatches: true },
+                  { label: "Icons:  " + iconStyleNames[cur] + (cur === "" ? " (the Icons setting)" : ""), act: "icons", sec: e.blockMenu }]
+      if (sections[e.blockMenu] && sections[e.blockMenu].group) {
+        list.push({ label: "Rename", act: "rename", sec: e.blockMenu, gap: true })
+        list.push({ label: "Delete group (apps go back to Pinned)", act: "delete", sec: e.blockMenu })
+      }
+      return list
+    }
     var sec = sectionOf(e.id)
     var items = [{ label: sec === -1 ? "Pin" : "Unpin", act: "pin" }]
     for (var i = 0; i < sections.length; i++)
@@ -868,7 +923,9 @@ Item {
     if (e && item && item.act === "cycle") { cycleFolderAction(e, item.how); return }   // stays open
     tileMenuEntry = null
     if (!e || !item) return
-    if (item.act === "rename") renaming = item.sec
+    if (item.act === "shade") setShade(item.sec, item.slot)
+    else if (item.act === "icons") { cycleIcons(item.sec); tileMenuEntry = { blockMenu: item.sec }; return }   // stays open
+    else if (item.act === "rename") renaming = item.sec
     else if (item.act === "delete") deleteGroup(item.sec)
     else if (item.act === "pin") togglePin(e)
     else if (item.act === "move") appendTo(e.id, item.sec)
@@ -1237,9 +1294,17 @@ Item {
   // default) or the desktop's line icon ("line"; apps without one keep
   // their own).
   readonly property bool lineIcons: menu.taskbar.pref("iconsSuperMenu", "app") === "line"
-  function tileIcon(entry) {
-    var name = lineIcons ? menu.taskbar.lineIconForEntry(entry) : ""
-    if (name) return TaskbarIcons.svg(name, menu.taskbar.lineColor(name, Color.menu.text, menu.taskbar.colorModeFor("SuperMenu")))
+  // An app's icon: the Icons setting's style, or a block's own (style:
+  // "line", "brand", "palette", "original", or "shade" in shadeHex).
+  function tileIcon(entry, style, shadeHex) {
+    var useLine = style === "original" ? false : (style ? true : lineIcons)
+    var name = useLine ? menu.taskbar.lineIconForEntry(entry) : ""
+    if (name) {
+      var tint = style === "shade" && shadeHex ? shadeHex
+        : menu.taskbar.lineColor(name, Color.menu.text, style === "line" ? "mono" : style === "brand" || style === "palette" ? style
+                                                       : menu.taskbar.colorModeFor("SuperMenu"))
+      return TaskbarIcons.svg(name, tint)
+    }
     // The app's own icon, skipping the launcher's line icons (Icons > App
     // launcher puts them where Omarchy's icon index looks first).
     var icon = entry ? String(entry.icon || "") : ""
@@ -1543,6 +1608,8 @@ Item {
               title: modelData.name
               entries: menu.sectionEntries[index] || []
               tiles: menu.sectionTiles[index] || []
+              shade: menu.shadeColor(modelData.shade)
+              iconStyle: modelData.icons || ""
               layout: menu.layouts[index] || ({ x: 0, y: 0, w: 1, h: 1 })
               offset: menu.sectionOffsets[index] || 0
               editable: modelData.group
@@ -2117,7 +2184,47 @@ property real live: 0
             }
             radius: Style.cornerRadius
             color: itemMouse.containsMouse ? Color.menu.selectedBackground : "transparent"
+            // A block's shade: none, then the theme's colours.
+            Row {
+              visible: !!parent.modelData.swatches
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(6)
+              Repeater {
+                model: parent.visible ? [""].concat(menu.shadeChoices) : []
+                Rectangle {
+                  required property var modelData
+                  readonly property string cur: menu.sections[menu.tileMenuEntry ? menu.tileMenuEntry.blockMenu : 0]
+                    ? menu.sections[menu.tileMenuEntry.blockMenu].shade : ""
+                  width: Style.space(18)
+                  height: width
+                  radius: width / 2
+                  color: modelData === "" ? "transparent" : menu.shadeColor(modelData)
+                  border.width: cur === modelData ? 2 : 1
+                  border.color: cur === modelData ? Color.menu.text : Util.alpha(Color.menu.text, 0.3)
+                  // None: a slash through an empty circle.
+                  Rectangle {
+                    visible: parent.modelData === ""
+                    anchors.centerIn: parent
+                    width: parent.width * 0.9
+                    height: 1
+                    rotation: -45
+                    color: Util.alpha(Color.menu.text, 0.5)
+                  }
+                  MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onEntered: menu.hoverDetail = parent.modelData === "" ? "No shade" : "Shade: " + parent.modelData
+                    onExited: menu.hoverDetail = ""
+                    onClicked: menu.runTileMenu({ act: "shade", sec: menu.tileMenuEntry.blockMenu, slot: parent.modelData })
+                  }
+                }
+              }
+            }
             Text {
+              visible: !parent.modelData.swatches
               anchors.left: parent.left
               anchors.leftMargin: Style.space(10)
               anchors.bottom: parent.bottom
@@ -2131,6 +2238,8 @@ property real live: 0
             MouseArea {
               id: itemMouse
               anchors.fill: parent
+              z: -1
+              enabled: !parent.modelData.swatches
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: menu.runTileMenu(parent.modelData)
