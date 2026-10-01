@@ -37,6 +37,12 @@ import "Visuals.js" as Visuals
 // a new track. Colours are all the theme's.
 BarWidget {
   id: root
+  // No "panel open" mark from Omarchy's bar under this module: it would sit a
+  // pixel or two under the song's progress line, and the popup already opens
+  // right at what was clicked. (The bar draws the mark at the length a module
+  // asks for, rounded; a fraction of a pixel is none.)
+  readonly property real openPanelIndicatorWidth: 0.4
+  readonly property real openPanelIndicatorHeight: 0.4
   moduleName: "nowplaying"
 
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"

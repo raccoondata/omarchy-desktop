@@ -42,6 +42,13 @@ import "Visuals.js" as Visuals
 // special:scratchpad by ~/.config/omarchy/window-minimize) render dimmed.
 BarWidget {
   id: root
+  // No "panel open" mark from Omarchy's bar under this module: it would sit
+  // centred under the whole taskbar, not the hovered icon, a pixel or two
+  // from its window dots, and the popup already opens right at what was
+  // clicked. (The bar draws the mark at the length a module asks for,
+  // rounded; a fraction of a pixel is none.)
+  readonly property real openPanelIndicatorWidth: 0.4
+  readonly property real openPanelIndicatorHeight: 0.4
 
   readonly property var toplevels: Hyprland.toplevels.values
   // Where the scripts and state files the taskbar uses live.
