@@ -111,7 +111,7 @@ fi
 # Remote access is optional (setup-remote); desktop.conf says whether it's on.
 remote=false
 grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null && remote=true
-units=(hyprland-safe-mode-agents.service config-history.timer lock-guard.service)
+units=(config-history.timer lock-guard.service)
 $remote && units+=(remote-screen.service)
 for unit in "${units[@]}"; do
   systemctl --user is-active --quiet "$unit" && ok "$unit active" || warn "$unit not active"
@@ -130,19 +130,27 @@ fi
 grep -q 'require("hypr.desktop")' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null && ok "hyprland.lua loads the desktop (hypr/desktop.lua)" \
   || bad "hyprland.lua doesn't load hypr/desktop.lua: no desktop keybindings (run omarchy-desktop update)"
 
-# --- agents -----------------------------------------------------------------------
-agents_json="$("$HOME/.config/omarchy/agents" list 2>/dev/null)"
-if [[ "$(jq 'length' <<<"$agents_json" 2>/dev/null || echo 0)" -gt 0 ]]; then
-  ok "agents: $(jq -r 'map(.name) | join(", ")' <<<"$agents_json")"
-else
-  warn "no coding agents found (~/.config/omarchy/agents list)"
+# --- agents (the Agent Tools plugin) -------------------------------------------------
+at="$HOME/.config/omarchy/plugins/agent-tools"
+if [[ -x $at/bin/agents ]]; then
+  at_on() { [[ "$(jq -r --arg k "$1" '.[$k]' "$HOME/.config/omarchy/agent-tools/settings.json" 2>/dev/null)" != false ]]; }
+  agents_json="$("$at/bin/agents" list 2>/dev/null)"
+  if [[ "$(jq 'length' <<<"$agents_json" 2>/dev/null || echo 0)" -gt 0 ]]; then
+    ok "agents: $(jq -r 'map(.name) | join(", ")' <<<"$agents_json")"
+  else
+    warn "no coding agents found (install one: Super+Space > Setup > Defaults > Agent)"
+  fi
+  if at_on notifications && { command -v claude >/dev/null || [[ -d $HOME/.claude ]]; }; then
+    grep -q 'plugins/agent-tools/bin/agent-notify' "$HOME/.claude/settings.json" 2>/dev/null && ok "Claude Code hooks call Agent Tools' agent-notify" \
+      || warn "Claude Code's hooks don't call Agent Tools' agent-notify (no finished/needs-you notifications; restart the shell to rerun its setup)"
+  fi
+  [[ -f $HOME/.local/share/nautilus-python/extensions/omarchy_agents.py ]] && ok "Files right-click agent menu installed" \
+    || warn "Files agent menu missing (Agent Tools installs it when nautilus-python is there)"
+  if at_on safeMode; then
+    systemctl --user is-active --quiet hyprland-safe-mode-agents.service && ok "safe-mode agents watching" \
+      || warn "hyprland-safe-mode-agents.service not active"
+  fi
 fi
-if command -v claude >/dev/null || [[ -d $HOME/.claude ]]; then
-  grep -q 'agent-notify' "$HOME/.claude/settings.json" 2>/dev/null && ok "Claude Code hooks call agent-notify" \
-    || warn "Claude Code's hooks don't call ~/.config/omarchy/agent-notify (no finished/needs-you notifications; run omarchy-desktop update)"
-fi
-[[ -f $HOME/.local/share/nautilus-python/extensions/omarchy_agents.py ]] && ok "Files right-click agent menu installed" \
-  || warn "Files agent menu missing (~/.local/share/nautilus-python/extensions/omarchy_agents.py)"
 # The desktop's plugins: Desktop Core (the shared window model, controls,
 # music visuals) and Line Icons (the icons the taskbar and Super menu draw).
 plugin_check() {  # plugin_check <id> <name> <file it must have> <what breaks> <repo>
@@ -161,6 +169,7 @@ plugin_check line-icons "Line Icons" lib/LineIcons.js "the taskbar has no icons"
 plugin_check now-playing "Now Playing" NowPlaying.qml "no song on the bar" omarchy-now-playing
 plugin_check super-menu "Super Menu" Main.qml "no Super menu" omarchy-super-menu
 plugin_check hot-corners "Hot Corners" bin/hotcorner "no hot corners" omarchy-hot-corners
+plugin_check agent-tools "Agent Tools" bin/agents "no ask card, Files agent menu or agent keys" omarchy-agent-tools
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi

@@ -4,19 +4,18 @@ import qs.Ui
 import "../../plugins/desktop-core/ui"
 
 // The action bar for handing something to a coding agent, shared by the
-// editor dock (EditorDock.qml, under the screenshot editor's window), the
-// screenshot preview (ScreenshotPreview.qml) and the ask card (AskCard.qml:
-// files, selected text):
+// editor dock (EditorDock.qml, under the screenshot editor's window) and the
+// screenshot preview (ScreenshotPreview.qml):
 //
 //   [thumbnail] · Ask Claude · Ask Codex · More · Edit     status · Open folder · Done
 //
-// The agents are the installed ones (~/.config/omarchy/agents): the two
+// The agents are the installed ones (Agent Tools' bin/agents): the two
 // primaries as buttons, the rest behind More (shown in place, not as a menu:
 // a menu would be clipped by these small windows).
 //
 // Asking turns the left side into a question field, with "Send to" chips (a
 // new session, or one that's already open) on a second line; Enter sends via
-// ~/.config/omarchy/ask-agent, which picks up the newest (annotated) version.
+// Agent Tools' bin/ask-agent, which picks up the newest (annotated) version.
 // The thumbnail (dock only) drags out as the file.
 //
 // Sizing: its implicitWidth comes from its own rows only, and nothing inside
@@ -77,7 +76,7 @@ Item {
   }
   function pickEffort(level) {
     effort = level
-    if (level !== "") Util.execArgv([taskbar.omarchyDir + "/agents", "effort", asking, level])
+    if (level !== "") Util.execArgv([taskbar.agentTools + "/agents", "effort", asking, level])
   }
 
   function reset() {
@@ -97,7 +96,7 @@ Item {
     var q = question.text.trim()
     var to = target !== "new" ? target : asking
     // Effort only means something for a new session.
-    var script = taskbar.omarchyDir + "/ask-agent"
+    var script = taskbar.agentTools + "/ask-agent"
     var pre = target === "new" && effort !== "" ? ["--effort", effort] : []
     if (mode === "files") Util.execArgv([script].concat(pre, ["files", to, q], paths))
     else if (mode === "text") Util.execArgv([script].concat(pre, ["text", to, q, actions.text, app, title]))

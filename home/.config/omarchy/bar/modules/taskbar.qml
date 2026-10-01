@@ -62,6 +62,8 @@ BarWidget {
   PluginSettings { id: shared; plugin: "desktop-core" }
   // Where the scripts and state files the taskbar uses live.
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"
+  // The Agent Tools plugin's scripts (agents, ask-agent).
+  readonly property string agentTools: omarchyDir + "/plugins/agent-tools/bin"
   readonly property int maxLabelWidth: Number(pref("maxLabelWidth", 120))
   readonly property bool showLabels: pref("showLabels", false) === true
   readonly property bool snapPreview: pref("snapPreview", true) !== false
@@ -128,7 +130,7 @@ BarWidget {
   readonly property string doubleClickGather: String(pref("doubleClickGather", "same"))
   // Terminal kinds (TaskbarStatus.terminalKinds ids, or "other") that don't
   // gather with agents (Taskbar & Desktop > Windows).
-  // Agents (ids, as in ~/.config/omarchy/agents) that don't gather.
+  // Agents (ids, as in Agent Tools' bin/agents) that don't gather.
   readonly property var gatherAgentsOff: {
     var list = pref("gatherAgentsOff", [])
     return Array.isArray(list) ? list : []
@@ -655,15 +657,10 @@ BarWidget {
       root.screenshot(path, app, title, x, y, w, h, cx, cy)
     }
     function isDragging(): bool { return root.windowDragging }
-    // Files' right-click "Ask …" (~/.local/share/nautilus-python/extensions):
-    // the ask card with these files (one path per line) and that agent picked.
-    function askFiles(agent: string, paths: string): void {
-      var list = String(paths).split("\n").filter(function(p) { return p !== "" })
-      if (list.length > 0) askCard.showFiles(agent, list)
-    }
-    // Super+Alt+A: the ask card with the selected text (the primary
-    // selection, or the clipboard's text when nothing is selected).
-    function askSelection(): void { askCard.showSelection() }
+    // The ask card is the Agent Tools plugin's now; these stay for older
+    // callers (a Files window that loaded the old extension).
+    function askFiles(agent: string, paths: string): void { Util.execArgv(["omarchy-shell", "-q", "agent-tools", "askFiles", agent, paths]) }
+    function askSelection(): void { Util.execArgv(["omarchy-shell", "-q", "agent-tools", "askSelection"]) }
     function reloadAgents(): void { root.reloadAgents() }
     // Esc in the screenshot editor while its ask panel/bar shows
     // (omarchy_screenshot_escape in hypr/desktop/bindings.lua): fold it away.
@@ -765,11 +762,6 @@ BarWidget {
       var area = root.lastShot && root.lastShot.path === path ? root.lastShot.area : Qt.rect(0, 0, 0, 0)
       screenshotPreview.show(path, app, title, area)
     }
-  }
-
-  AskCard {
-    id: askCard
-    taskbar: root
   }
 
   ScreenshotPreview {
@@ -1630,7 +1622,7 @@ BarWidget {
   // V V), or a terminal whose foreground program is the agent. For the
   // screenshot card's "Send to".
   // Open sessions of an agent (its own window class org.omarchy.<id>, or a
-  // terminal running it). See ~/.config/omarchy/agents.
+  // terminal running it). See Agent Tools' bin/agents.
   function agentSessions(kind) {
     var list = []
     var cls = "org.omarchy." + String(kind).replace(/-/g, "_")

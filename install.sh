@@ -12,8 +12,8 @@ set -euo pipefail
 #   - the desktop's own files (listed in ./manifest); the ones it replaces are
 #     kept in ~/.local/state/omarchy-desktop/backups/
 #   - defaults for its settings files, only where you have none (./templates)
-#   - one line each in ~/.config/hypr/hyprland.lua, ~/.bashrc and your agents'
-#     settings, the taskbar widgets in ~/.config/omarchy/shell.json and a few
+#   - one line each in ~/.config/hypr/hyprland.lua and ~/.bashrc, the
+#     plugins it adds (each its own changes: see their READMEs), the taskbar widgets in ~/.config/omarchy/shell.json and a few
 #     entries in Omarchy's menu (extensions/omarchy-menu.jsonc)
 #   - system files (setup-system: asks for your password)
 # Your own monitors, input, keybindings, theme and apps stay yours.
@@ -122,6 +122,7 @@ need_plugin line-icons "Line Icons" omarchy-line-icons
 need_plugin now-playing "Now Playing" omarchy-now-playing widget
 need_plugin super-menu "Super Menu" omarchy-super-menu
 need_plugin hot-corners "Hot Corners" omarchy-hot-corners
+need_plugin agent-tools "Agent Tools" omarchy-agent-tools
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -141,10 +142,14 @@ for p in "${owned[@]}"; do
   fi
 done
 # Files an earlier version installed that this one dropped (moved aside, not
-# deleted). Only ours: anything else in those folders is yours.
+# deleted). Only ours: anything else in those folders is yours. Some kept
+# their place but belong to a plugin now (it updates them itself).
+plugin_owned=(.local/share/nautilus-python/extensions/omarchy_agents.py
+  .config/systemd/user/hyprland-safe-mode-agents.service)
 if [[ -f $state/installed-files ]]; then
   while read -r f; do
     [[ -f $HOME/$f ]] || continue
+    [[ " ${plugin_owned[*]} " == *" $f "* ]] && continue
     mkdir -p "$backup/$(dirname "$f")"
     mv "$HOME/$f" "$backup/$f"
     echo "  removed $f (no longer part of the desktop)"
@@ -297,52 +302,6 @@ EOF
   echo "  rescue console menu (~/.bashrc)"
 fi
 
-# Agent notifications (finished / needs you) through the taskbar, instead of
-# each agent's own.
-notify="$omarchy/agent-notify"
-if command -v claude >/dev/null || [[ -d $HOME/.claude ]]; then
-  cs="$HOME/.claude/settings.json"
-  mkdir -p "$HOME/.claude"
-  [[ -s $cs ]] || echo '{}' > "$cs"
-  if ! grep -q 'agent-notify' "$cs"; then
-    tmp="$(mktemp)"
-    jq --arg cmd "$notify claude" '
-      def hook: {"hooks": [{"type": "command", "command": $cmd, "timeout": 5}]};
-      .hooks.Stop = ((.hooks.Stop // []) + [hook])
-      | .hooks.Notification = ((.hooks.Notification // []) + [hook])
-      | .preferredNotifChannel = "notifications_disabled"
-    ' "$cs" > "$tmp" && cp "$cs" "$cs.bak.$(date +%s)" && mv "$tmp" "$cs" && echo "  Claude Code notifications"
-  fi
-fi
-if command -v codex >/dev/null || [[ -d $HOME/.codex ]]; then
-  cc="$HOME/.codex/config.toml"
-  mkdir -p "$HOME/.codex"
-  [[ -f $cc ]] || : > "$cc"
-  if ! grep -q '^notify' "$cc"; then
-    # A top-level key: before the first [table].
-    tmp="$(mktemp)"
-    awk -v line="notify = [\"$notify\", \"codex\"]" 'BEGIN{done=0} /^\[/ && !done {print line; done=1} {print} END{if(!done) print line}' "$cc" > "$tmp" && mv "$tmp" "$cc"
-    echo "  Codex notifications"
-  fi
-  if ! grep -q '^notifications' "$cc"; then
-    if grep -q '^\[tui\]' "$cc"; then
-      sed -i 's/^\[tui\]/[tui]\nnotifications = ["approval-requested"]/' "$cc"
-    else
-      printf '\n[tui]\nnotifications = ["approval-requested"]\n' >> "$cc"
-    fi
-  fi
-fi
-if command -v grok >/dev/null || [[ -d $HOME/.grok ]]; then
-  # Grok runs Claude Code's hooks (above); its own notifications would double them.
-  gc="$HOME/.grok/config.toml"
-  mkdir -p "$HOME/.grok"
-  [[ -f $gc ]] || : > "$gc"
-  if ! grep -q '^\[ui.notifications\]' "$gc"; then
-    printf '\n[ui.notifications]\ncondition = "never"\n' >> "$gc"
-    echo "  Grok: notifications through the taskbar"
-  fi
-fi
-
 # --- 4 system ------------------------------------------------------------------
 step 4 "System setup (packages, rescue console)"
 "$omarchy/setup-system" || warn "setup-system failed; run ~/.config/omarchy/setup-system"
@@ -363,10 +322,9 @@ step 6 "Background services"
 chmod +x "$HOME/.local/bin/rescue" 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
-systemctl --user enable hyprland-safe-mode-agents.service >/dev/null 2>&1 || warn "couldn't enable the safe-mode agents"
 systemctl --user enable --now lock-guard.service >/dev/null 2>&1 || warn "couldn't start the lock guard"
 [[ "$(conf_get remote)" == on ]] && systemctl --user restart remote-screen.service 2>/dev/null
-echo "  config history (local undo), crash helper, backup lock guard"
+echo "  config history (local undo), backup lock guard"
 
 # --- 7 optional ------------------------------------------------------------------
 step 7 "Optional"

@@ -72,9 +72,10 @@ added it yourself).
 - **Screenshots**: Print Screen opens the editor (Tensaku) with an ask panel
   next to it: type a question and send the screenshot to Claude Code, Codex
   or whichever agents you have, in a new or an open session.
-- **Coding agents**: finds the agents you have installed (Omarchy's list),
-  asks about files from Files' right-click menu or about selected text
-  (Super+Alt+A), and puts their "done" / "needs you" notices on the taskbar.
+- **Coding agents** (the Agent Tools plugin): finds the agents you have
+  installed (Omarchy's list), asks about files from Files' right-click menu or
+  about selected text (Super+Alt+A), and puts their "done" / "needs you"
+  notices on the taskbar.
 - **Now playing**: title and artist on the bar, a card with album art and
   controls, a volume mixer, the audio outputs by name (Speakers, Headphones,
   your monitor, a Bluetooth device: click to switch); scroll for volume.
@@ -155,11 +156,15 @@ new window. Esc in the screenshot editor folds its ask panel first.
 - `home/`: the desktop's own files, copied into your home folder (listed in
   `manifest`). Updates replace them, so don't edit them there; the ones an
   update replaces are kept in `~/.local/state/omarchy-desktop/backups/`.
-- `templates/`: starting settings (taskbar pins, hot corners, ...), copied
-  only where you have none, then yours.
-- `install.sh`: copies those, hooks the desktop into Omarchy (one line in
-  `hyprland.lua`, the bar widgets in `shell.json`, menu entries, agent
-  notification hooks), runs `setup-system` (packages, rescue console), builds
+- `templates/`: starting settings (taskbar pins, ...), copied only where you
+  have none, then yours.
+- Plugins, each its own repository and installable on its own: Desktop Core
+  (what the others share), Line Icons, Now Playing, Super Menu, Hot Corners,
+  Agent Tools. The installer adds the ones you don't have; each sets itself
+  up (and its `bin/teardown` undoes that).
+- `install.sh`: copies those, adds the plugins, hooks the desktop into
+  Omarchy (one line in `hyprland.lua`, the bar widgets in `shell.json`, menu
+  entries), runs `setup-system` (packages, rescue console), builds
   the two Hyprland plugins, starts the background services.
 - `bin/omarchy-desktop`: update / status / check / keys / remote / uninstall
   (`uninstall.sh`).

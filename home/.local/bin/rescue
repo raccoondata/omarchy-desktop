@@ -14,7 +14,7 @@ set -uo pipefail
 # restore` to keep it.
 
 history="$HOME/.config/omarchy/config-history"
-agents="$HOME/.config/omarchy/agents"
+agents="$HOME/.config/omarchy/plugins/agent-tools/bin/agents"
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 
 context() {
@@ -51,7 +51,7 @@ changing anything big, and tell me exactly how to get back into the desktop.
 PROMPT
 }
 
-# Your two coding agents (~/.config/omarchy/agents primary), run right here in
+# Your two coding agents (Agent Tools: agents primary), run right here in
 # the console with their usual flags.
 mapfile -t agent_ids < <("$agents" primary 2>/dev/null | tr ',' '\n' | sed '/^$/d')
 agent_name() {

@@ -980,81 +980,25 @@ Item {
     }
   }
 
-  function setPrimaries(first, second) {
-    Util.execArgv([dir + "/agents", "primary", first, second])
-    agentsReload.restart()
-  }
-  Timer { id: agentsReload; interval: 400; onTriggered: settings.taskbar.reloadAgents() }
-
   Component {
     id: agentsTab
 
     Column {
-      id: agTab
-      width: settings.cardWidth
+      width: settings.cardWidth / 2
       spacing: Style.space(6)
-      readonly property var list: settings.taskbar.agents
-      readonly property var primaries: list.filter(function(a) { return a.primary })
-      readonly property string first: primaries.length > 0 ? primaries[0].id : ""
-      readonly property string second: primaries.length > 1 ? primaries[1].id : ""
-      readonly property var options: list.map(function(a) { return { value: a.id, label: a.name } })
-
       Section { title: "Coding agents" }
-
       SettingRow {
-        label: "First agent"
-        description: "the first button wherever you can ask an agent (screenshots, Files, selected text), and Omarchy's default agent"
-        ButtonGroup {
-          options: agTab.options
-          value: agTab.first
+        label: "Agent Tools"
+        description: "your first and second agent, Files' right-click, keys, notifications: the Agent Tools plugin's own settings"
+        Button {
+          text: "Open"
           foreground: Color.menu.text
-          background: Color.menu.background
           fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) {
-            settings.setPrimaries(v, v === agTab.second ? agTab.first : agTab.second)
+          onClicked: {
+            settings.close()
+            Util.execArgv(["omarchy-shell", "shell", "summon", "agent-tools", "{}"])
           }
         }
-      }
-      SettingRow {
-        label: "Second agent"
-        description: "the second button; any others are under More"
-        ButtonGroup {
-          options: agTab.options
-          value: agTab.second
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) {
-            settings.setPrimaries(v === agTab.first ? agTab.second : agTab.first, v)
-          }
-        }
-      }
-      SettingRow {
-        label: "Files right-click"
-        description: (settings.taskbar.prefs || {}).filesAgentMenu === "flat"
-          ? "the agent items sit at the top of the menu" : "the agent items are under one Agents submenu"
-        ButtonGroup {
-          options: [{ value: "grouped", label: "Agents submenu" }, { value: "flat", label: "Top of the menu" }]
-          value: (settings.taskbar.prefs || {}).filesAgentMenu === "flat" ? "flat" : "grouped"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("filesAgentMenu", v) }
-        }
-      }
-      Text {
-        width: parent.width
-        wrapMode: Text.WordWrap
-        text: "Installed: " + agTab.list.map(function(a) { return a.name }).join(", ")
-          + ". Omarchy knows a dozen more (OpenCode, Gemini, Copilot, Cursor, Crush, Pi…): install one from Omarchy's menu (Setup > Default Agent) and it shows up here."
-          + " Ask about selected text: Super+Alt+A."
-        color: Color.menu.text
-        opacity: 0.45
-        font.family: Style.font.menuFamily
-        font.pixelSize: Style.font.caption
       }
     }
   }

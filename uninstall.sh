@@ -24,7 +24,7 @@ if grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null; then
 fi
 
 echo "- services"
-for u in config-history.timer hyprland-safe-mode-agents.service lock-guard.service remote-screen.service; do
+for u in config-history.timer lock-guard.service remote-screen.service; do
   systemctl --user disable --now "$u" >/dev/null 2>&1 || true
 done
 
@@ -46,33 +46,6 @@ s = open(p).read()
 s = re.sub(r"\n*# Text console 3 \(Ctrl\+Alt\+Delete.*?\nfi\n", "\n", s, flags=re.S)
 open(p, "w").write(s)
 PY
-# Agent notifications back to the agents' own.
-cs="$HOME/.claude/settings.json"
-if [[ -f $cs ]] && grep -q agent-notify "$cs"; then
-  tmp="$(mktemp)"
-  jq 'def keep: map(select(all(.hooks[]?; (.command // "") | contains("agent-notify") | not)));
-      (if .hooks.Stop then .hooks.Stop |= keep else . end)
-      | (if .hooks.Notification then .hooks.Notification |= keep else . end)
-      | (if (.hooks.Stop // [1]) == [] then del(.hooks.Stop) else . end)
-      | (if (.hooks.Notification // [1]) == [] then del(.hooks.Notification) else . end)
-      | (if .hooks == {} then del(.hooks) else . end)
-      | del(.preferredNotifChannel)' "$cs" > "$tmp" && mv "$tmp" "$cs"
-fi
-cc="$HOME/.codex/config.toml"
-if [[ -f $cc ]]; then
-  sed -i '/^notify = \[".*agent-notify", "codex"\]$/d; /^notifications = \["approval-requested"\]$/d' "$cc"
-  # A [tui] table left empty (it added it) goes too.
-  python3 - "$cc" <<'PY'
-import re, sys
-p = sys.argv[1]
-s = open(p).read()
-s = re.sub(r"\n*\[tui\]\n(?=\s*(\[|$))", "\n", s)
-open(p, "w").write(s.rstrip("\n") + "\n")
-PY
-fi
-gc="$HOME/.grok/config.toml"
-[[ -f $gc ]] && sed -i '/^\[ui.notifications\]$/{N;/\ncondition = "never"$/d}' "$gc"
-
 echo "- the desktop's files"
 backup="$state/backups/uninstalled-$(date +%F-%H%M%S)"
 if [[ -f $state/installed-files ]]; then
@@ -88,7 +61,7 @@ rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprlan
 rm -f "$HOME/.local/bin/omarchy-desktop"
 # The desktop's plugins: removed if the desktop added them; ones you added
 # yourself stay.
-for id in hot-corners super-menu now-playing line-icons desktop-core; do
+for id in agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
   dir="$HOME/.config/omarchy/plugins/$id"
   key="plugin_${id//-/_}"
   mark="$(sed -n "s/^$key=//p" "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"

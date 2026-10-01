@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
+import "../../plugins/agent-tools/ui"
 
 // After Print Screen (~/.config/omarchy/screenshot), when "After a
 // screenshot" is set to the editor: the capture opens in the screenshot
@@ -294,7 +295,6 @@ Item {
         x: panel.pad
         y: panel.pad
         width: card.width - panel.pad * 2
-        taskbar: dock.taskbar
         mode: "image"
         path: dock.path
         app: dock.app

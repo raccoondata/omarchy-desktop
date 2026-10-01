@@ -9,9 +9,6 @@
 .config/omarchy/bar/modules/
 .config/omarchy/hyprland-plugins/
 .config/omarchy/hooks/post-update.d/desktop-plugins-selfcheck.hook
-.config/omarchy/agent-notify
-.config/omarchy/agents
-.config/omarchy/ask-agent
 .config/omarchy/audio-owners
 .config/omarchy/backup-lock
 .config/omarchy/bar-height
@@ -22,7 +19,6 @@
 .config/omarchy/mouse-setting
 .config/omarchy/reboot-to-windows
 .config/omarchy/remote-screen
-.config/omarchy/safe-mode-agents
 .config/omarchy/screenshot
 .config/omarchy/screenshot-editor
 .config/omarchy/screenshot.upstream
@@ -46,10 +42,8 @@
 .config/omarchy/window-minimize-now
 .config/omarchy/window-restore
 .config/omarchy/window-restore-all
-.config/systemd/user/hyprland-safe-mode-agents.service
 .config/systemd/user/lock-guard.service
 .config/systemd/user/remote-screen.service
 .local/bin/rescue
-.local/share/nautilus-python/extensions/omarchy_agents.py
 .local/share/icons/hicolor/256x256/apps/teams.png
 .local/share/icons/hicolor/256x256/apps/youtube-music.png

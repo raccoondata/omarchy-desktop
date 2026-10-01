@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "../../plugins/agent-tools/ui"
 
 // The screenshot preview: after Print Screen when "After a screenshot" is set
 // to the preview, or when the screenshot editor doesn't open. A window-like
@@ -284,7 +285,6 @@ Item {
         x: panel.pad
         y: header.y + header.height + Style.space(10)
         width: card.width - panel.pad * 2
-        taskbar: preview.taskbar
         mode: "image"
         path: preview.path
         app: preview.app

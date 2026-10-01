@@ -81,13 +81,6 @@ if ALL then
 end
 
 if NEW then
-  -- Super+Alt+A: ask an agent about the selected text (just highlight it; no
-  -- need to copy). Opens the taskbar's ask card (bar/modules/AskCard.qml).
-  -- (Super+Shift+A stays Omarchy's ChatGPT.)
-  o.bind("SUPER + ALT + A", "Ask an agent about the selected text", "omarchy-shell -q taskbar askSelection")
-end
-
-if NEW then
   -- SUPER+SHIFT+ESCAPE twice within 2s reboots into Windows once (firmware
   -- BootNext); a single press only shows a warning. Also in the system menu.
   o.bind("SUPER + SHIFT + ESCAPE", "Reboot into Windows (press twice)", D .. "reboot-to-windows --tap")
@@ -103,80 +96,6 @@ if ALL then
   hl.unbind("SUPER + SHIFT + TAB")
   o.bind("SUPER + TAB", "Window switcher", "omarchy-shell -q taskbar switcherNext")
   o.bind("SUPER + SHIFT + TAB", "Window switcher (backwards)", "omarchy-shell -q taskbar switcherPrev")
-end
-
-if NEW then
-  -- SUPER+C stays Universal copy on a single tap. A second tap within 400ms opens
-  -- your first coding agent (~/.config/omarchy/agents) instead of copying again.
-  -- The copy mirrors Omarchy's default/hypr/bindings/clipboard.lua.
-  hl.unbind("SUPER + C")
-  do
-    local claude_tap_pending = false
-
-    local function universal_copy()
-      local mods, key = "CTRL", "C"
-      local window = hl.get_active_window()
-      for _, tag in ipairs((window and window.tags) or {}) do
-        if tag:gsub("%*$", "") == "terminal" then
-          key = "Insert"
-        end
-      end
-      hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down" }))
-      hl.timer(function()
-        hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up" }))
-      end, { timeout = 50, type = "oneshot" })
-    end
-
-    o.bind("SUPER + C", "Universal copy (double-tap: your first agent)", function()
-      if claude_tap_pending then
-        claude_tap_pending = false
-        hl.exec_cmd(D .. "agents launch-primary 1")
-        return
-      end
-      claude_tap_pending = true
-      universal_copy()
-      hl.timer(function()
-        claude_tap_pending = false
-      end, { timeout = 400, type = "oneshot" })
-    end)
-  end
-end
-
-if NEW then
-  -- SUPER+V stays Universal paste on a single tap. A second tap within 400ms opens
-  -- your second coding agent instead of pasting again. The paste mirrors Omarchy's
-  -- default/hypr/bindings/clipboard.lua.
-  hl.unbind("SUPER + V")
-  do
-    local codex_tap_pending = false
-
-    local function universal_paste()
-      local mods, key = "CTRL", "V"
-      local window = hl.get_active_window()
-      for _, tag in ipairs((window and window.tags) or {}) do
-        if tag:gsub("%*$", "") == "terminal" then
-          mods, key = "SHIFT", "Insert"
-        end
-      end
-      hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down" }))
-      hl.timer(function()
-        hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up" }))
-      end, { timeout = 50, type = "oneshot" })
-    end
-
-    o.bind("SUPER + V", "Universal paste (double-tap: your second agent)", function()
-      if codex_tap_pending then
-        codex_tap_pending = false
-        hl.exec_cmd(D .. "agents launch-primary 2")
-        return
-      end
-      codex_tap_pending = true
-      universal_paste()
-      hl.timer(function()
-        codex_tap_pending = false
-      end, { timeout = 400, type = "oneshot" })
-    end)
-  end
 end
 
 if ALL then
