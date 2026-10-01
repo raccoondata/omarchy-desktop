@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# zoxide's best folders for some words, for the Super menu's search
+# (bar/modules/SuperMenu.qml): up to 3, home itself left out.
+#
+#   folder-search <word>...   one line each: path <TAB> branch <TAB> kind <TAB> repos
+#
+# branch: the git branch if the folder is in a repo ("-" when detached),
+# empty if not. kind: the project type from its marker files (in the folder,
+# else at its repo's top): python, rust, go, typescript, node, deno, ruby,
+# php, java, dotnet, elixir, dart, cpp, nix, docker; empty if none. repos:
+# how many git repos sit directly inside it (a folder of projects), 0 if none.
+
+command -v zoxide >/dev/null || exit 0
+
+kind_of() {
+  local d=$1
+  if [[ -f $d/pyproject.toml || -f $d/setup.py || -f $d/requirements.txt || -f $d/Pipfile ]]; then echo python
+  elif [[ -f $d/Cargo.toml ]]; then echo rust
+  elif [[ -f $d/go.mod ]]; then echo go
+  elif [[ -f $d/tsconfig.json ]]; then echo typescript
+  elif [[ -f $d/package.json ]]; then echo node
+  elif [[ -f $d/deno.json || -f $d/deno.jsonc ]]; then echo deno
+  elif [[ -f $d/Gemfile ]]; then echo ruby
+  elif [[ -f $d/composer.json ]]; then echo php
+  elif [[ -f $d/pom.xml || -f $d/build.gradle || -f $d/build.gradle.kts ]]; then echo java
+  elif compgen -G "$d/*.csproj" >/dev/null || compgen -G "$d/*.sln" >/dev/null; then echo dotnet
+  elif [[ -f $d/mix.exs ]]; then echo elixir
+  elif [[ -f $d/pubspec.yaml ]]; then echo dart
+  elif [[ -f $d/CMakeLists.txt || -f $d/meson.build ]]; then echo cpp
+  elif [[ -f $d/flake.nix || -f $d/default.nix ]]; then echo nix
+  elif [[ -f $d/Dockerfile || -f $d/compose.yaml || -f $d/docker-compose.yml ]]; then echo docker
+  fi
+}
+
+zoxide query --list -- "$@" 2>/dev/null | grep -vxF -- "$HOME" | head -n 3 | while IFS= read -r p; do
+  branch="" kind=""
+  if top=$(git -C "$p" rev-parse --show-toplevel 2>/dev/null); then
+    branch=$(git -C "$p" branch --show-current 2>/dev/null)
+    branch=${branch:--}
+    kind=$(kind_of "$p")
+    [[ -z $kind && $top != "$p" ]] && kind=$(kind_of "$top")
+  else
+    kind=$(kind_of "$p")
+  fi
+  repos=0
+  for g in "$p"/*/.git; do [[ -e $g ]] && repos=$((repos + 1)); done
+  printf '%s\t%s\t%s\t%s\n' "$p" "$branch" "$kind" "$repos"
+done

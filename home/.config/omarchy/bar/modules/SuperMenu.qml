@@ -63,8 +63,9 @@ Item {
 
   // ------------------------------------------------------------- folders
   // zoxide's best matches for what's typed (the folders you cd into most),
-  // as rows under the apps. Looked up a moment after typing stops; nothing
-  // without zoxide. Opening one tells zoxide, so the menu teaches it too.
+  // as rows under the apps, each marked if it's in a git repo (with its
+  // branch). Looked up a moment after typing stops; nothing without zoxide.
+  // Opening one tells zoxide, so the menu teaches it too.
   property var folderResults: []
   property string folderQuery: ""
   Timer {
@@ -74,7 +75,8 @@ Item {
       var q = menu.query.trim()
       if (q.length < 2) { menu.folderResults = []; return }
       folderProc.forQuery = q
-      folderProc.command = ["zoxide", "query", "--list", "--"].concat(q.split(/\s+/))
+      // path<TAB>branch<TAB>kind (~/.config/omarchy/folder-search).
+      folderProc.command = [taskbar.omarchyDir + "/folder-search"].concat(q.split(/\s+/))
       folderProc.running = true
     }
   }
@@ -84,13 +86,21 @@ Item {
     stdout: StdioCollector {
       onStreamFinished: {
         var home = Quickshell.env("HOME")
-        var paths = this.text.split("\n").filter(function(p) { return p !== "" && p !== home }).slice(0, 3)
+        var lines = this.text.split("\n").filter(function(l) { return l !== "" })
         menu.folderQuery = folderProc.forQuery
-        menu.folderResults = paths.map(function(p) {
+        menu.folderResults = lines.map(function(line) {
+          var f = line.split("\t")
+          var p = f[0], branch = f[1] || "", kind = f[2] || "", repos = parseInt(f[3], 10) || 0
           var cut = p.lastIndexOf("/")
           var parent = p.slice(0, cut) || "/"
-          return { kind: "folder", glyph: "", label: p.slice(cut + 1), path: p,
-                   detail: parent.indexOf(home) === 0 ? "~" + parent.slice(home.length) : parent }
+          var where = parent.indexOf(home) === 0 ? "~" + parent.slice(home.length) : parent
+          // The project's icon, else git's if it's a repo, else a folder of
+          // repos', else a folder; a repo's branch (or how many repos it
+          // holds) follows the place.
+          return { kind: "folder", label: p.slice(cut + 1), path: p, git: branch !== "", repos: repos, project: kind,
+                   glyph: menu.projectGlyphs[kind] || (branch !== "" ? "" : repos > 0 ? "" : ""),
+                   detail: branch !== "" ? where + "     " + (branch === "-" ? "detached" : branch)
+                         : repos > 0 ? where + "    " + repos + (repos === 1 ? " repo" : " repos") : where }
         })
       }
     }
@@ -98,21 +108,31 @@ Item {
 
   // What Enter / Shift+Enter / Ctrl+Enter (or click, with the same keys) do
   // on a folder row (settings superMenuFolderEnter/Shift/Ctrl).
-  readonly property var folderActionNames: ({ files: "Files", terminal: "Terminal", agent: "Agent", editor: "Editor", copy: "Copy path" })
-  function folderAction(how) {
+  // Nerd Font icons for folder-search's project kinds.
+  readonly property var projectGlyphs: ({ python: "\ue73c", rust: "\ue7a8", go: "\ue627", typescript: "\ue628", node: "\ue718",
+    deno: "\ue718", ruby: "\ue739", php: "\ue73d", java: "\ue738", dotnet: "\udb80\udf1b", elixir: "\ue62d", dart: "\ue798",
+    cpp: "\ue61d", nix: "\uf313", docker: "\uf308" })
+
+  // "smart": the agent in a git repo or a folder of repos, Files elsewhere.
+  readonly property var folderActionNames: ({ smart: "Smart", files: "Files", terminal: "Terminal", agent: "Agent", editor: "Editor", copy: "Copy path" })
+  // The action for a key on a row (smart resolved by whether it's a repo).
+  function folderAction(how, row) {
     var key = how === "ctrl" ? "superMenuFolderCtrl" : how === "shift" ? "superMenuFolderShift" : "superMenuFolderEnter"
-    var fallback = how === "ctrl" ? "agent" : how === "shift" ? "terminal" : "files"
+    var fallback = how === "ctrl" ? "files" : how === "shift" ? "terminal" : "smart"
     var v = String(taskbar.pref(key, fallback))
-    return folderActionNames[v] ? v : fallback
+    if (!folderActionNames[v]) v = fallback
+    return v === "smart" ? (row && (row.git || row.repos > 0) ? "agent" : "files") : v
   }
-  function folderActionLabel(how) {
-    var a = folderAction(how)
+  function folderActionLabel(how, row) {
+    var a = folderAction(how, row)
     return a === "agent" && askAgents.length ? askAgents[0].name : folderActionNames[a]
   }
-  readonly property string folderHint: "Enter: " + folderActionLabel("enter") + " · Shift+Enter: " + folderActionLabel("shift")
-    + " · Ctrl+Enter: " + folderActionLabel("ctrl")
+  function folderHint(row) {
+    return "Enter: " + folderActionLabel("enter", row) + " · Shift+Enter: " + folderActionLabel("shift", row)
+      + " · Ctrl+Enter: " + folderActionLabel("ctrl", row)
+  }
   function openFolderRow(r, how) {
-    var a = folderAction(how)
+    var a = folderAction(how, r)
     Util.execArgv(["zoxide", "add", "--", r.path])
     if (a === "files") Util.execArgv(["uwsm-app", "--", "nautilus", "--new-window", r.path])
     else if (a === "terminal") Util.execArgv(["setsid", "uwsm-app", "--", "xdg-terminal-exec", "--dir=" + r.path])
@@ -892,7 +912,9 @@ Item {
             id: askHint
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            readonly property var selectedExtra: menu.selected >= menu.tiles.length ? menu.extraResults[menu.selected - menu.tiles.length] : null
             text: menu.query.trim() === "" ? "type a question, or click for a new session"
+              : selectedExtra && selectedExtra.kind === "folder" ? ""      // Ctrl+Enter is the folder's then
               : "Ctrl+Enter to ask"
             color: Color.menu.text
             opacity: 0.45
@@ -1340,7 +1362,7 @@ property real live: 0
           width: parent.width
           readonly property var selectedExtra: menu.selected >= menu.tiles.length ? menu.extraResults[menu.selected - menu.tiles.length] : null
           text: menu.hoverDetail !== "" ? menu.hoverDetail
-            : selectedExtra && selectedExtra.kind === "folder" ? menu.folderHint
+            : selectedExtra && selectedExtra.kind === "folder" ? menu.folderHint(selectedExtra)
             : menu.query.length > 0
             ? "Enter opens (Shift: new window) · Ctrl+Enter asks an agent · + or Ctrl+P pins · Esc closes"
             : "Drag or Ctrl+Arrows to rearrange · +/− or Ctrl+P to pin · Shift: new window · type to find more"
