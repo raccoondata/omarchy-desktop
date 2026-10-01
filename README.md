@@ -51,12 +51,12 @@ back; your settings files stay).
   app's windows onto a workspace, laid out evenly. Files (and any app you
   choose) comes to you instead.
 - **Super menu** (double-tap Super, or Caps Lock): apps and folders (pinned,
-  and in named groups you make, fold and rearrange; each pinned folder can
-  set what its click, Shift+click and Ctrl+click do), search (with your
-  zoxide folders, marked by project type and git branch: Enter starts your
-  coding agent in a repo or a folder of repos, Files elsewhere; every key
-  configurable), now playing, a box to ask a coding agent, and lock /
-  restart / shut down.
+  and in named groups you make: blocks you place anywhere on the grid and
+  size in tiles, 2×2, 3×2, ...; each pinned folder can set what its click,
+  Shift+click and Ctrl+click do), search (with your zoxide folders, marked
+  by project type and git branch: Enter starts your coding agent in a repo
+  or a folder of repos, Files elsewhere; every key configurable), now
+  playing, a box to ask a coding agent, and lock / restart / shut down.
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
   and maximize buttons, hot corners.
