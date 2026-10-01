@@ -83,8 +83,10 @@ step 1 "Desktop files"
 # launcher and menu icons). They come first: without them nothing is
 # changed. Each sets itself up when the shell loads it. (docs/SPLIT.md)
 plugins_base="https://github.com/raccoondata"
-need_plugin() {  # need_plugin <id> <name> <repo>
-  local id="$1" name="$2" url="$plugins_base/$3.git" dir="$omarchy/plugins/$1"
+need_plugin() {  # need_plugin <id> <name> <repo> [widget]
+  # widget: a bar widget, placed by the bar step below rather than where
+  # `omarchy plugin enable` would put it.
+  local id="$1" name="$2" url="$plugins_base/$3.git" dir="$omarchy/plugins/$1" widget="${4:-}"
   if [[ ! -d $dir ]]; then
     # Adding also asks a running shell to look for it, which fails outside a
     # session: the plugin's folder (and it passing Omarchy's check) is what counts.
@@ -100,7 +102,8 @@ need_plugin() {  # need_plugin <id> <name> <repo>
     fi
   fi
   if ! jq -e --arg id "$id" 'any(.plugins[]?; .id == $id)' "$omarchy/shell.json" >/dev/null 2>&1; then
-    if omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable "$id" >/dev/null 2>&1; then
+    [[ -n $widget ]] && { omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; }
+    if [[ -z $widget ]] && omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable "$id" >/dev/null 2>&1; then
       echo "  turned on the $name plugin"
     elif [[ -f $omarchy/shell.json ]] && jq --arg id "$id" '.plugins = ((.plugins // []) + [{"id": $id}])' "$omarchy/shell.json" > "$omarchy/shell.json.tmp" 2>/dev/null; then
       # No shell running (not in a session): on at the next login.
@@ -116,6 +119,7 @@ need_plugin() {  # need_plugin <id> <name> <repo>
 [[ "$(conf_get line_icons)" == added && -z "$(conf_get plugin_line_icons)" ]] && conf_set plugin_line_icons added
 need_plugin desktop-core "Desktop Core" omarchy-desktop-core
 need_plugin line-icons "Line Icons" omarchy-line-icons
+need_plugin now-playing "Now Playing" omarchy-now-playing widget
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -224,8 +228,9 @@ if ! grep -q 'require("hypr.desktop")' "$hl"; then
   echo "  hyprland.lua loads hypr/desktop.lua"
 fi
 
-# The bar: the taskbar after the workspaces, now-playing after the clock (in
-# place of Omarchy's media widget).
+# The bar: the taskbar after the workspaces, Now Playing (the plugin) after
+# the clock, in place of Omarchy's media widget and of the desktop's old
+# now-playing module.
 shell="$omarchy/shell.json"
 [[ -f $shell ]] || cp /usr/share/omarchy/config/omarchy/shell.json "$shell"
 tmp="$(mktemp)"
@@ -236,7 +241,8 @@ jq '
       | if $i == null then . + [$entry] else .[:$i+1] + [$entry] + .[$i+1:] end);
   .bar.layout |= with_entries(.value |= map(select(.id != "omarchy.media")))
   | if has_id("taskbar") then . else after("left"; "omarchy.workspaces"; {"id": "taskbar", "type": "qml"}) end
-  | if has_id("nowplaying") then . else after("center"; "omarchy.clock"; {"id": "nowplaying", "type": "qml"}) end
+  | .bar.layout |= with_entries(.value |= map(if .id == "nowplaying" then {"id": "now-playing"} else . end))
+  | if has_id("now-playing") then . else after("center"; "omarchy.clock"; {"id": "now-playing"}) end
 ' "$shell" > "$tmp" && if ! cmp -s "$tmp" "$shell"; then
   cp "$shell" "$shell.bak.$(date +%s)"
   mv "$tmp" "$shell"

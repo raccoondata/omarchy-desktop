@@ -34,7 +34,7 @@ sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hyp
 shell="$omarchy/shell.json"
 if [[ -f $shell ]]; then
   tmp="$(mktemp)"
-  jq '.bar.layout |= with_entries(.value |= map(select(.id != "taskbar" and .id != "nowplaying")))' "$shell" > "$tmp" && mv "$tmp" "$shell"
+  jq '.bar.layout |= with_entries(.value |= map(select(.id != "taskbar" and .id != "nowplaying" and .id != "now-playing")))' "$shell" > "$tmp" && mv "$tmp" "$shell"
 fi
 menu="$omarchy/extensions/omarchy-menu.jsonc"
 [[ -f $menu ]] && sed -i -E '/^\s*"(system\.lock|system\.reboot-windows|setup\.hotcorners|setup\.taskbar|update\.desktop)":/d' "$menu"
@@ -88,7 +88,7 @@ rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprlan
 rm -f "$HOME/.local/bin/omarchy-desktop"
 # The desktop's plugins: removed if the desktop added them; ones you added
 # yourself stay.
-for id in line-icons desktop-core; do
+for id in now-playing line-icons desktop-core; do
   dir="$HOME/.config/omarchy/plugins/$id"
   key="plugin_${id//-/_}"
   mark="$(sed -n "s/^$key=//p" "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"

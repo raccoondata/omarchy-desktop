@@ -158,6 +158,7 @@ plugin_check() {  # plugin_check <id> <name> <file it must have> <what breaks> <
 }
 plugin_check desktop-core "Desktop Core" model/Windows.qml "the taskbar and Super menu don't load" omarchy-desktop-core
 plugin_check line-icons "Line Icons" lib/LineIcons.js "the taskbar has no icons" omarchy-line-icons
+plugin_check now-playing "Now Playing" NowPlaying.qml "no song on the bar" omarchy-now-playing
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi

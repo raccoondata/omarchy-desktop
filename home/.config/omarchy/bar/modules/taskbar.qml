@@ -58,6 +58,8 @@ BarWidget {
   // each terminal, recently used, attention, the agents): the desktop-core
   // plugin's model/Windows.qml.
   Windows { id: core }
+  // Desktop Core's shared settings: the equalizer style and battery saving.
+  PluginSettings { id: shared; plugin: "desktop-core" }
   // Where the scripts and state files the taskbar uses live.
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"
   readonly property int maxLabelWidth: Number(pref("maxLabelWidth", 120))
@@ -69,14 +71,14 @@ BarWidget {
   readonly property bool hoverWorkspacesEnabled: pref("hoverWorkspaces", true) !== false
   readonly property bool audioMarks: pref("audioMarks", true) !== false
   // Battery saver for the equalizers and effects (AudioLevels.saving).
-  readonly property bool mediaSaving: AudioLevels.saving(String(pref("mediaSaver", "battery")), UPower.onBattery,
+  readonly property bool mediaSaving: AudioLevels.saving(String(shared.value("mediaSaver", "battery")), UPower.onBattery,
                                                          PowerProfiles.profile === PowerProfile.PowerSaver)
   // Minimize/restore outline and app open/close pixel effects.
   readonly property bool motionEffects: pref("motionEffects", true) !== false
   // spectrum | wave | embers | ripple (Equalizer.qml)
   // A style that's since been removed falls back to spectrum.
   readonly property string equalizerStyle: {
-    var v = String(pref("equalizerStyle", "spectrum"))
+    var v = String(shared.value("equalizerStyle", "spectrum"))
     return v === "shuffle" || Visuals.values(Visuals.eqStyles).indexOf(v) !== -1 ? v : "spectrum"
   }
   readonly property string minimizedWorkspace: "special:scratchpad"

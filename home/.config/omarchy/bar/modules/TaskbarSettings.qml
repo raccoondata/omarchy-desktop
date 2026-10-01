@@ -7,6 +7,7 @@ import qs.Ui
 import "../../plugins/desktop-core/lib/Visuals.js" as Visuals
 import "../../plugins/desktop-core/lib/WindowStatus.js" as TaskbarStatus
 import "../../plugins/desktop-core/ui"
+import "../../plugins/desktop-core/model"
 import "../../plugins/desktop-core/media"
 
 // Taskbar settings window: Super+Space > Setup > Taskbar, or a taskbar icon's
@@ -28,6 +29,9 @@ Item {
   // no keyboard focus, so it can't take anyone's typing.
   property bool previewOnly: false
   property string tab: "taskbar"
+  // Desktop Core's settings, shared by every plugin: the default equalizer
+  // style and battery saving.
+  PluginSettings { id: shared; plugin: "desktop-core" }
   // Search (the box in the header): what's typed, and every setting found
   // in the tabs (built on the first search; see buildIndex).
   property string query: ""
@@ -1565,7 +1569,6 @@ Item {
         model: [
           { place: "Taskbar", style: "iconsTaskbar", styleDefault: "line", label: "Taskbar and switcher", description: "the taskbar, window previews and Super+Tab" },
           { place: "SuperMenu", style: "iconsSuperMenu", styleDefault: "app", label: "Super menu", description: "the app grid" },
-          { place: "NowPlaying", style: "iconsNowPlaying", styleDefault: "app", label: "Now playing", description: "the card and its volume mixer" }
         ]
         Column {
         id: placeCol
@@ -1649,74 +1652,13 @@ Item {
           ToggleSwitch { checked: settings.taskbar.audioMarks; onToggled: settings.set("audioMarks", !checked) }
         }
         SettingRow {
-          label: "Bar, by the song"
-          description: "a small one next to the now-playing title"
-          Dropdown {
-            width: Style.space(180)
-            showLabel: false
-            fontFamily: Style.font.menuFamily
-            options: [{ value: "off", label: "Off" }, { value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles)
-            value: visTab.prefs.nowPlayingBarEq || "off"
-            onChanged: function(v) { settings.set("nowPlayingBarEq", v) }
-          }
-        }
-        SettingRow {
-          label: "Card header"
-          description: "by NOW PLAYING in the card, when the card visualizer is off; click it to change it"
-          Dropdown {
-            width: Style.space(180)
-            showLabel: false
-            fontFamily: Style.font.menuFamily
-            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
-            value: visTab.prefs.nowPlayingHeaderEq || "same"
-            onChanged: function(v) { settings.set("nowPlayingHeaderEq", v) }
-          }
-        }
-      SettingRow {
-        label: "Card visualizer"
-        description: "under the art; click it to step through them (right-click: back)"
-        Dropdown {
-          width: Style.space(180)
-          showLabel: false
-          fontFamily: Style.font.menuFamily
-          options: Visuals.cardVisuals()
-          value: visTab.prefs.nowPlayingVisual || (visTab.prefs.nowPlayingVisualizer === false ? "off" : "pixel")
-          onChanged: function(v) { settings.set("nowPlayingVisual", v) }
-        }
-      }
-        SettingRow {
-          visible: (visTab.prefs.nowPlayingVisual || "pixel") === "pixel"
-          label: "Card equalizer style"
-          description: "for the card's pixel equalizer"
-          Dropdown {
-            width: Style.space(180)
-            showLabel: false
-            fontFamily: Style.font.menuFamily
-            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles)
-            value: visTab.prefs.nowPlayingCardEq || "same"
-            onChanged: function(v) { settings.set("nowPlayingCardEq", v) }
-          }
-        }
-      SettingRow {
-        label: "Album art effect"
-        description: "moves with the music; right-click the art to step through them"
-        Dropdown {
-          width: Style.space(180)
-          showLabel: false
-          fontFamily: Style.font.menuFamily
-          options: Visuals.artEffects
-          value: visTab.prefs.nowPlayingArtFx || "off"
-          onChanged: function(v) { settings.set("nowPlayingArtFx", v) }
-        }
-      }
-        SettingRow {
           label: "Super menu equalizer"
           description: "by the song in the Super menu"
           Dropdown {
             width: Style.space(180)
             showLabel: false
             fontFamily: Style.font.menuFamily
-            options: [{ value: "same", label: "Same as taskbar" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
+            options: [{ value: "same", label: "Default" }].concat(visTab.eqStyles).concat([{ value: "off", label: "Off" }])
             value: visTab.prefs.superMenuEq || "same"
             onChanged: function(v) { settings.set("superMenuEq", v) }
           }
@@ -1734,7 +1676,7 @@ Item {
           }
         }
 
-        Section { title: "Battery" }
+        Section { title: "Battery (every plugin)" }
 
         SettingRow {
           label: "Save power"
@@ -1743,10 +1685,10 @@ Item {
             width: Style.space(180)
             showLabel: false
             fontFamily: Style.font.menuFamily
-            options: [{ value: "battery", label: "On battery or power saver" }, { value: "saver", label: "In power saver only" },
+            options: [{ value: "battery", label: "On battery or saver" }, { value: "saver", label: "Power saver only" },
                       { value: "off", label: "Never" }]
-            value: visTab.prefs.mediaSaver || "battery"
-            onChanged: function(v) { settings.set("mediaSaver", v) }
+            value: shared.value("mediaSaver", "battery")
+            onChanged: function(v) { shared.set("mediaSaver", v) }
           }
         }
       }
@@ -1755,61 +1697,13 @@ Item {
         width: parent.columnWidth
         spacing: Style.space(6)
 
-        Section { title: "Taskbar style" }
+        Section { title: "Equalizer style (the taskbar's, and Default everywhere)" }
 
-        Grid {
-          columns: 3
-          columnSpacing: Style.space(8)
-          rowSpacing: Style.space(8)
-          readonly property real tileWidth: (parent.width - 2 * columnSpacing) / 3
-
-          Repeater {
-            model: visTab.eqStyles
-
-            Rectangle {
-              id: swatch
-              required property var modelData
-              readonly property bool current: settings.taskbar.equalizerStyle === modelData.value
-
-              width: parent.tileWidth
-              height: Style.space(76)
-              radius: Style.cornerRadius
-              color: current ? Color.menu.selectedBackground : (swatchMouse.containsMouse ? Util.alpha(Color.menu.text, 0.05) : "transparent")
-              border.width: current ? 2 : 1
-              border.color: current ? Color.accent : Util.alpha(Color.menu.text, 0.14)
-
-              Equalizer {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: Style.space(10)
-                columns: 14
-                rows: 9
-                pixel: 3
-                gap: 1
-                playing: settings.opened
-                style: swatch.modelData.value
-                opacity: swatch.current ? 0.9 : 0.55
-              }
-
-              Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Style.space(8)
-                text: swatch.modelData.label
-                color: swatch.current ? Color.menu.selectedText : Color.menu.text
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              MouseArea {
-                id: swatchMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: settings.set("equalizerStyle", swatch.modelData.value)
-              }
-            }
-          }
+        EqualizerStylePicker {
+          width: parent.width
+          value: String(shared.value("equalizerStyle", "spectrum"))
+          playing: settings.opened
+          onPicked: function(v) { shared.set("equalizerStyle", v) }
         }
       }
     }
@@ -1819,59 +1713,22 @@ Item {
     id: nowPlayingTab
 
     Column {
-      id: npTab
       width: settings.cardWidth / 2
       spacing: Style.space(6)
-      readonly property var prefs: settings.taskbar.prefs || ({})
 
-      Section { title: "Now playing (bar center)" }
+      Section { title: "Now playing" }
 
       SettingRow {
-        label: "Left-click"
-        description: "right-click does the other one; middle-click skips the track"
-        ButtonGroup {
-          options: [{ value: "card", label: "Opens the card" }, { value: "play", label: "Play / pause" }]
-          value: npTab.prefs.nowPlayingClick === "play" ? "play" : "card"
+        label: "Now Playing"
+        description: "the song on the bar and its card: the Now Playing plugin's own settings"
+        Button {
+          text: "Open"
           foreground: Color.menu.text
-          background: Color.menu.background
           fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("nowPlayingClick", v) }
-        }
-      }
-      SettingRow {
-        label: "Scrolling over it"
-        description: "the app's own volume, not the system's"
-        ButtonGroup {
-          readonly property string mode: npTab.prefs.nowPlayingScroll || "volume"
-          options: [{ value: "volume", label: "Volume" }, { value: "track", label: "Changes track" }, { value: "off", label: "Nothing" }]
-          value: mode
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("nowPlayingScroll", v) }
-        }
-      }
-      SettingRow {
-        label: "Volume while scrolling"
-        description: (npTab.prefs.nowPlayingVolume || "center") === "side" ? "a bar, the percent at the right" : "the percent in the middle, the level growing out both sides"
-        ButtonGroup {
-          options: [{ value: "center", label: "Centered" }, { value: "side", label: "Bar + percent" }]
-          value: (npTab.prefs.nowPlayingVolume || "center") === "side" ? "side" : "center"
-          foreground: Color.menu.text
-          background: Color.menu.background
-          fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) { settings.set("nowPlayingVolume", v) }
-        }
-      }
-      SettingRow {
-        label: "Title on the bar"
-        description: "off: just the album art"
-        ToggleSwitch {
-          checked: npTab.prefs.nowPlayingTitle !== false
-          onToggled: settings.set("nowPlayingTitle", !checked)
+          onClicked: {
+            settings.close()
+            Util.execArgv(["omarchy-shell", "shell", "summon", "now-playing", "{}"])
+          }
         }
       }
     }
