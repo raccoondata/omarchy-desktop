@@ -23,6 +23,7 @@
 .config/omarchy/lock-guard
 .config/omarchy/lock-on-autologin
 .config/omarchy/mouse-setting
+.config/omarchy/new-app-icon
 .config/omarchy/reboot-to-windows
 .config/omarchy/remote-screen
 .config/omarchy/safe-mode-agents
