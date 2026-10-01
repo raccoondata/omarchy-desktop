@@ -5,7 +5,7 @@ import "AudioLevels.js" as AudioLevels
 // The now-playing card's visualizer scenes, after Windows Media Player's,
 // drawn on the GPU by shaders/visualizer.frag. The CPU only advances `tick`
 // (15 a second) while `playing`, so a scene costs the same as a still one.
-//   tunnel  kaleido  starfield  battery  lava  lissajous  aurora
+//   tunnel  kaleido  starfield  battery  lava  lissajous  aurora  woods
 ShaderEffect {
   id: vis
 
@@ -15,7 +15,7 @@ ShaderEffect {
   property color colorA: Color.accent
   property color colorB: Color.foreground
 
-  readonly property var scenes: ["tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora"]
+  readonly property var scenes: ["tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "woods"]
 
   // The shader's inputs (names match shaders/visualizer.frag).
   property real tick: Math.floor(Math.random() * 1000)

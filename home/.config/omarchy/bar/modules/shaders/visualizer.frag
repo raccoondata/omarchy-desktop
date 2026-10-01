@@ -11,6 +11,8 @@
 //   4 lava        blobs that merge and part
 //   5 lissajous   a glowing looping curve ("Bars and Waves")
 //   6 aurora      ribbons of light waving
+//   7 woods       walking through a digital forest: pines in layers, fog,
+//                 fireflies that flare on the kicks
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -100,6 +102,40 @@ void main() {
         }
         v = smoothstep(0.06 + 0.05 * b, 0.0, d) + 0.35 * smoothstep(0.25, 0.0, d);
         mixB = smoothstep(0.03, 0.0, d);
+    } else if (s == 7) {  // woods
+        vec2 uv = px / vec2(w, h);          // 0..1, y down
+        float sky = 0.18 * (1.0 - uv.y) + 0.05;
+        v = sky;
+        mixB = 1.0;
+        float walk = t * (0.35 + 0.8 * b);
+        // Far to near: each layer's pines, lit by fog behind them.
+        for (int i = 0; i < 3; i++) {
+            float L = float(i);
+            float scale = 7.0 - L * 2.2;                     // trees per screen width
+            float x = uv.x * scale * (w / h) * 0.5 + walk * (0.08 + 0.12 * L) + L * 13.0;
+            float cell = floor(x);
+            float f = fract(x) - 0.5;
+            float hgt = 0.35 + 0.2 * L + 0.25 * hash(vec2(cell, L));
+            float y = 1.0 - uv.y;                              // up from the ground
+            float trunk = step(abs(f), 0.03 + 0.02 * L) * step(y, hgt * 0.35);
+            float canopy = step(abs(f), (hgt - y) * (0.55 + 0.1 * L)) * step(hgt * 0.25, y) * step(y, hgt);
+            float tree = max(trunk, canopy) * step(hash(vec2(cell, L + 4.0)), 0.75);
+            // A tree covers what's behind it: darker the nearer it is.
+            v = mix(v, 0.04 + 0.06 * (2.0 - L), tree);
+            mixB = mix(mixB, 0.0, tree);
+            // Fog between layers.
+            v += 0.05 * (1.0 - y) * (1.0 - tree) * (2.0 - L) * 0.5;
+        }
+        // Fireflies drifting up, flaring on the kicks.
+        vec2 fcell = floor(uv * vec2(18.0, 8.0) + vec2(walk * 0.3, -t * 0.08));
+        vec2 ff = fract(uv * vec2(18.0, 8.0) + vec2(walk * 0.3, -t * 0.08)) - 0.5;
+        if (hash(fcell) > 0.86) {
+            float glow = smoothstep(0.18, 0.0, length(ff)) * (0.5 + 0.5 * sin(t * 3.0 + hash(fcell) * 20.0));
+            v = max(v, glow * (0.6 + 1.2 * b));
+            mixB = mix(mixB, 0.0, glow);
+        }
+        // Digital: faint scanlines.
+        v *= 0.9 + 0.1 * sin(px.y * 1.6);
     } else {  // aurora
         for (int i = 0; i < 3; i++) {
             float k = float(i);

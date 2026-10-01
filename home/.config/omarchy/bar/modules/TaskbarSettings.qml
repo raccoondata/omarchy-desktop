@@ -1100,7 +1100,7 @@ Item {
                     { value: "ripple", label: "Ripple" }, { value: "scope", label: "Scope" }, { value: "mist", label: "Mist" },
                     { value: "fire", label: "Fire" }, { value: "radar", label: "Radar" }, { value: "swirl", label: "Swirl" },
                     { value: "plasma", label: "Plasma" }, { value: "rain", label: "Rain" }, { value: "flashlights", label: "Flashlights" },
-                    { value: "shuffle", label: "Shuffle" }]
+                    { value: "woods", label: "Woods" }, { value: "shuffle", label: "Shuffle" }]
 
       Column {
         width: parent.columnWidth
@@ -1146,7 +1146,8 @@ Item {
           fontFamily: Style.font.menuFamily
           options: [{ value: "pixel", label: "Pixel equalizer" }, { value: "tunnel", label: "Tunnel" }, { value: "kaleido", label: "Kaleidoscope" },
                     { value: "starfield", label: "Starfield" }, { value: "battery", label: "Battery" }, { value: "lava", label: "Lava" },
-                    { value: "lissajous", label: "Lissajous" }, { value: "aurora", label: "Aurora" }, { value: "off", label: "Off" }]
+                    { value: "lissajous", label: "Lissajous" }, { value: "aurora", label: "Aurora" }, { value: "woods", label: "Digital woods" },
+                    { value: "off", label: "Off" }]
           value: visTab.prefs.nowPlayingVisual || (visTab.prefs.nowPlayingVisualizer === false ? "off" : "pixel")
           onChanged: function(v) { settings.set("nowPlayingVisual", v) }
         }
@@ -1232,6 +1233,7 @@ Item {
               { value: "plasma", label: "Plasma" },
               { value: "rain", label: "Rain" },
               { value: "flashlights", label: "Flashlights" },
+              { value: "woods", label: "Woods" },
               { value: "shuffle", label: "Shuffle" }
             ]
 

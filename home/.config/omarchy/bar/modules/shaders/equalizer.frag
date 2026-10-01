@@ -6,6 +6,7 @@
 // Compile: shaders/build (qsb). Styles, by index:
 //   0 spectrum  1 wave  2 embers  3 ripple  4 scope  5 mist
 //   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 flashlights
+//   12 woods
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -91,6 +92,28 @@ float radarBeam(float c, float r, float a) {
     float off = abs(d.x * dir.y - d.y * dir.x);
     if (along > 0.0 && off < 0.09 + 0.06 * len) return 1.0;
     return len > 0.82 ? 0.18 : 0.0;
+}
+
+// Woods: one layer of pines scrolling past (0 far .. 2 near): how lit this
+// pixel is by that layer's trees.
+float woodsLayer(float c, float r, float t, int layer) {
+    float L = float(layer);
+    float speed = 0.12 + 0.22 * L;               // near layers pass quicker
+    float density = 0.09 + 0.03 * L;
+    float x = c + t * speed + L * 37.0;
+    float wx = floor(x);
+    float lit = 0.0;
+    for (int dx = -2; dx <= 2; dx++) {
+        float tree = wx + float(dx);
+        if (hash(vec2(tree, L * 11.0 + 3.0)) > density) continue;
+        float h = rowCount * (0.45 + 0.15 * L + 0.35 * hash(vec2(tree, L + 5.0)));
+        float fromTrunk = abs(wx - tree);
+        // The trunk, then a pine canopy widening toward the ground.
+        if (fromTrunk < 0.5 && r < h) lit = 1.0;
+        float canopyBase = h * 0.3;
+        if (r >= canopyBase && r < h && fromTrunk <= floor((h - r) * 0.28 + 0.3)) lit = max(lit, 0.8);
+    }
+    return lit;
 }
 
 float brightness(float c, float r, float t, int s) {
@@ -190,6 +213,29 @@ float brightness(float c, float r, float t, int s) {
         // Now and then one flickers, like a torch with a loose battery.
         float flick = hash(vec2(floor(t * 0.5), 3.0)) > 0.94 ? 0.35 : 1.0;
         return b * flick * (isLive() ? 0.55 + 0.9 * bass : 1.0);
+    }
+    if (s == 12) {  // woods: walking through a pixel forest (faster when louder)
+        float b = 0.0;
+        for (int k = 0; k < 3; k++) {
+            float lit = woodsLayer(c, r, t, k);
+            if (lit > 0.0) {
+                float tone = 0.18 + 0.32 * float(k);          // far dim, near bright
+                // The canopies glow with the music at their column.
+                if (isLive() && lit < 1.0) tone *= 0.7 + 1.2 * band(c);
+                b = lit * tone;                                // nearer layers cover farther ones
+            }
+        }
+        // The path underfoot, scrolling.
+        if (r == 0.0 && b == 0.0) b = mod(floor(c + t * 0.6), 3.0) == 0.0 ? 0.22 : 0.08;
+        // Data motes rising like fireflies; more on the beat.
+        float born = floor(t / 3.0);
+        for (int k = 0; k < 3; k++) {
+            float seed = born - float(k);
+            float mx = floor(hash(vec2(seed, 1.7)) * cols);
+            float chance = isLive() ? 0.35 + 1.4 * bass : 0.55;
+            if (hash(vec2(seed, 9.1)) < chance && c == mx && r == floor(1.0 + (t / 3.0 - seed) * 1.5)) b = max(b, 1.0);
+        }
+        return min(b, 1.0);
     }
     if (s == 10) {  // rain: drops falling a row a tick, with a short trail
         float b = 0.0;
