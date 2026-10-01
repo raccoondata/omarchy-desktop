@@ -115,12 +115,14 @@ mv "$list_new" "$state/installed-files"
 done
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$repo/bin/omarchy-desktop" "$HOME/.local/bin/omarchy-desktop"
-# The taskbar-icons skill for Codex and other agents too (~/.agents/skills;
-# Claude Code reads ~/.claude/skills).
-if [[ -d $HOME/.agents/skills ]] || command -v codex >/dev/null; then
-  mkdir -p "$HOME/.agents/skills"
-  [[ -e $HOME/.agents/skills/taskbar-icons ]] || ln -s "$HOME/.claude/skills/taskbar-icons" "$HOME/.agents/skills/taskbar-icons"
-fi
+# The taskbar-icons skill for every agent, where Omarchy puts its own skills:
+# ~/.agents/skills (shared), Codex, Pi, Hermes (each only if it's set up;
+# Claude Code reads ~/.claude/skills, where the skill itself lives).
+for d in "$HOME/.agents/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills" "$HOME/.hermes/skills"; do
+  [[ -d $(dirname "$d") || $d == "$HOME/.agents/skills" ]] || continue
+  mkdir -p "$d"
+  [[ -e $d/taskbar-icons ]] || ln -s "$HOME/.claude/skills/taskbar-icons" "$d/taskbar-icons"
+done
 gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || true   # the icon font
 # Omarchy's menu with our icons (Taskbar & Desktop > Icons): refresh it, as
