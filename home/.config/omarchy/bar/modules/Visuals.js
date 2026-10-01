@@ -47,11 +47,8 @@ var scenes = [
 var artEffects = [
   { value: "off", label: "Off" },
   { value: "glitch", label: "Glitch" },
-  { value: "chroma", label: "Chroma" },
-  { value: "pixel", label: "Pixelate" },
   { value: "crt", label: "CRT" },
   { value: "melt", label: "Melt" },
-  { value: "solar", label: "Solar" },
   { value: "datamosh", label: "Datamosh" },
   { value: "tear", label: "Tear" },
   { value: "sort", label: "Pixel sort" },
