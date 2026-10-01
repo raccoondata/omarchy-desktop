@@ -16,20 +16,18 @@
 //   4 lava        blobs that merge and part, each swelling with a band
 //   5 lissajous   a looping curve ("Bars and Waves") bent by the spectrum
 //   6 aurora      ribbons of light, lit across the width by the spectrum
-//   7 woods       walking through a digital forest: pines in layers, fog,
-//                 the spectrum glowing in the grass, fireflies flaring
-// Scenes 0-7 get a glitch layer on top (main), all from the music, none in
+// Scenes 0-6 get a glitch layer on top (main), all from the music, none in
 // silence: slices torn on the hits, a ghost as far as the bass swells, blocks
 // flipping on the kicks, scanlines.
 // The glitch family:
-//   8 glitch      a spectrum torn into slices that jump on the kicks, split
+//   7 glitch      a spectrum torn into slices that jump on the kicks, split
 //                 into two colours, with blocks flipping and dropping out
-//   9 signal      signal loss: a waveform built from the bands (each wave
+//   8 signal      signal loss: a waveform built from the bands (each wave
 //                 as tall as its band, travelling only while it plays),
 //                 tearing, rolling on the kicks, lost in snow when quiet
-//   10 blocks     macroblocks: the spectrum as compressed-video blocks,
+//   9 blocks      macroblocks: the spectrum as compressed-video blocks,
 //                 moshed sideways and smeared, more so on the bass
-//   11 sorted     pixel sort: streaks dripping from the top, each as long
+//   10 sorted     pixel sort: streaks dripping from the top, each as long
 //                 as its band
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -182,46 +180,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         }
         v = smoothstep(0.05 + 0.08 * pm, 0.0, d) + (0.15 + 0.6 * loud) * smoothstep(0.25, 0.0, d);
         mixB = smoothstep(0.03, 0.0, d);
-    } else if (s == 7) {  // woods
-        vec2 uv = px / vec2(w, h);          // 0..1, y down
-        float sky = 0.18 * (1.0 - uv.y) + 0.05;
-        v = sky;
-        mixB = 1.0;
-        float walk = t * (0.35 + 0.5 * loud);
-        // Far to near: each layer's pines, lit by fog behind them.
-        for (int i = 0; i < 3; i++) {
-            float L = float(i);
-            float scale = 7.0 - L * 2.2;                     // trees per screen width
-            float x = uv.x * scale * (w / h) * 0.5 + walk * (0.08 + 0.12 * L) + L * 13.0;
-            float cell = floor(x);
-            float f = fract(x) - 0.5;
-            // Trees stretch with their band.
-            float hgt = (0.35 + 0.2 * L + 0.25 * hash(vec2(cell, L))) * (0.6 + 0.7 * spec(hash(vec2(cell, L + 9.0)), t));
-            float y = 1.0 - uv.y;                              // up from the ground
-            float trunk = step(abs(f), 0.03 + 0.02 * L) * step(y, hgt * 0.35);
-            float canopy = step(abs(f), (hgt - y) * (0.55 + 0.1 * L)) * step(hgt * 0.25, y) * step(y, hgt);
-            float tree = max(trunk, canopy) * step(hash(vec2(cell, L + 4.0)), 0.75);
-            // A tree covers what's behind it: darker the nearer it is.
-            v = mix(v, 0.04 + 0.06 * (2.0 - L), tree);
-            mixB = mix(mixB, 0.0, tree);
-            // Fog between layers.
-            v += (0.01 + 0.2 * loud) * (1.0 - y) * (1.0 - tree) * (2.0 - L) * 0.5;
-        }
-        // Digital grass along the ground: the spectrum, in pixel steps.
-        float grass = ceil(spec(uv.x, t) * 8.0) / 8.0 * 0.16;
-        float gy = 1.0 - uv.y;
-        if (gy < grass) { v = max(v, 0.35 + 0.5 * gy / max(grass, 0.01)); mixB = 0.0; }
-        // Fireflies drifting up, flaring on the kicks.
-        vec2 fcell = floor(uv * vec2(18.0, 8.0) + vec2(walk * 0.3, -t * 0.08));
-        vec2 ff = fract(uv * vec2(18.0, 8.0) + vec2(walk * 0.3, -t * 0.08)) - 0.5;
-        if (hash(fcell) > 0.86) {
-            float glow = smoothstep(0.18, 0.0, length(ff)) * (0.5 + 0.5 * sin(t * 3.0 + hash(fcell) * 20.0));
-            v = max(v, glow * (0.4 + 0.8 * pm + 0.8 * b));
-            mixB = mix(mixB, 0.0, glow);
-        }
-        // Digital: faint scanlines.
-        v *= 0.9 + 0.1 * sin(px.y * 1.6);
-    } else if (s == 8) {  // glitch
+    } else if (s == 7) {  // glitch
         vec2 uv = px / vec2(w, h);
         float slice = floor(uv.y * 12.0);
         float k = floor(tick / 2.0);
@@ -250,7 +209,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         mixB = ghost > lead ? 1.0 : 0.0;
         if (shift != 0.0) mixB = 1.0 - mixB;                          // torn slices swap colours
         v *= 0.82 + 0.18 * step(0.5, fract(px.y / (grainPx * 2.0)));  // scanlines
-    } else if (s == 9) {  // signal loss
+    } else if (s == 8) {  // signal loss
         vec2 uv = px / vec2(w, h);
         float k = floor(tick);
         float roll = b * 0.35 * (hash(vec2(k, 2.0)) - 0.5);           // vertical hold slips on a kick
@@ -269,7 +228,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         v = max(max(line, ghost), noise);
         mixB = ghost > line ? 1.0 : (line > noise ? 0.0 : 1.0);
         if (tear != 0.0) v *= 0.75;
-    } else if (s == 10) {  // macroblocks
+    } else if (s == 9) {  // macroblocks
         vec2 uv = px / vec2(w, h);
         vec2 grid = vec2(floor(clamp(w / h * 6.0, 12.0, 40.0)), 6.0);
         vec2 cell = floor(uv * grid);
@@ -292,7 +251,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         v = on * pat * edge * (0.45 + 0.55 * (row + 1.0) / grid.y);
         mixB = moshed ? 1.0 : 0.0;
         if (hash(cell + floor(tick / 12.0) * 3.1) > 1.0 - 0.03 * spec(0.85, t)) { v = max(v, 0.7 * edge); mixB = 1.0; }   // stuck, on the treble
-    } else if (s == 11) {  // pixel sort
+    } else if (s == 10) {  // pixel sort
         vec2 uv = px / vec2(w, h);
         float colW = grainPx * 2.0;
         float col = floor(px.x / colW);
@@ -329,7 +288,7 @@ void main() {
     float loud = live > 0.5 ? loudness : 0.45;
     int s = int(sceneIndex + 0.5);
     vec2 o;
-    if (s >= 8) {
+    if (s >= 7) {
         o = scene(px, s, t, b, pm, loud);   // the glitch family: glitched already
     } else {
         // The glitch layer over the older scenes, all of it from the music

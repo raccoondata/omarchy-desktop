@@ -7,7 +7,7 @@ import "Visuals.js" as Visuals
 // drawn on the GPU by shaders/visualizer.frag, following the music (cava, via
 // AudioLevels.js). The CPU only hands over the spectrum and advances `tick`
 // (15 a second) while `playing`, so a scene costs the same as a still one.
-//   tunnel  kaleido  starfield  battery  lava  lissajous  aurora  woods
+//   tunnel  kaleido  starfield  battery  lava  lissajous  aurora
 //   glitch  signal  blocks  sorted (the glitch family)
 ShaderEffect {
   id: vis
