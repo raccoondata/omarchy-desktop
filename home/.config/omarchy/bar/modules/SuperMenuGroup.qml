@@ -57,6 +57,7 @@ Item {
         else block.owner.endBlock()
       }
       onCentroidChanged: if (active) block.owner.updateBlock(centroid.scenePosition)
+      onCanceled: block.owner.cancelDrag()
     }
 
     Text {

@@ -152,6 +152,7 @@ Rectangle {
       tile.owner.dragPoint = centroid.scenePosition
       tile.owner.updateDrop(centroid.scenePosition)
     }
+    onCanceled: tile.owner.cancelDrag()
   }
 
   // Take it out of this grid (Frequent), in the other corner.
