@@ -66,7 +66,7 @@ back; your settings files stay).
   your monitor, a Bluetooth device: click to switch); scroll for volume.
   Visualizers after Windows Media Player's (pixel equalizers, and scenes
   like Tunnel, Battery, Lava) and album-art effects (Glitch, CRT, Melt...):
-  right-click the art for the next visualizer, middle-click for the next
+  click the visualizer for the next one, right-click the art for the next
   effect; Taskbar & Desktop > Media picks them per place. They follow the
   music (its spectrum, from cava), are drawn on the GPU, and only run while
   something plays; on battery or in power saver they rest (equalizers flat,
