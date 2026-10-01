@@ -701,11 +701,10 @@ Item {
   // A block's own icon style (over the Icons setting): stepped from its ⋯.
   readonly property var iconStyleNames: ({ "": "default", line: "line", brand: "coloured", palette: "theme-coloured",
                                            original: "the apps' own", shade: "in the group's shade" })
-  function cycleIcons(sec) {
+  function setIcons(sec, style) {
     var secs = snapshot()
     if (sec < 0 || sec >= secs.length) return
-    var order = ["", "line", "brand", "palette", "original"].concat(secs[sec].shade ? ["shade"] : [])
-    secs[sec].icons = order[(order.indexOf(secs[sec].icons || "") + 1) % order.length]
+    secs[sec].icons = style || ""
     commit(secs)
   }
 
@@ -885,10 +884,16 @@ Item {
     if (!e) return []
     // A block's ⋯: its shade; for a group, rename and delete too.
     if (e.blockMenu !== undefined) {
-      var cur = sections[e.blockMenu] ? sections[e.blockMenu].icons || "" : ""
-      var list = [{ label: "Shade", act: "shades", sec: e.blockMenu, swatches: true },
-                  { label: "Icons:  " + iconStyleNames[cur] + (cur === "" ? " (the Icons setting)" : ""), act: "icons", sec: e.blockMenu }]
-      if (sections[e.blockMenu] && sections[e.blockMenu].group) {
+      var block = sections[e.blockMenu] || {}
+      var cur = block.icons || ""
+      var list = [{ label: "Shade", act: "shades", sec: e.blockMenu, swatches: true }]
+      // Its icons: one line per style, the current one ticked.
+      ;["", "line", "brand", "palette", "original"].concat(block.shade ? ["shade"] : []).forEach(function(style, i) {
+        list.push({ label: (i === 0 ? "Icons:  " : "            ") + iconStyleNames[style]
+                    + (style === "" ? " (the Icons setting)" : "") + (style === cur ? "   \u2713" : ""),
+                    act: "icons", sec: e.blockMenu, style: style, gap: i === 0 })
+      })
+      if (block.group) {
         list.push({ label: "Rename", act: "rename", sec: e.blockMenu, gap: true })
         list.push({ label: "Delete group (apps go back to Pinned)", act: "delete", sec: e.blockMenu })
       }
@@ -924,7 +929,7 @@ Item {
     tileMenuEntry = null
     if (!e || !item) return
     if (item.act === "shade") setShade(item.sec, item.slot)
-    else if (item.act === "icons") { cycleIcons(item.sec); tileMenuEntry = { blockMenu: item.sec }; return }   // stays open
+    else if (item.act === "icons") { setIcons(item.sec, item.style); tileMenuEntry = { blockMenu: item.sec }; return }   // stays open
     else if (item.act === "rename") renaming = item.sec
     else if (item.act === "delete") deleteGroup(item.sec)
     else if (item.act === "pin") togglePin(e)
@@ -2238,7 +2243,6 @@ property real live: 0
             MouseArea {
               id: itemMouse
               anchors.fill: parent
-              z: -1
               enabled: !parent.modelData.swatches
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
