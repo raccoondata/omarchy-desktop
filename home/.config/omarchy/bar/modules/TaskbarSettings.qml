@@ -980,6 +980,12 @@ Item {
     }
   }
 
+  function setPrimaries(first, second) {
+    Util.execArgv([dir + "/agents", "primary", first, second])
+    agentsReload.restart()
+  }
+  Timer { id: agentsReload; interval: 400; onTriggered: settings.taskbar.reloadAgents() }
+
   Component {
     id: agentsTab
 
