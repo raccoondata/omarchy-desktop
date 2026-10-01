@@ -3,7 +3,8 @@ import qs.Commons
 import "AudioLevels.js" as AudioLevels
 
 // The now-playing card's visualizer scenes, after Windows Media Player's,
-// drawn on the GPU by shaders/visualizer.frag. The CPU only advances `tick`
+// drawn on the GPU by shaders/visualizer.frag, following the music (cava, via
+// AudioLevels.js). The CPU only hands over the spectrum and advances `tick`
 // (15 a second) while `playing`, so a scene costs the same as a still one.
 //   tunnel  kaleido  starfield  battery  lava  lissajous  aurora  woods
 ShaderEffect {
@@ -25,9 +26,16 @@ ShaderEffect {
   readonly property real grainPx: Math.max(1, grain)
   readonly property color inkA: colorA
   readonly property color inkB: colorB
-  // The music's beat (AudioLevels.js), when cava is sending.
+  // The music (AudioLevels.js), when cava is sending.
   property real live: 0
   property real beatLevel: 0
+  property real pump: 0
+  property real loudness: 0
+  property vector4d bandsA: Qt.vector4d(0, 0, 0, 0)
+  property vector4d bandsB: Qt.vector4d(0, 0, 0, 0)
+  property vector4d bandsC: Qt.vector4d(0, 0, 0, 0)
+  property vector4d bandsD: Qt.vector4d(0, 0, 0, 0)
+  property int seenFrame: -1
 
   fragmentShader: Qt.resolvedUrl("shaders/visualizer.frag.qsb")
 
@@ -36,9 +44,7 @@ ShaderEffect {
     interval: 66
     repeat: true
     onTriggered: {
-      AudioLevels.want()
-      vis.live = AudioLevels.live() ? 1 : 0
-      vis.beatLevel = AudioLevels.beat
+      AudioLevels.feed(vis)
       // Faster when louder.
       vis.tick += vis.live ? 0.5 + 1.5 * AudioLevels.level : 1
     }

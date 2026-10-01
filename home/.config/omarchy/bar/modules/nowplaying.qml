@@ -1182,8 +1182,8 @@ BarWidget {
               layer.enabled: Style.cornerRadius > 0
               layer.effect: MultiEffect { maskEnabled: true; maskSource: artMask }
             }
-            // The art effect (shaders/artfx.frag), on the GPU; its beat moves
-            // only while the card is open and playing.
+            // The art effect (shaders/artfx.frag), on the GPU, following the
+            // music; it moves only while the card is open and playing.
             ShaderEffect {
               id: artFx
               anchors.fill: art
@@ -1192,18 +1192,23 @@ BarWidget {
               property real tick: 0
               readonly property real mode: Math.max(0, root.artEffects.indexOf(root.artEffect))
               readonly property real aspect: width / Math.max(1, height)
-              // The music's beat (AudioLevels.js), when cava is sending.
+              // The music (AudioLevels.js), when cava is sending.
               property real live: 0
               property real beatLevel: 0
+              property real pump: 0
+              property real loudness: 0
+              property vector4d bandsA: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsB: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsC: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsD: Qt.vector4d(0, 0, 0, 0)
+              property int seenFrame: -1
               fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
               Timer {
                 running: artFx.visible && root.popupOpen && root.playing
                 interval: 66
                 repeat: true
                 onTriggered: {
-                  AudioLevels.want()
-                  artFx.live = AudioLevels.live() ? 1 : 0
-                  artFx.beatLevel = AudioLevels.beat
+                  AudioLevels.feed(artFx)
                   artFx.tick += 1
                 }
               }
