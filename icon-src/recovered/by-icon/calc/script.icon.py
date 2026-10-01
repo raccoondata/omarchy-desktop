@@ -1,1 +1,0 @@
-../../../icons/calc.icon.py

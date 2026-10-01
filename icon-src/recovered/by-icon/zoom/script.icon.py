@@ -1,1 +1,0 @@
-../../../icons/zoom.icon.py

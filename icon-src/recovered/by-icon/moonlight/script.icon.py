@@ -1,1 +1,0 @@
-../../../icons/moonlight.icon.py

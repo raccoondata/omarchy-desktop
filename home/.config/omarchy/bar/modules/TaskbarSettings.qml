@@ -1265,7 +1265,7 @@ Item {
     }
   }
 
-  // Icons: the desktop's line icons (bar/modules/taskbar-icons.js, one
+  // Icons: line icons (the Line Icons plugin's, plugins/line-icons; one
   // drawing per app recoloured with the theme) or each app's own colour
   // icon, per place. Apps without a line icon keep their own everywhere.
   Component {
@@ -1293,7 +1293,6 @@ Item {
         model: [
           { place: "Taskbar", style: "iconsTaskbar", styleDefault: "line", label: "Taskbar and switcher", description: "the taskbar, window previews and Super+Tab" },
           { place: "SuperMenu", style: "iconsSuperMenu", styleDefault: "app", label: "Super menu", description: "the app grid" },
-          { place: "Launcher", style: "iconsLauncher", styleDefault: "app", label: "App launcher", description: "Omarchy's Super+Space list" },
           { place: "NowPlaying", style: "iconsNowPlaying", styleDefault: "app", label: "Now playing", description: "the card and its volume mixer" }
         ]
         SettingRow {
@@ -1325,40 +1324,16 @@ Item {
         }
       }
       SettingRow {
-        label: "Omarchy menu"
-        description: "Super+Alt+Space: its entries that are apps (Setup > Default, Install / Remove); one colour, it draws icons as text"
-        ButtonGroup {
-          options: [{ value: "line", label: "Line" }, { value: "omarchy", label: "Original" }]
-          value: icTab.prefs.iconsOmarchyMenu === "line" ? "line" : "omarchy"
+        label: "App launcher, Omarchy menu, new apps"
+        description: "line icons there are the Line Icons plugin's: its own settings"
+        Button {
+          text: "Open"
           foreground: Color.menu.text
-          background: Color.menu.background
           fontFamily: Style.font.menuFamily
-          fontSize: Style.font.bodySmall
-          onChanged: function(v) {
-            settings.set("iconsOmarchyMenu", v)
-            Util.execArgv([settings.dir + "/menu-icons", v === "line" ? "on" : "off"])
+          onClicked: {
+            settings.close()
+            Util.execArgv(["omarchy-shell", "shell", "summon", "line-icons", "{}"])
           }
-        }
-      }
-      SettingRow {
-        label: "New apps"
-        description: "when an app without a line icon is installed, a notification offers to have your coding agent draw one"
-        ToggleSwitch {
-          checked: icTab.prefs.newAppIcons !== false && icTab.prefs.newAppIcons !== "false"
-          onToggled: settings.set("newAppIcons", !checked)
-        }
-      }
-      SettingRow {
-        visible: icTab.prefs.newAppIcons !== false && icTab.prefs.newAppIcons !== "false"
-        label: "Draw with"
-        description: "the agent the new-app notification hands the icon to"
-        Dropdown {
-          width: Style.space(180)
-          showLabel: false
-          fontFamily: Style.font.menuFamily
-          options: [{ value: "", label: "Default agent" }].concat((settings.taskbar.agents || []).map(function(a) { return { value: a.id, label: a.name } }))
-          value: icTab.prefs.newAppIconsAgent || ""
-          onChanged: function(v) { settings.set("newAppIconsAgent", v) }
         }
       }
     }

@@ -1,1 +1,0 @@
-../../../icons/localsend.icon.py

@@ -5,7 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
-import "taskbar-icons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 
 // After Print Screen (~/.config/omarchy/screenshot), when "After a
 // screenshot" is set to the editor: the capture opens in the screenshot

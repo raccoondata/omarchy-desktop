@@ -1,1 +1,0 @@
-../../../icons/hermes.icon.py

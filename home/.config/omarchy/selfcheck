@@ -143,6 +143,16 @@ if command -v claude >/dev/null || [[ -d $HOME/.claude ]]; then
 fi
 [[ -f $HOME/.local/share/nautilus-python/extensions/omarchy_agents.py ]] && ok "Files right-click agent menu installed" \
   || warn "Files agent menu missing (~/.local/share/nautilus-python/extensions/omarchy_agents.py)"
+# The line icons the taskbar and Super menu draw are the Line Icons plugin's.
+if [[ -f $omarchy/plugins/line-icons/lib/LineIcons.js ]]; then
+  if jq -e 'any(.plugins[]?; .id == "line-icons")' "$omarchy/shell.json" >/dev/null 2>&1; then
+    ok "Line Icons plugin installed and on"
+  else
+    warn "Line Icons plugin installed but off (omarchy plugin enable line-icons)"
+  fi
+else
+  bad "Line Icons plugin missing: the taskbar has no icons (omarchy plugin add https://github.com/raccoondata/omarchy-line-icons.git --enable)"
+fi
 if hyprctl binds -j 2>/dev/null | jq -e '[.[] | select((.key|ascii_downcase)=="escape" and .modmask==0)] | length > 0' >/dev/null \
    && ! hyprctl clients -j | jq -e 'any(.[]; .class == "dev.tensaku.Tensaku")' >/dev/null; then
   warn "Esc is still bound with no screenshot editor open (hyprctl eval 'hl.unbind(\"ESCAPE\")')"

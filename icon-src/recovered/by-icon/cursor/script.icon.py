@@ -1,1 +1,0 @@
-../../../icons/cursor.icon.py

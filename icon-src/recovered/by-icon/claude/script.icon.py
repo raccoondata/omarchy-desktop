@@ -1,1 +1,0 @@
-../../../icons/claude.icon.py

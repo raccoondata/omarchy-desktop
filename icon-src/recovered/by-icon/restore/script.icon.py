@@ -1,1 +1,0 @@
-../../../icons/restore.icon.py

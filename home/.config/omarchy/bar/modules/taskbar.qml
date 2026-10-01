@@ -7,9 +7,9 @@ import Quickshell.Services.Mpris
 import Quickshell.Services.UPower
 import qs.Commons
 import qs.Ui
-import "taskbar-icons.js" as TaskbarIcons
-import "TaskbarMatch.js" as TaskbarMatch
-import "IconColors.js" as IconColors
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
+import "../../plugins/line-icons/lib/IconColors.js" as IconColors
 import "MediaWindow.js" as MediaWindow
 import "AudioLevels.js" as AudioLevels
 import "TaskbarStatus.js" as TaskbarStatus
@@ -37,7 +37,7 @@ import "Visuals.js" as Visuals
 // bar"); middle-click or Shift+click opens a new window. Dragging any window
 // onto a workspace number moves it there too (dragevents plugin).
 // Super+Tab opens TaskbarSwitcher.qml. Actions run
-// ~/.config/omarchy/taskbar-action. Icons come from taskbar-icons.js, coloured
+// ~/.config/omarchy/taskbar-action. Icons come from the Line Icons plugin (its lib/LineIcons.js), coloured
 // at runtime so they follow the theme. Minimized windows (moved to
 // special:scratchpad by ~/.config/omarchy/window-minimize) render dimmed.
 BarWidget {
@@ -145,7 +145,8 @@ BarWidget {
   // Window classes -> icon, first match wins. Anything unmatched shows "app".
   // Your own icons and which windows get them, kept apart from the built-in
   // set so updates don't touch them (the taskbar-icons skill's icon-set
-  // writes it): ~/.config/omarchy/taskbar-icons.json
+  // writes it): ~/.config/omarchy/line-icons/user-icons.json (the Line
+  // Icons plugin)
   //   {"icons": {"name": "<svg body>"}, "programs": {"htop": "name"},
   //    "classes": [["^regex$", "name"]]}
   // Checked before the built-in rules. Read once at startup: restart the
@@ -153,7 +154,7 @@ BarWidget {
   property var userPrograms: ({})
   property var userClasses: []
   FileView {
-    path: Quickshell.env("HOME") + "/.config/omarchy/taskbar-icons.json"
+    path: Quickshell.env("HOME") + "/.config/omarchy/line-icons/user-icons.json"
     blockLoading: true
     printErrors: false
     onLoaded: {
@@ -683,52 +684,6 @@ BarWidget {
 
   // The current theme's colours by name (colors.toml: red, blue, accent, ...).
   property var themeColors: ({})
-
-  // ------------------------------------------------ new apps: line icons
-  // An app installed without a line icon: a notification offers to have
-  // the coding agent draw one with the taskbar-icons skill (new-app-icon).
-  // The apps here when this first runs are only noted, and each new one is
-  // offered once (~/.local/state/omarchy/known-apps.json); setting newAppIcons.
-  readonly property bool newAppIcons: pref("newAppIcons", true) !== false && pref("newAppIcons", true) !== "false"
-  property var knownApps: null
-  Connections {
-    target: DesktopEntries.applications
-    function onValuesChanged() { newAppsCheck.restart() }
-  }
-  FileView {
-    path: Quickshell.env("HOME") + "/.local/state/omarchy/known-apps.json"
-    id: knownAppsFile
-    printErrors: false
-    atomicWrites: true
-    onLoaded: {
-      try { root.knownApps = JSON.parse(text()) || { ids: [] } } catch (e) { root.knownApps = { ids: [] } }
-      newAppsCheck.restart()
-    }
-    onLoadFailed: { root.knownApps = { ids: [] }; newAppsCheck.restart() }
-  }
-  // A while after the app list settles (an install adds several at once).
-  Timer {
-    id: newAppsCheck
-    interval: 6000
-    onTriggered: root.checkNewApps()
-  }
-  function checkNewApps() {
-    if (!knownApps) return
-    var apps = DesktopEntries.applications.values.filter(function(e) { return !e.noDisplay })
-    if (apps.length === 0) return
-    var known = Array.isArray(knownApps.ids) ? knownApps.ids : []
-    var fresh = apps.filter(function(e) { return known.indexOf(e.id) === -1 })
-    if (known.length > 0 && newAppIcons) {
-      fresh.filter(function(e) { return TaskbarMatch.forEntry(e) === "" }).slice(0, 3).forEach(function(e) {
-        Util.execArgv([omarchyDir + "/new-app-icon", String(e.id), String(e.name || e.id),
-                       String(e.startupClass || ""), String(e.icon || "")])
-      })
-    }
-    if (fresh.length > 0 || known.length === 0) {
-      knownApps = { ids: known.concat(fresh.map(function(e) { return e.id })) }
-      knownAppsFile.setText(JSON.stringify(knownApps) + "\n")
-    }
-  }
 
   // For settings (Frequent's hidden apps).
   readonly property var superMenuPanel: superMenu
@@ -1751,51 +1706,6 @@ BarWidget {
     return appIcons && appIcon ? appIcon : TaskbarIcons.svg(name, lineColor(name, color))
   }
 
-  // Omarchy's app launcher (Super+Space) with line icons (Icons > App
-  // launcher): a line icon file for every app that has one, named after the
-  // app's own icon, in a folder the launcher's icon index reads first
-  // (~/.config/omarchy/launcher-icons). Rewritten when the setting, the
-  // colours, the theme or the installed apps change.
-  readonly property bool launcherLineIcons: pref("iconsLauncher", "app") === "line"
-  onLauncherLineIconsChanged: launcherIconsTimer.restart()
-  onLauncherColorModeChanged: if (launcherLineIcons) launcherIconsTimer.restart()
-  onIconColorsRevisionChanged: if (launcherLineIcons) launcherIconsTimer.restart()
-  Connections {
-    target: DesktopEntries
-    function onApplicationsChanged() { if (root.launcherLineIcons) launcherIconsTimer.restart() }
-  }
-  Timer {
-    id: launcherIconsTimer
-    interval: 2000
-    onTriggered: root.writeLauncherIcons()
-  }
-  FileView {
-    id: launcherIconsFile
-    path: Quickshell.env("XDG_RUNTIME_DIR") + "/omarchy-launcher-icons.json"
-    printErrors: false
-    onSaved: Util.execArgv([root.omarchyDir + "/launcher-icons", "write", path])
-  }
-  function writeLauncherIcons() {
-    if (!launcherLineIcons) {
-      Util.execArgv([omarchyDir + "/launcher-icons", "off"])
-      return
-    }
-    var apps = DesktopEntries.applications.values || []
-    var fallback = String(Color.menu.text)
-    var out = {}
-    for (var i = 0; i < apps.length; i++) {
-      var icon = String(apps[i].icon || "")
-      // An icon given as a path is used as is by the launcher; only names can be replaced.
-      if (!icon || icon.charAt(0) === "/" || out[icon] !== undefined) continue
-      // Generic freedesktop names (applications-system, utilities-terminal...)
-      // are shared by unrelated apps: leave those alone.
-      if (/^(applications|utilities|preferences|system|accessories|help|user|x|text|image|audio|video|network|input|media|document|folder|emblem)-/.test(icon)) continue
-      var name = TaskbarMatch.forEntry(apps[i])
-      if (name) out[icon] = TaskbarIcons.markup(name, lineColor(name, fallback, launcherColorMode))
-    }
-    launcherIconsFile.setText(JSON.stringify(out))
-  }
-
   // Line icon colours: "mono" (the theme's, as each place draws), "brand"
   // (each app's own) or "palette" (that, moved onto the theme). IconColors.js.
   // Set per place (Icons tab): iconColors<Place>, else the older single
@@ -1804,14 +1714,13 @@ BarWidget {
     return String(pref("iconColors" + place, pref("iconColors", "mono")))
   }
   readonly property string iconColorMode: colorModeFor("Taskbar")
-  readonly property string launcherColorMode: colorModeFor("Launcher")
   property int iconColorsRevision: 0
   function lineColor(name, fallback, mode) {
     var revision = iconColorsRevision
     return IconColors.colorFor(name, mode || iconColorMode, String(fallback))
   }
   FileView {
-    path: root.omarchyDir + "/bar/modules/icon-colors.json"
+    path: root.omarchyDir + "/plugins/line-icons/lib/icon-colors.json"
     blockLoading: true
     printErrors: false
     onLoaded: {
@@ -1849,7 +1758,6 @@ BarWidget {
   // ---------------------------------------------------------------- events
 
   Component.onCompleted: {
-    launcherIconsTimer.restart()
     reloadAgents()
     Hyprland.refreshToplevels()
     programScan.running = true

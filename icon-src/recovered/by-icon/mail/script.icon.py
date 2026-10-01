@@ -1,1 +1,0 @@
-../../../icons/mail.icon.py

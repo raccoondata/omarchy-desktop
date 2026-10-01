@@ -1,1 +1,0 @@
-../../../icons/calendar.icon.py

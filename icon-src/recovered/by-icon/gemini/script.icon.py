@@ -1,1 +1,0 @@
-../../../icons/gemini.icon.py

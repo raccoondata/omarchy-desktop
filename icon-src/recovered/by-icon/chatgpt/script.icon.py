@@ -1,1 +1,0 @@
-../../../icons/chatgpt.icon.py

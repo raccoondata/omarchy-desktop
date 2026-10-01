@@ -1,1 +1,0 @@
-../../../icons/draw.icon.py

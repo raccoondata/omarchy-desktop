@@ -1,1 +1,0 @@
-../../../icons/network.icon.py

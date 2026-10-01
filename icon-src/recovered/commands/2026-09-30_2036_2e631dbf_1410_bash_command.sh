@@ -1,1 +1,0 @@
-I=/tmp/claude-1000/-home-user-Work/2e631dbf-6b6a-4eb9-8346-4759cc1800bc/scratchpad/icons; for d in b c d; do for f in $I/$d/*.svgbody; do n=$(basename $f .svgbody); ~/.claude/skills/taskbar-icons/scripts/icon-set "$n" "$f" | cut -c1-60; done; done 2>&1 | tail -3; ~/.claude/skills/taskbar-icons/scripts/icon-set --list | wc -w

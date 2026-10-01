@@ -1,1 +1,0 @@
-../../../icons/edge.icon.py

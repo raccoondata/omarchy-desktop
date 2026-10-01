@@ -1,1 +1,0 @@
-../../../icons/mpv.icon.py

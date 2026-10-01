@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell.Wayland
 import qs.Commons
-import "taskbar-icons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 import "TaskbarStatus.js" as TaskbarStatus
 
 // One window as a card: icon, title and status on top, a live thumbnail, and

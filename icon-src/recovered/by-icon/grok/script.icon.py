@@ -1,1 +1,0 @@
-../../../icons/grok.icon.py

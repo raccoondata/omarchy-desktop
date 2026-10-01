@@ -1,1 +1,0 @@
-../../../icons/aether.icon.py

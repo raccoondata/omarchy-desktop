@@ -1,1 +1,0 @@
-../../../icons/node.icon.py

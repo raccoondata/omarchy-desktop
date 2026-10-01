@@ -1,1 +1,0 @@
-../../../icons/uuctl.icon.py

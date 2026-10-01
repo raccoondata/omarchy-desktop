@@ -1,1 +1,0 @@
-../../../icons/copilot.icon.py

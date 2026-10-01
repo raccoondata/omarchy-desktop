@@ -1,1 +1,0 @@
-../../../icons/pen.icon.py

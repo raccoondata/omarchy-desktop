@@ -1,1 +1,0 @@
-../../../icons/github.icon.py

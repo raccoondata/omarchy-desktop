@@ -1,1 +1,0 @@
-../../../icons/whatsapp.icon.py

@@ -10,9 +10,9 @@ import qs.Ui
 import qs.services
 import "MediaWindow.js" as MediaWindow
 import "AudioLevels.js" as AudioLevels
-import "taskbar-icons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 import "Visuals.js" as Visuals
-import "IconColors.js" as IconColors
+import "../../plugins/line-icons/lib/IconColors.js" as IconColors
 
 // Super menu: double-tap Super (or Caps Lock, which is Super here) for your
 // common apps in a grid, drawn like Omarchy's own menu.

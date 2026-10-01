@@ -1,1 +1,0 @@
-../../../icons/neovim.icon.py

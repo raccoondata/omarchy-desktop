@@ -1,1 +1,0 @@
-../../../icons/omawrite.icon.py

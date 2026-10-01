@@ -1,1 +1,0 @@
-find /usr/share/icons/hicolor /usr/share/pixmaps -iname '*omawrite*' -o -iname '*obsidian*' -o -iname '*evince*' -o -iname 'libreoffice*writer*' -o -iname 'libreoffice*main*' 2>/dev/null | grep -E 'scalable|256|pixmaps' | head -20; cat ~/.claude/skills/taskbar-icons/scripts/icon-preview | head -40

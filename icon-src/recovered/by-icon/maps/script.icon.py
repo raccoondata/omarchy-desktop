@@ -1,1 +1,0 @@
-../../../icons/maps.icon.py

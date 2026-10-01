@@ -1,1 +1,0 @@
-../../../icons/play.icon.py

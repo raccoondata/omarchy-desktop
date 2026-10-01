@@ -1,12 +1,12 @@
 import QtQuick
 import qs.Commons
-import "taskbar-icons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 
 // A label and a row of pick-one chips (wrapping), as in "Send to [New session]
 // [an open session]" or "Effort [low] … [max]". Used by the ask bar
 // (ShotActions.qml) and the ask card (AskCard.qml).
 //
-//   options: [{ value, label, icon? }]  (icon: a taskbar-icons.js name)
+//   options: [{ value, label, icon? }]  (icon: a line icon's name, LineIcons.js)
 //   current: the picked value    picked(value)
 Flow {
   id: chips

@@ -1,1 +1,0 @@
-../../../icons/btop.icon.py

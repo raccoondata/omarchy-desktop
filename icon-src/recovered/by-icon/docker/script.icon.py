@@ -1,1 +1,0 @@
-../../../icons/docker.icon.py

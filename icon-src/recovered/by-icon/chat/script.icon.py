@@ -1,1 +1,0 @@
-../../../icons/chat.icon.py

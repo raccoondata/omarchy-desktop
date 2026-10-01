@@ -1,1 +1,0 @@
-../../../icons/math.icon.py

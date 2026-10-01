@@ -1,7 +1,0 @@
-#!/bin/bash
-# After `omarchy update`: Omarchy's menu entries may have changed, and the
-# desktop's icon overrides (Taskbar & Desktop > Icons > Omarchy menu) restate
-# them whole, so write them again from the new ones.
-omarchy="$HOME/.config/omarchy"
-[[ "$("$omarchy/menu-icons" status 2>/dev/null)" == on ]] && "$omarchy/menu-icons" on >/dev/null 2>&1
-exit 0

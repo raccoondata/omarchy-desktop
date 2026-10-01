@@ -1,1 +1,0 @@
-../../../icons/pdf.icon.py

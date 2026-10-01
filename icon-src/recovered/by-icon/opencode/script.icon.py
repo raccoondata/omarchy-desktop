@@ -1,1 +1,0 @@
-../../../icons/opencode.icon.py

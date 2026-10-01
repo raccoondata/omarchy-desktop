@@ -1,8 +1,8 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "taskbar-icons.js" as TaskbarIcons
-import "TaskbarMatch.js" as TaskbarMatch
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
 
 // The ask layout, shared by the ask card (AskCard.qml: files, selected text)
 // and the screenshot panel (ScreenshotPreview.qml and EditorDock.qml when

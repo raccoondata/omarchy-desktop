@@ -1,7 +1,0 @@
-"""impress: LibreOffice Impress: the LibreOffice page with three rising bars."""
-from iconkit import *
-
-icon(
-    path("M7 3.5h7.5l5 5V19a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"),
-    path("M9 17.5v-2.5M12.5 17.5v-5.5M16 17.5v-8"),
-)

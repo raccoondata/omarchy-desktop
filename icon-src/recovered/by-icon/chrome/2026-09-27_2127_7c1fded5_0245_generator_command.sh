@@ -1,1 +1,0 @@
-../../commands/2026-09-27_2127_7c1fded5_0245_generator_command.sh

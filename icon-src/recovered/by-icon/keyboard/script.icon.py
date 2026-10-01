@@ -1,1 +1,0 @@
-../../../icons/keyboard.icon.py

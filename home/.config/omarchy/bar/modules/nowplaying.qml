@@ -9,9 +9,9 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
 import "MediaWindow.js" as MediaWindow
-import "taskbar-icons.js" as TaskbarIcons
-import "TaskbarMatch.js" as TaskbarMatch
-import "IconColors.js" as IconColors
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/IconMatch.js" as TaskbarMatch
+import "../../plugins/line-icons/lib/IconColors.js" as IconColors
 import "AudioLevels.js" as AudioLevels
 import "Visuals.js" as Visuals
 

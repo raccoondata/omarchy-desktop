@@ -1,1 +1,0 @@
-../../../icons/impress.icon.py

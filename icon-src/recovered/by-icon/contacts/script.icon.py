@@ -1,1 +1,0 @@
-../../../icons/contacts.icon.py

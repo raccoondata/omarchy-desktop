@@ -5,7 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
-import "taskbar-icons.js" as TaskbarIcons
+import "../../plugins/line-icons/lib/LineIcons.js" as TaskbarIcons
 
 // Ask a coding agent about files (Files' right-click "Ask …",
 // ~/.local/share/nautilus-python/extensions/omarchy_agents.py) or the selected

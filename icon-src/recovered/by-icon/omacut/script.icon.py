@@ -1,1 +1,0 @@
-../../../icons/omacut.icon.py

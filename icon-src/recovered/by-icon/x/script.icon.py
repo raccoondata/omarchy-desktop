@@ -1,1 +1,0 @@
-../../../icons/x.icon.py

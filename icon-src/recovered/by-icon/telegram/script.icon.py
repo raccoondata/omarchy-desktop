@@ -1,1 +1,0 @@
-../../../icons/telegram.icon.py

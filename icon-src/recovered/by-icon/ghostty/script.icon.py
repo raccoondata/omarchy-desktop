@@ -1,1 +1,0 @@
-../../../icons/ghostty.icon.py

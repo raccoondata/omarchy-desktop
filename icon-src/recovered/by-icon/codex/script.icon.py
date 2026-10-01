@@ -1,1 +1,0 @@
-../../../icons/codex.icon.py

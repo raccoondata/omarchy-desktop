@@ -1,1 +1,0 @@
-../../../icons/tensaku.icon.py
