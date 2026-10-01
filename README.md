@@ -89,17 +89,18 @@ back; your settings files stay).
 - **Restart into Windows**, on PCs that dual-boot Windows (hidden otherwise).
 
 - **Taskbar icons** for Omarchy's own apps and tools (LibreOffice, Obsidian,
-  btop, lazygit, the Wi-Fi / Bluetooth / audio tools, ...), coding agents and
-  common web apps, drawn to match. An app without one gets a generic icon:
-  ask Claude Code or Codex for "a taskbar icon for <app>" (the bundled
+  btop, lazygit, the Wi-Fi / Bluetooth / audio tools, ...), coding agents
+  and common web apps, drawn to match. An app without one gets a generic
+  icon: ask Claude Code or Codex for "a taskbar icon for <app>" (the bundled
   `taskbar-icons` skill draws one in the same style). Yours are kept in
-  `~/.config/omarchy/taskbar-icons.json`, which updates never touch.
-  Taskbar & Desktop > Icons chooses, for each place (taskbar and switcher,
-  Super menu, Omarchy's app launcher, now playing, Omarchy's menu): line
-  icons in the theme's colours, in each app's colour, or in that colour
-  matched to your theme, or the apps' original icons. Defaults: line on the
-  taskbar, originals elsewhere. When an app without a line icon is installed, a notification offers to have
-  your coding agent draw one (Taskbar & Desktop > Icons > New apps).
+  `~/.config/omarchy/taskbar-icons.json`, which updates never touch. Taskbar
+  & Desktop > Icons chooses, for each place (taskbar and switcher, Super
+  menu, Omarchy's app launcher, now playing, Omarchy's menu): line icons in
+  the theme's colours, in each app's colour, or in that colour matched to
+  your theme, or the apps' original icons. Defaults: line on the taskbar,
+  originals elsewhere. When an app without a line icon is installed, a
+  notification offers to have your coding agent draw one (Taskbar & Desktop
+  > Icons > New apps).
 
 Settings: **Super+Alt+Space > Setup > Taskbar & Desktop** (type to search
 them). Health check: `omarchy-desktop check`.

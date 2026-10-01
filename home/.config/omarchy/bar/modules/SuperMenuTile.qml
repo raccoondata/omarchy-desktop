@@ -77,7 +77,8 @@ Rectangle {
         opacity: tile.modelData.missing ? 0.35 : 0.9
         // A repo with uncommitted changes: a dot (ahead / behind only: a ring).
         Rectangle {
-          visible: !!tile.modelData.folder && (tile.modelData.changed > 0 || tile.modelData.ahead > 0 || tile.modelData.behind > 0)
+          visible: !!tile.modelData.folder && tile.owner.showRepoStatus
+                   && (tile.modelData.changed > 0 || tile.modelData.ahead > 0 || tile.modelData.behind > 0)
           anchors.right: parent.right
           anchors.top: parent.top
           anchors.rightMargin: -Style.space(4)
@@ -98,7 +99,7 @@ Rectangle {
       horizontalAlignment: Text.AlignHCenter
       // A dot under apps that are open, like the taskbar's.
       Rectangle {
-        visible: tile.running
+        visible: tile.running && tile.owner.showRunning
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.bottom
         anchors.topMargin: Style.space(3)
@@ -222,7 +223,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.topMargin: Style.space(5)
     anchors.rightMargin: Style.space(5)
-    visible: tile.owner.taskbar.showBadges && !pinButton.shown
+    visible: tile.owner.showBadges && !pinButton.shown
     unread: tile.unread
     attention: tile.wantsYou
     size: Style.space(11)

@@ -693,7 +693,7 @@ Item {
             label: modelData.label
             description: modelData.description
             Dropdown {
-              width: Style.space(180)
+              width: Style.space(230)
               showLabel: false
               fontFamily: Style.font.menuFamily
               options: [{ value: "smart", label: "Agent for repos, else Files" },
@@ -702,6 +702,21 @@ Item {
                         { value: "copy", label: "Copy the path" }]
               value: (settings.taskbar.prefs || {})[modelData.key] || modelData.fallback
               onChanged: function(v) { settings.set(modelData.key, v) }
+            }
+          }
+        }
+        Repeater {
+          model: [{ key: "superMenuBadges", label: "Unread badges", description: "on tiles: an app's unread count, or a dot when it wants you (as on the taskbar)" },
+                  { key: "superMenuRepoStatus", label: "Repo status", description: "on pinned folders: a dot for uncommitted changes, the branch when hovered" },
+                  { key: "superMenuRunning", label: "Open-app dots", description: "a dot under apps with a window open" }]
+          SettingRow {
+            required property var modelData
+            label: modelData.label
+            description: modelData.description
+            ToggleSwitch {
+              readonly property var v: (settings.taskbar.prefs || {})[modelData.key]
+              checked: v !== false && v !== "false"
+              onToggled: settings.set(modelData.key, !checked)
             }
           }
         }

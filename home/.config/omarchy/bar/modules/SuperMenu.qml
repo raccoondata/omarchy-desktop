@@ -139,9 +139,15 @@ Item {
   property var folderInfo: ({})
   readonly property var pinnedFolderPaths: groupedIds.filter(function(id) { return id.indexOf("folder:") === 0 })
     .map(function(id) { return id.slice(7) })
+  // What tiles show besides their icon and name (Desktop > Super menu).
+  function prefOn(key) { var v = taskbar.pref(key, true); return v !== false && v !== "false" }
+  readonly property bool showBadges: prefOn("superMenuBadges")
+  readonly property bool showRepoStatus: prefOn("superMenuRepoStatus")
+  readonly property bool showRunning: prefOn("superMenuRunning")
+
   function refreshFolderInfo() {
     if (pinnedFolderPaths.length === 0 || folderInfoProc.running) return
-    folderInfoProc.command = [taskbar.omarchyDir + "/folder-search", "--info"].concat(pinnedFolderPaths)
+    folderInfoProc.command = [taskbar.omarchyDir + "/folder-search", showRepoStatus ? "--info" : "--info-plain"].concat(pinnedFolderPaths)
     folderInfoProc.running = true
   }
   onPinnedFolderPathsChanged: if (opened) refreshFolderInfo()
