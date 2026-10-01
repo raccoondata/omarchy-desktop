@@ -16,6 +16,7 @@
 .config/omarchy/audio-outputs
 .config/omarchy/backup-lock
 .config/omarchy/bar-height
+.config/omarchy/folder-search
 .config/omarchy/hotcorner
 
 .config/omarchy/lock

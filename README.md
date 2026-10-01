@@ -51,8 +51,10 @@ back; your settings files stay).
   app's windows onto a workspace, laid out evenly. Files (and any app you
   choose) comes to you instead.
 - **Super menu** (double-tap Super, or Caps Lock): apps, search (with your
-  zoxide folders: open in Files, a terminal or an agent, your pick per key),
-  now playing, a box to ask a coding agent, and lock / restart / shut down.
+  zoxide folders, marked by project type and git branch: Enter starts your
+  coding agent in a repo or a folder of repos, Files elsewhere; every key
+  configurable), now playing, a box to ask a coding agent, and lock /
+  restart / shut down.
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
   and maximize buttons, hot corners.
