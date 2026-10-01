@@ -18,8 +18,9 @@
 //   6 aurora      ribbons of light, lit across the width by the spectrum
 //   7 woods       walking through a digital forest: pines in layers, fog,
 //                 the spectrum glowing in the grass, fireflies flaring
-// Scenes 0-7 get a glitch layer on top (main): slices torn sideways on the
-// bass, a ghost in the other colour, corrupt blocks, scanlines.
+// Scenes 0-7 get a glitch layer on top (main), all from the music, none in
+// silence: slices torn on the hits, a ghost as far as the bass swells, blocks
+// flipping on the kicks, scanlines.
 // The glitch family:
 //   8 glitch      a spectrum torn into slices that jump on the kicks, split
 //                 into two colours, with blocks flipping and dropping out
@@ -74,6 +75,10 @@ float spec(float x, float t) {
     float f = x * 15.0, i = floor(f);
     return mix(bandAt(int(i)), bandAt(int(min(i + 1.0, 15.0))), f - i);
 }
+
+// How hard the music hits right now, 0 in silence: the kicks most, the
+// bass's swell some. Every glitch below happens only as often as this says.
+float hitOf(float b, float pm) { return clamp(b * 0.9 + pm * pm * 0.5, 0.0, 1.0); }
 
 // Signal loss's waveform at x: the spectrum as harmonics, about -0.8..0.8.
 float signalWave(float x, float t) {
@@ -208,26 +213,29 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         vec2 uv = px / vec2(w, h);
         float slice = floor(uv.y * 12.0);
         float k = floor(tick / 2.0);
-        float shift = hash(vec2(slice, k)) > 0.78 - 0.35 * b ? (hash(vec2(slice, tick)) - 0.5) * (0.12 + 0.4 * pm) : 0.0;
+        // Slices tear on the hits, mostly where the spectrum is loud (bass
+        // at the bottom).
+        float shift = hash(vec2(slice, k)) < hitOf(b, pm) * (0.2 + 0.8 * spec(1.0 - slice / 11.0, t)) * 0.7
+            ? (hash(vec2(slice, tick)) - 0.5) * (0.08 + 0.4 * pm) : 0.0;
         float x = fract(uv.x + shift);
         float y = 1.0 - uv.y;
         float bars = clamp(floor(w / max(grainPx, 1.0) / 6.0), 16.0, 48.0);
-        float main = 0.0, ghost = 0.0;
+        float lead = 0.0, ghost = 0.0;
         for (int i = 0; i < 2; i++) {
             // The ghost: the same spectrum a little to the side (the split).
-            float xx = fract(x + (i == 1 ? 0.01 + 0.035 * pm : 0.0));
+            float xx = fract(x + (i == 1 ? 0.002 + 0.04 * pm : 0.0));
             float bi = floor(xx * bars);
             float hgt = 0.04 + 0.92 * spec(bi / (bars - 1.0), t);
             float on = step(fract(xx * bars), 0.75) * step(y, hgt) * (0.45 + 0.55 * y / hgt);
-            if (i == 0) main = on; else ghost = on;
+            if (i == 0) lead = on; else ghost = on;
         }
         // Corrupt blocks: some flip, some go dark.
         vec2 blk = floor(uv * vec2(20.0, 6.0));
         float hb = hash(blk + floor(tick / 3.0) * 1.7);
-        if (hb > 0.975 - 0.05 * b) main = 1.0 - main * 0.8;
-        else if (hb < 0.02) { main = 0.0; ghost = 0.0; }
-        v = max(main, ghost * 0.7);
-        mixB = ghost > main ? 1.0 : 0.0;
+        if (hb > 1.0 - 0.06 * b) lead = 1.0 - lead * 0.8;
+        else if (hb < 0.03 * hitOf(b, pm)) { lead = 0.0; ghost = 0.0; }
+        v = max(lead, ghost * 0.7);
+        mixB = ghost > lead ? 1.0 : 0.0;
         if (shift != 0.0) mixB = 1.0 - mixB;                          // torn slices swap colours
         v *= 0.82 + 0.18 * step(0.5, fract(px.y / (grainPx * 2.0)));  // scanlines
     } else if (s == 9) {  // signal loss
@@ -235,7 +243,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         float k = floor(tick);
         float roll = b * 0.35 * (hash(vec2(k, 2.0)) - 0.5);           // vertical hold slips on a kick
         float slice = floor(uv.y * 16.0);
-        float tear = hash(vec2(slice, k)) > 0.8 - 0.35 * pm ? (hash(vec2(slice, k + 1.0)) - 0.5) * (0.15 + 0.3 * pm) : 0.0;
+        float tear = hash(vec2(slice, k)) < hitOf(b, pm) * 0.5 ? (hash(vec2(slice, k + 1.0)) - 0.5) * (0.1 + 0.3 * pm) : 0.0;
         float x = uv.x + tear;
         float yy = fract(uv.y + roll) * 2.0 - 1.0;
         // The wave, and its ghost a little behind (the colours split apart).
@@ -256,9 +264,9 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         float k = floor(tick / 2.0);
         vec2 src = cell;
         // Moshed: a block shows one from beside it.
-        if (hash(cell + k * 0.73) > 0.8 - 0.3 * pm) src.x = mod(src.x + floor((hash(cell + k) - 0.5) * 8.0) + grid.x, grid.x);
+        if (hash(cell + k * 0.73) < 0.45 * hitOf(b, pm)) src.x = mod(src.x + floor((hash(cell + k) - 0.5) * 8.0) + grid.x, grid.x);
         // Smeared: a run of blocks repeats the one at its left.
-        float smear = hash(vec2(cell.y, floor(tick / 4.0))) > 0.7 ? floor(hash(vec2(cell.y, k)) * grid.x) : -1.0;
+        float smear = hash(vec2(cell.y, floor(tick / 4.0))) < 0.5 * hitOf(b, pm) ? floor(hash(vec2(cell.y, k)) * grid.x) : -1.0;
         if (smear >= 0.0 && cell.x > smear && cell.x < smear + 2.0 + 6.0 * pm) src.x = smear;
         float f = spec(src.x / (grid.x - 1.0), t);
         float row = grid.y - 1.0 - src.y;                             // 0 at the bottom
@@ -271,7 +279,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         float edge = step(0.08, inner.x) * step(0.1, inner.y);
         v = on * pat * edge * (0.45 + 0.55 * (row + 1.0) / grid.y);
         mixB = moshed ? 1.0 : 0.0;
-        if (hash(cell + floor(tick / 12.0) * 3.1) > 0.985) { v = max(v, 0.7 * edge); mixB = 1.0; }   // a stuck block
+        if (hash(cell + floor(tick / 12.0) * 3.1) > 1.0 - 0.03 * spec(0.85, t)) { v = max(v, 0.7 * edge); mixB = 1.0; }   // stuck, on the treble
     } else if (s == 11) {  // pixel sort
         vec2 uv = px / vec2(w, h);
         float colW = grainPx * 2.0;
@@ -284,7 +292,7 @@ vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
         float on = step(0.0, along) * step(along, 1.0);
         float grad = hash(vec2(col, 3.0)) > 0.5 ? 1.0 - along : along;
         v = on * (0.25 + 0.75 * grad);
-        if (hash(vec2(col, floor(tick))) > 0.93 - 0.2 * b) v *= 0.4;   // a column skips
+        if (hash(vec2(col, floor(tick))) < 0.25 * b) v *= 0.4;          // columns skip on the kicks
         mixB = step(0.5, hash(vec2(col, floor(tick / 6.0) + 5.0)));
         v = max(v, 0.08 * hash(floor(px / grainPx) + floor(tick / 3.0)));   // the unsorted rest
     } else {  // aurora
@@ -312,22 +320,24 @@ void main() {
     if (s >= 8) {
         o = scene(px, s, t, b, pm, loud);   // the glitch family: glitched already
     } else {
-        // The glitch layer over the older scenes, driven by the bass: slices
-        // torn sideways, a ghost split off in the other colour, corrupt
-        // blocks, scanlines.
+        // The glitch layer over the older scenes, all of it from the music
+        // (none in silence): slices torn sideways on the hits, where the
+        // spectrum is loud (bass at the bottom); a ghost split off in the
+        // other colour as far as the bass swells; blocks flipping on kicks.
         vec2 uv = px / vec2(w, h);
+        float hit = hitOf(b, pm);
         float slice = floor(uv.y * 10.0);
-        float tear = hash(vec2(slice, floor(tick / 2.0))) > 0.86 - 0.4 * pm
-            ? (hash(vec2(slice, tick)) - 0.5) * w * (0.08 + 0.3 * pm) : 0.0;
+        float tear = hash(vec2(slice, floor(tick / 2.0))) < hit * (0.2 + 0.8 * spec(1.0 - slice / 9.0, t)) * 0.6
+            ? (hash(vec2(slice, tick)) - 0.5) * w * (0.05 + 0.3 * hit) : 0.0;
         vec2 q = floor(vec2(mod(px.x + tear, w), px.y) / grainPx) * grainPx + grainPx * 0.5;
         vec2 body = scene(q, s, t, b, pm, loud);
-        vec2 ghost = scene(q + vec2(grainPx * floor(1.0 + 6.0 * pm), 0.0), s, t, b, pm, loud);
+        vec2 ghost = scene(q + vec2(grainPx * floor(6.0 * pm), 0.0), s, t, b, pm, loud);
         o.x = max(body.x, ghost.x * 0.55);
         o.y = ghost.x * 0.55 > body.x ? 1.0 : body.y;
         if (tear != 0.0) o.y = 1.0 - o.y;
         float hb = hash(floor(uv * vec2(18.0, 5.0)) + floor(tick / 3.0) * 1.7);
-        if (hb > 0.992 - 0.025 * b) o.x = 1.0 - o.x * 0.8;
-        else if (hb < 0.01 + 0.03 * pm) o.x *= 0.1;
+        if (hb > 1.0 - 0.03 * b) o.x = 1.0 - o.x * 0.8;
+        else if (hb < 0.03 * hit) o.x *= 0.1;
         o.x *= 0.82 + 0.18 * step(0.5, fract(px.y / (grainPx * 2.0)));
     }
     vec3 ink = mix(inkA.rgb, inkB.rgb, clamp(o.y, 0.0, 1.0) * 0.6);
