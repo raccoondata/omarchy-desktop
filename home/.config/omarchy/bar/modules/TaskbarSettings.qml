@@ -683,6 +683,26 @@ Item {
             }
           }
         }
+        SettingRow {
+          label: "Frequent apps"
+          description: "the apps you use most that aren't pinned; hover one and click × (or Delete) to take it out"
+          ToggleSwitch {
+            checked: (settings.taskbar.prefs || {}).superMenuFrequent !== false && (settings.taskbar.prefs || {}).superMenuFrequent !== "false"
+            onToggled: settings.set("superMenuFrequent", !checked)
+          }
+        }
+        SettingRow {
+          readonly property int hidden: settings.taskbar.superMenuPanel ? settings.taskbar.superMenuPanel.hiddenFrequent.length : 0
+          visible: hidden > 0
+          label: "Taken out of Frequent"
+          description: hidden + (hidden === 1 ? " app" : " apps") + " kept out of the Frequent row"
+          Button {
+            text: "Show again"
+            foreground: Color.menu.text
+            fontFamily: Style.font.menuFamily
+            onClicked: settings.taskbar.superMenuPanel.unhideFrequent()
+          }
+        }
       }
       Loader { width: parent.width; sourceComponent: cornersTab }
       Loader { width: parent.width; sourceComponent: effectsTab }

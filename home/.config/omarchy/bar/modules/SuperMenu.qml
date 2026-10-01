@@ -20,7 +20,9 @@ import "Visuals.js" as Visuals
 //             right-click a tile to pin or unpin it
 //   Frequent  the apps you use most lately that aren't pinned, from
 //             ~/.local/state/omarchy/app-usage.json (the taskbar counts every
-//             switch to an app, and launches from here)
+//             switch to an app, and launches from here). Optional (setting
+//             superMenuFrequent); × on a tile, or Delete, keeps that app out
+//             of it ("hiddenFrequent" in supermenu.json)
 //   Search    just type: all apps, Omarchy's own launcher search
 //   Ask       always there under the search line: "Ask [Claude] [Codex] …".
 //             Nothing typed: click one for a new session. Typed: click one,
@@ -80,8 +82,10 @@ Item {
       try {
         var data = JSON.parse(text())
         menu.pinnedIds = Array.isArray(data.pinned) ? data.pinned : []
+        menu.hiddenFrequent = Array.isArray(data.hiddenFrequent) ? data.hiddenFrequent : []
       } catch (e) {
         menu.pinnedIds = []
+        menu.hiddenFrequent = []
       }
     }
   }
@@ -144,9 +148,10 @@ Item {
   }
 
   readonly property var frequentEntries: {
+    if (!showFrequent) return []
     var candidates = []
     for (var id in usage) {
-      if (pinnedIds.indexOf(id) !== -1) continue
+      if (pinnedIds.indexOf(id) !== -1 || hiddenFrequent.indexOf(id) !== -1) continue
       var entry = entryById(id)
       if (entry) candidates.push({ entry: entry, score: score(id) })
     }
@@ -159,9 +164,34 @@ Item {
   // Everything the arrow keys walk through, in order.
   readonly property var tiles: query.length > 0 ? searchEntries : pinnedEntries.concat(frequentEntries)
 
+  function saveConfig() {
+    configFile.setText(JSON.stringify({ pinned: pinnedIds, hiddenFrequent: hiddenFrequent }, null, 2) + "\n")
+  }
+
   function savePinned(ids) {
     pinnedIds = ids
-    configFile.setText(JSON.stringify({ pinned: ids }, null, 2) + "\n")
+    saveConfig()
+  }
+
+  // Frequent: on unless turned off in settings; apps taken out of it stay out
+  // (until "show them again" in settings) but can still be found and pinned.
+  readonly property bool showFrequent: taskbar.pref("superMenuFrequent", true) !== false && taskbar.pref("superMenuFrequent", true) !== "false"
+  property var hiddenFrequent: []
+
+  function hideFrequent(entry) {
+    if (!entry || hiddenFrequent.indexOf(entry.id) !== -1) return
+    hiddenFrequent = hiddenFrequent.concat([entry.id])
+    saveConfig()
+    selected = Math.max(0, Math.min(selected, tiles.length - 1))
+  }
+
+  function unhideFrequent() {
+    hiddenFrequent = []
+    saveConfig()
+  }
+
+  function isFrequent(entry) {
+    return !!entry && query.length === 0 && frequentEntries.indexOf(entry) !== -1
   }
 
   function isPinned(entry) {
@@ -719,6 +749,8 @@ Item {
           } else if (event.key === Qt.Key_Delete && menu.isPinned(current)) {
             menu.togglePin(current)
             menu.selected = Math.max(0, Math.min(menu.selected, menu.tiles.length - 1))
+          } else if (event.key === Qt.Key_Delete && menu.isFrequent(current)) {
+            menu.hideFrequent(current)
           } else if (event.key === Qt.Key_Escape) {
             menu.close()
           } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && menu.query.trim() !== "") {
@@ -887,6 +919,7 @@ Item {
           title: "Frequent"
           entries: menu.frequentEntries
           offset: menu.pinnedEntries.length
+          removable: true
         }
 
         // Now playing.
