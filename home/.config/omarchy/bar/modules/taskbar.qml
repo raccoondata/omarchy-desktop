@@ -681,6 +681,9 @@ BarWidget {
     dropItem = hit ? hit.item : null
   }
 
+  // For settings (Frequent's hidden apps).
+  readonly property var superMenuPanel: superMenu
+
   SuperMenu {
     id: superMenu
     taskbar: root

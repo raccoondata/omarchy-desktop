@@ -3,7 +3,8 @@ import qs.Commons
 
 // One titled grid of app tiles in the super menu (SuperMenu.qml). In the
 // pinned grid (reorderable) tiles can be dragged to a new spot; every tile has
-// a +/- button (on hover or when selected) to pin or unpin it.
+// a +/- button (on hover or when selected) to pin or unpin it; in a removable
+// grid (Frequent) an × beside it takes the app out of that grid.
 Column {
   id: section
   required property var owner
@@ -12,6 +13,7 @@ Column {
   property int offset: 0
   property string empty: ""
   property bool reorderable: false
+  property bool removable: false
 
   width: owner.gridWidth
   spacing: Style.space(6)
@@ -182,10 +184,49 @@ Column {
           }
         }
 
+        // Take it out of this grid (Frequent), in the other corner.
+        Rectangle {
+          id: removeButton
+          readonly property bool shown: section.removable && (tileMouse.containsMouse || removeMouse.containsMouse || pinMouse.containsMouse || tile.current)
+            && section.owner.dragIndex < 0
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.margins: Style.space(4)
+          width: Style.space(20)
+          height: width
+          radius: Math.min(Style.cornerRadius, width / 2)
+          color: removeMouse.containsMouse ? Color.accent : Util.alpha(Color.menu.text, 0.08)
+          border.width: 1
+          border.color: Util.alpha(Color.menu.text, 0.25)
+          opacity: shown ? 1 : 0
+          visible: section.removable
+
+          Behavior on opacity { NumberAnimation { duration: section.owner.taskbar.motionFast } }
+
+          Text {
+            anchors.centerIn: parent
+            text: "×"
+            color: removeMouse.containsMouse ? Color.background : Color.menu.text
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.body
+          }
+
+          MouseArea {
+            id: removeMouse
+            anchors.fill: parent
+            enabled: removeButton.shown
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onEntered: section.owner.hoverDetail = "Remove from Frequent (Delete) · still in search"
+            onExited: section.owner.hoverDetail = ""
+            onClicked: section.owner.hideFrequent(tile.modelData)
+          }
+        }
+
         // Pin (+) or unpin (−), in the corner while hovered or selected.
         Rectangle {
           id: pinButton
-          readonly property bool shown: (tileMouse.containsMouse || pinMouse.containsMouse || tile.current)
+          readonly property bool shown: (tileMouse.containsMouse || pinMouse.containsMouse || (section.removable && removeMouse.containsMouse) || tile.current)
             && section.owner.dragIndex < 0
           anchors.top: parent.top
           anchors.right: parent.right
