@@ -69,9 +69,10 @@ added it yourself).
 - **Windows-style windows**: Super+Up / Down to maximize, restore and
   minimize, Super+Left / Right to dock to a half, title bars with minimize
   and maximize buttons, hot corners.
-- **Screenshots** (the Screenshots plugin): Print Screen opens the editor (Tensaku) with an ask panel
-  next to it: type a question and send the screenshot to Claude Code, Codex
-  or whichever agents you have, in a new or an open session.
+- **Screenshots** (the Screenshots plugin, on top of Agent Tools): Print
+  Screen opens the editor (Tensaku) with an ask panel next to it: type a
+  question and send the screenshot to Claude Code, Codex or whichever agents
+  you have, in a new or an open session.
 - **Coding agents** (the Agent Tools plugin): finds the agents you have
   installed (Omarchy's list), asks about files from Files' right-click menu or
   about selected text (Super+Alt+A), and puts their "done" / "needs you"

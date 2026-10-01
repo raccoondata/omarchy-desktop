@@ -14,8 +14,8 @@ bundle that adds them all. Nothing should need the taskbar to be installed.
 | windows | Super+arrows ladder, minimize/restore, Super+Tab switcher, title bars + drag (Hyprland plugins), double-tap close, snap preview | Setup > Windows |
 | hot-corners | corners and their effects | Setup > Hot Corners |
 | now-playing | the card, visualizers, output picker | Setup > Now Playing |
-| screenshots | capture, editor, fly-out; "ask an agent" when the agent tools are there | Setup > Screenshots |
-| agent-tools | agent launchers, notifications, Files right-click, ask panel, safe mode | Setup > Agents |
+| screenshots | Print Screen into the editor or a preview with the ask panel (requires agent-tools) | Setup > Screenshots |
+| agent-tools | the agents base: the agent list, starting and pasting into sessions, the ask panel and card, notifications; plus small entry points into the ask card (Files right-click, Super+Alt+A, Super+C/V twice, safe mode), each with an on/off switch | Setup > Agent Tools |
 | rescue | Ctrl+Alt+Del task manager, Ctrl+Alt+Esc rescue console, lock guard, backup lock, reboot to Windows | — |
 | remote-access | RustDesk unattended setup | — |
 | line-icons | done (raccoondata/omarchy-line-icons) | Setup > Line Icons |
@@ -25,9 +25,15 @@ listing the installed elements' settings.
 
 ## Rules
 
-- A plugin works alone. Another plugin is used only if installed: Line
-  Icons (else app icons), agent-tools (else no ask), desktop-core is the one
-  hard requirement (each plugin's setup adds it if missing).
+- A plugin works alone, apart from what it requires. desktop-core is
+  required by all. Other plugins are used only if installed (Line Icons,
+  else app icons), through `bridges/` files loaded by a Loader.
+- Agent features: agent-tools is the base. A small entry point into its ask
+  card (a menu item, a key) lives inside agent-tools with its own on/off
+  switch. Anything with its own substantial UI, or that takes over
+  something Omarchy already does, is a separate plugin that requires
+  agent-tools (screenshots: without an agent it would only repeat
+  Omarchy's own Print Screen).
 - Omarchy gives third-party plugins no access to each other's services, so
   desktop-core's service publishes shared state as files in
   `$XDG_RUNTIME_DIR/desktop-core/` (programs.json, mru.json,
@@ -74,7 +80,7 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    Desktop Core's hypr-include adds a plugin's Hyprland file to
    hyprland.lua. Agent Tools took over the Files extension and the safe-mode
    unit at the same paths, so install.sh's "dropped files" step skips them.
-   Screenshots loads Agent Tools' ask panel through bridges/AskPanel.qml.
+   Screenshots requires Agent Tools and uses its ask panel directly.
 3. super-menu (done locally): its own key file, Host.qml as its link to the
    rest; Desktop Core counts app use. First release: line-icons and
    super-menu, after a visual pass.
