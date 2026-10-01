@@ -1348,6 +1348,19 @@ Item {
           onToggled: settings.set("newAppIcons", !checked)
         }
       }
+      SettingRow {
+        visible: icTab.prefs.newAppIcons !== false && icTab.prefs.newAppIcons !== "false"
+        label: "Draw with"
+        description: "the agent the new-app notification hands the icon to"
+        Dropdown {
+          width: Style.space(180)
+          showLabel: false
+          fontFamily: Style.font.menuFamily
+          options: [{ value: "", label: "Default agent" }].concat((settings.taskbar.agents || []).map(function(a) { return { value: a.id, label: a.name } }))
+          value: icTab.prefs.newAppIconsAgent || ""
+          onChanged: function(v) { settings.set("newAppIconsAgent", v) }
+        }
+      }
     }
   }
 
