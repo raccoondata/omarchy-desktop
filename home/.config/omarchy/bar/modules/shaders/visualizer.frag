@@ -18,6 +18,17 @@
 //   6 aurora      ribbons of light, lit across the width by the spectrum
 //   7 woods       walking through a digital forest: pines in layers, fog,
 //                 the spectrum glowing in the grass, fireflies flaring
+// Scenes 0-7 get a glitch layer on top (main): slices torn sideways on the
+// bass, a ghost in the other colour, corrupt blocks, scanlines.
+// The glitch family:
+//   8 glitch      a spectrum torn into slices that jump on the kicks, split
+//                 into two colours, with blocks flipping and dropping out
+//   9 signal      signal loss: a waveform built from the bands, tearing,
+//                 rolling on the kicks, lost in snow when the music is quiet
+//   10 blocks     macroblocks: the spectrum as compressed-video blocks,
+//                 moshed sideways and smeared, more so on the bass
+//   11 sorted     pixel sort: streaks dripping from the top, each as long
+//                 as its band
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -64,17 +75,24 @@ float spec(float x, float t) {
     return mix(bandAt(int(i)), bandAt(int(min(i + 1.0, 15.0))), f - i);
 }
 
-void main() {
-    // Snap to the grain, then work in a centred space (height = 2).
-    vec2 px = floor(qt_TexCoord0 * vec2(w, h) / grainPx) * grainPx + grainPx * 0.5;
-    vec2 p = (px - vec2(w, h) * 0.5) / (h * 0.5);
-    float t = tick / 15.0;   // seconds
-    float b = live > 0.5 ? beatLevel : beat(tick);
-    float pm = live > 0.5 ? pump : 0.3 + 0.5 * b;          // the bass's pulse
-    float loud = live > 0.5 ? loudness : 0.45;
-    int s = int(sceneIndex + 0.5);
-    float v = 0.0;   // brightness
-    float mixB = 0.0;  // how much of the second colour
+// Signal loss's waveform at x: the spectrum as harmonics, about -0.8..0.8.
+float signalWave(float x, float t) {
+    float wv = 0.0, total = 0.0;
+    for (int i = 0; i < 8; i++) {
+        float fi = float(i);
+        float weight = 1.0 / (1.0 + fi * 0.4);
+        wv += spec(fi / 7.0, t) * sin(x * 6.2832 * (1.0 + fi * 1.5) + t * (1.2 + fi * 0.35)) * weight;
+        total += weight;
+    }
+    return wv / total * 2.2;
+}
+
+// One scene at a (grain-snapped) pixel: (brightness, how much of the second
+// colour).
+vec2 scene(vec2 px, int s, float t, float b, float pm, float loud) {
+    vec2 p = (px - vec2(w, h) * 0.5) / (h * 0.5);   // centred, height = 2
+    float v = 0.0;
+    float mixB = 0.0;
 
     if (s == 0) {  // tunnel
         float r = length(p) * (1.25 - 0.45 * pm), a = atan(p.y, p.x);   // the mouth pumps
@@ -111,7 +129,7 @@ void main() {
         // A glow in the middle on the bass.
         v = max(v, smoothstep(0.2 + 0.5 * pm, 0.0, length(p)) * pm * 0.8);
         mixB = step(0.5, fract(p.x * 3.0));
-        v *= 0.7 + 0.5 * b;
+        v *= (0.25 + 1.3 * loud) * (0.8 + 0.4 * b);
     } else if (s == 3) {  // battery
         float r = length(p), a = atan(p.y, p.x);
         float ring = step(0.85 - 0.35 * pm, fract(r * 3.0 - t * 0.8));
@@ -161,7 +179,7 @@ void main() {
             float cell = floor(x);
             float f = fract(x) - 0.5;
             // Trees stretch with their band.
-            float hgt = (0.35 + 0.2 * L + 0.25 * hash(vec2(cell, L))) * (0.85 + 0.3 * spec(hash(vec2(cell, L + 9.0)), t));
+            float hgt = (0.35 + 0.2 * L + 0.25 * hash(vec2(cell, L))) * (0.6 + 0.7 * spec(hash(vec2(cell, L + 9.0)), t));
             float y = 1.0 - uv.y;                              // up from the ground
             float trunk = step(abs(f), 0.03 + 0.02 * L) * step(y, hgt * 0.35);
             float canopy = step(abs(f), (hgt - y) * (0.55 + 0.1 * L)) * step(hgt * 0.25, y) * step(y, hgt);
@@ -170,7 +188,7 @@ void main() {
             v = mix(v, 0.04 + 0.06 * (2.0 - L), tree);
             mixB = mix(mixB, 0.0, tree);
             // Fog between layers.
-            v += (0.03 + 0.08 * loud) * (1.0 - y) * (1.0 - tree) * (2.0 - L) * 0.5;
+            v += (0.01 + 0.2 * loud) * (1.0 - y) * (1.0 - tree) * (2.0 - L) * 0.5;
         }
         // Digital grass along the ground: the spectrum, in pixel steps.
         float grass = ceil(spec(uv.x, t) * 8.0) / 8.0 * 0.16;
@@ -186,17 +204,133 @@ void main() {
         }
         // Digital: faint scanlines.
         v *= 0.9 + 0.1 * sin(px.y * 1.6);
+    } else if (s == 8) {  // glitch
+        vec2 uv = px / vec2(w, h);
+        float slice = floor(uv.y * 12.0);
+        float k = floor(tick / 2.0);
+        float shift = hash(vec2(slice, k)) > 0.78 - 0.35 * b ? (hash(vec2(slice, tick)) - 0.5) * (0.12 + 0.4 * pm) : 0.0;
+        float x = fract(uv.x + shift);
+        float y = 1.0 - uv.y;
+        float bars = clamp(floor(w / max(grainPx, 1.0) / 6.0), 16.0, 48.0);
+        float main = 0.0, ghost = 0.0;
+        for (int i = 0; i < 2; i++) {
+            // The ghost: the same spectrum a little to the side (the split).
+            float xx = fract(x + (i == 1 ? 0.01 + 0.035 * pm : 0.0));
+            float bi = floor(xx * bars);
+            float hgt = 0.04 + 0.92 * spec(bi / (bars - 1.0), t);
+            float on = step(fract(xx * bars), 0.75) * step(y, hgt) * (0.45 + 0.55 * y / hgt);
+            if (i == 0) main = on; else ghost = on;
+        }
+        // Corrupt blocks: some flip, some go dark.
+        vec2 blk = floor(uv * vec2(20.0, 6.0));
+        float hb = hash(blk + floor(tick / 3.0) * 1.7);
+        if (hb > 0.975 - 0.05 * b) main = 1.0 - main * 0.8;
+        else if (hb < 0.02) { main = 0.0; ghost = 0.0; }
+        v = max(main, ghost * 0.7);
+        mixB = ghost > main ? 1.0 : 0.0;
+        if (shift != 0.0) mixB = 1.0 - mixB;                          // torn slices swap colours
+        v *= 0.82 + 0.18 * step(0.5, fract(px.y / (grainPx * 2.0)));  // scanlines
+    } else if (s == 9) {  // signal loss
+        vec2 uv = px / vec2(w, h);
+        float k = floor(tick);
+        float roll = b * 0.35 * (hash(vec2(k, 2.0)) - 0.5);           // vertical hold slips on a kick
+        float slice = floor(uv.y * 16.0);
+        float tear = hash(vec2(slice, k)) > 0.8 - 0.35 * pm ? (hash(vec2(slice, k + 1.0)) - 0.5) * (0.15 + 0.3 * pm) : 0.0;
+        float x = uv.x + tear;
+        float yy = fract(uv.y + roll) * 2.0 - 1.0;
+        // The wave, and its ghost a little behind (the colours split apart).
+        float d = abs(yy - signalWave(x, t));
+        float dg = abs(yy - signalWave(x - 0.012 - 0.03 * pm, t));
+        float line = smoothstep(0.07 + 0.05 * pm, 0.0, d) + 0.25 * smoothstep(0.35, 0.0, d);
+        float ghost = 0.7 * smoothstep(0.06 + 0.05 * pm, 0.0, dg);
+        // Snow, thicker when the signal (the music) is weak.
+        float snow = hash(floor(px / grainPx) + k * vec2(1.3, 7.7));
+        float noise = snow * (0.06 + 0.3 * (1.0 - clamp(loud * 2.0, 0.0, 1.0)));
+        v = max(max(line, ghost), noise);
+        mixB = ghost > line ? 1.0 : (line > noise ? 0.0 : 1.0);
+        if (tear != 0.0) v *= 0.75;
+    } else if (s == 10) {  // macroblocks
+        vec2 uv = px / vec2(w, h);
+        vec2 grid = vec2(floor(clamp(w / h * 6.0, 12.0, 40.0)), 6.0);
+        vec2 cell = floor(uv * grid);
+        float k = floor(tick / 2.0);
+        vec2 src = cell;
+        // Moshed: a block shows one from beside it.
+        if (hash(cell + k * 0.73) > 0.8 - 0.3 * pm) src.x = mod(src.x + floor((hash(cell + k) - 0.5) * 8.0) + grid.x, grid.x);
+        // Smeared: a run of blocks repeats the one at its left.
+        float smear = hash(vec2(cell.y, floor(tick / 4.0))) > 0.7 ? floor(hash(vec2(cell.y, k)) * grid.x) : -1.0;
+        if (smear >= 0.0 && cell.x > smear && cell.x < smear + 2.0 + 6.0 * pm) src.x = smear;
+        float f = spec(src.x / (grid.x - 1.0), t);
+        float row = grid.y - 1.0 - src.y;                             // 0 at the bottom
+        float on = step(row / grid.y, f * 1.05 - 0.02);
+        vec2 inner = fract(uv * grid);
+        // Solid blocks, lit from below; a moshed one carries a compression
+        // pattern and the other colour.
+        bool moshed = src.x != cell.x;
+        float pat = moshed ? 0.55 + 0.45 * step(0.5, fract(inner.x * 2.0 + floor(inner.y * 2.0) * 0.5)) : 0.8 + 0.2 * (1.0 - inner.y);
+        float edge = step(0.08, inner.x) * step(0.1, inner.y);
+        v = on * pat * edge * (0.45 + 0.55 * (row + 1.0) / grid.y);
+        mixB = moshed ? 1.0 : 0.0;
+        if (hash(cell + floor(tick / 12.0) * 3.1) > 0.985) { v = max(v, 0.7 * edge); mixB = 1.0; }   // a stuck block
+    } else if (s == 11) {  // pixel sort
+        vec2 uv = px / vec2(w, h);
+        float colW = grainPx * 2.0;
+        float col = floor(px.x / colW);
+        float x = col / max(floor(w / colW) - 1.0, 1.0);
+        // Each column starts at its own height and smears down as far as
+        // its band; bright at the head, or (some) at the tail.
+        float start = hash(vec2(col, floor(tick / 6.0))) * 0.35;
+        float along = (uv.y - start) / (spec(x, t) * (0.9 - start) + 0.03);
+        float on = step(0.0, along) * step(along, 1.0);
+        float grad = hash(vec2(col, 3.0)) > 0.5 ? 1.0 - along : along;
+        v = on * (0.25 + 0.75 * grad);
+        if (hash(vec2(col, floor(tick))) > 0.93 - 0.2 * b) v *= 0.4;   // a column skips
+        mixB = step(0.5, hash(vec2(col, floor(tick / 6.0) + 5.0)));
+        v = max(v, 0.08 * hash(floor(px / grainPx) + floor(tick / 3.0)));   // the unsorted rest
     } else {  // aurora
         for (int i = 0; i < 3; i++) {
             float k = float(i);
             float y = (0.2 + 0.4 * pm) * sin(p.x * (1.2 + 0.4 * k) + t * (0.5 + 0.2 * k) + k) + (k - 1.0) * 0.3;
             float band = smoothstep(0.2 + 0.3 * loud, 0.0, abs(p.y - y)) * (0.5 + 0.5 * sin(p.x * 6.0 + t * 2.0 + k));
             // Lit across the width by the spectrum, low on the left.
-            v = max(v, band * (0.15 + 1.5 * spec(qt_TexCoord0.x, t)));
+            v = max(v, band * (0.15 + 1.5 * spec(px.x / w, t)));
             if (k == 1.0) mixB = band;
         }
     }
-    vec3 ink = mix(inkA.rgb, inkB.rgb, clamp(mixB, 0.0, 1.0) * 0.6);
-    float a = clamp(v, 0.0, 1.0) * qt_Opacity;
+    return vec2(v, mixB);
+}
+
+void main() {
+    // Snap to the grain (chunky pixels for the Omarchy look).
+    vec2 px = floor(qt_TexCoord0 * vec2(w, h) / grainPx) * grainPx + grainPx * 0.5;
+    float t = tick / 15.0;   // seconds
+    float b = live > 0.5 ? beatLevel : beat(tick);
+    float pm = live > 0.5 ? pump : 0.3 + 0.5 * b;          // the bass's pulse
+    float loud = live > 0.5 ? loudness : 0.45;
+    int s = int(sceneIndex + 0.5);
+    vec2 o;
+    if (s >= 8) {
+        o = scene(px, s, t, b, pm, loud);   // the glitch family: glitched already
+    } else {
+        // The glitch layer over the older scenes, driven by the bass: slices
+        // torn sideways, a ghost split off in the other colour, corrupt
+        // blocks, scanlines.
+        vec2 uv = px / vec2(w, h);
+        float slice = floor(uv.y * 10.0);
+        float tear = hash(vec2(slice, floor(tick / 2.0))) > 0.86 - 0.4 * pm
+            ? (hash(vec2(slice, tick)) - 0.5) * w * (0.08 + 0.3 * pm) : 0.0;
+        vec2 q = floor(vec2(mod(px.x + tear, w), px.y) / grainPx) * grainPx + grainPx * 0.5;
+        vec2 body = scene(q, s, t, b, pm, loud);
+        vec2 ghost = scene(q + vec2(grainPx * floor(1.0 + 6.0 * pm), 0.0), s, t, b, pm, loud);
+        o.x = max(body.x, ghost.x * 0.55);
+        o.y = ghost.x * 0.55 > body.x ? 1.0 : body.y;
+        if (tear != 0.0) o.y = 1.0 - o.y;
+        float hb = hash(floor(uv * vec2(18.0, 5.0)) + floor(tick / 3.0) * 1.7);
+        if (hb > 0.992 - 0.025 * b) o.x = 1.0 - o.x * 0.8;
+        else if (hb < 0.01 + 0.03 * pm) o.x *= 0.1;
+        o.x *= 0.82 + 0.18 * step(0.5, fract(px.y / (grainPx * 2.0)));
+    }
+    vec3 ink = mix(inkA.rgb, inkB.rgb, clamp(o.y, 0.0, 1.0) * 0.6);
+    float a = clamp(o.x, 0.0, 1.0) * qt_Opacity;
     fragColor = vec4(ink * a, a);
 }

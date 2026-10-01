@@ -3,10 +3,12 @@
 // computed here from `tick` (a step count the item advances ~10 times a
 // second while playing), so the CPU work per frame is one number. Styles are
 // deterministic: "random" motion is hashed from (column, tick), so no state.
-// Compile: shaders/build (qsb). Styles, by index:
+// Compile: shaders/build (qsb). Styles, by index (Visuals.js eqStyles):
 //   0 spectrum  1 wave  2 embers  3 ripple  4 scope  5 mist
-//   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 flashlights
-//   12 woods
+//   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 woods
+//   12 glitch   13 static  14 corrupt
+// Styles 0-11 get a glitch layer on top (main): rows torn sideways on the
+// bass, an echo on the beat, dropouts, stuck pixels.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -140,8 +142,10 @@ float brightness(float c, float r, float t, int s) {
         float d = sqrt((c - mid) * (c - mid) * 0.55 + r * r);
         float period = rowCount * 0.9;
         float front = mod(d - t * 0.5, period);
-        float glow = isLive() ? 0.35 + bass : 1.0;
-        return front < 1.0 ? clamp(glow * (1.0 - d / (rowCount * 1.3)), 0.0, 1.0) : 0.0;
+        // Live: brighter and further out the stronger the bass.
+        float glow = isLive() ? 0.12 + 1.3 * bass : 1.0;
+        float far = isLive() ? rowCount * (0.4 + 1.1 * bass) : rowCount * 1.3;
+        return front < 1.0 ? clamp(glow * (1.0 - d / far), 0.0, 1.0) : 0.0;
     }
     if (s == 4) {  // scope, with a faint trail
         float b = 0.0;
@@ -175,14 +179,14 @@ float brightness(float c, float r, float t, int s) {
     if (s == 7) {  // radar, with an afterglow
         float b = 0.0;
         for (int k = 0; k < 3; k++) b = max(b, radarBeam(c, r, (t - float(k)) * 0.4) * pow(0.6, float(k)));
-        return isLive() ? b * (0.4 + 1.2 * bass) : b;
+        return isLive() ? b * (0.12 + 1.5 * bass) : b;
     }
     if (s == 8) {  // swirl
         float cx = mid, cy = (rowCount - 1.0) / 2.0;
         float dx = c - cx, dy = (r - cy) * 1.4;
         float d = sqrt(dx * dx + dy * dy);
         float v = cos(2.0 * atan(dy, dx) - d * 0.9 + t * 0.28);
-        float swirlGlow = isLive() ? 0.35 + loudness * 1.4 : 1.0;
+        float swirlGlow = isLive() ? 0.1 + loudness * 1.9 : 1.0;
         return v > 0.3 ? min(1.0, swirlGlow * v * max(0.25, 1.0 - d / (max(cx, cy) * 1.6))) : 0.0;
     }
     if (s == 9) {  // plasma, in four steps
@@ -192,36 +196,14 @@ float brightness(float c, float r, float t, int s) {
         float l = floor((v + 4.0) / 8.0 * 4.0) / 3.0;
         return l > 0.34 ? l : 0.0;
     }
-    if (s == 11) {  // flashlights: two beams sweeping the dark from the lower corners
-        float b = 0.0;
-        float reachLen = isLive() ? 0.45 + 0.9 * loudness : 0.9;
-        for (int k = 0; k < 2; k++) {
-            float side = k == 0 ? -1.0 : 1.0;
-            vec2 origin = vec2(k == 0 ? -0.5 : cols - 0.5, -0.5);
-            // Sweeping, each at its own pace; aimed up and inwards.
-            float aim = radians(90.0 + side * (32.0 + 22.0 * sin(t * (0.09 + 0.03 * float(k)) + float(k) * 2.1)));
-            vec2 d = vec2(c, r) - origin;
-            d.y *= cols / max(1.0, rowCount) * 0.55;   // the grid is wide: widen the cone's look
-            float dist = length(d) / max(cols, 1.0);
-            float off = abs(atan(d.y, d.x) - aim);
-            float cone = smoothstep(radians(13.0), radians(4.0), off);
-            float fall = clamp(1.0 - dist / reachLen, 0.0, 1.0);
-            b = max(b, cone * fall);
-            // Dust in the beam.
-            if (cone > 0.3 && hash(vec2(c * 7.0 + r, floor(t * 0.7) + float(k))) > 0.93) b = max(b, 0.9 * fall + 0.1);
-        }
-        // Now and then one flickers, like a torch with a loose battery.
-        float flick = hash(vec2(floor(t * 0.5), 3.0)) > 0.94 ? 0.35 : 1.0;
-        return b * flick * (isLive() ? 0.55 + 0.9 * bass : 1.0);
-    }
-    if (s == 12) {  // woods: walking through a pixel forest (faster when louder)
+    if (s == 11) {  // woods: walking through a pixel forest (faster when louder)
         float b = 0.0;
         for (int k = 0; k < 3; k++) {
             float lit = woodsLayer(c, r, t, k);
             if (lit > 0.0) {
                 float tone = 0.18 + 0.32 * float(k);          // far dim, near bright
-                // The canopies glow with the music at their column.
-                if (isLive() && lit < 1.0) tone *= 0.7 + 1.2 * band(c);
+                // The trees glow with the music at their column.
+                if (isLive()) tone *= 0.3 + 1.8 * band(c);
                 b = lit * tone;                                // nearer layers cover farther ones
             }
         }
@@ -250,6 +232,39 @@ float brightness(float c, float r, float t, int s) {
         }
         return b;
     }
+    if (s == 12) {  // glitch: the spectrum, torn: rows jump sideways (more on
+                    // the bass), a column drops out, a pixel sticks
+        float k = floor(t);
+        float shift = 0.0;
+        if (hash(vec2(r, k)) > 0.84 - (isLive() ? 0.45 * bass : 0.1))
+            shift = floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.6);
+        float cc = mod(c + shift + cols, cols);
+        float h = isLive() ? ceil(band(cc) * rowCount) : level(cc, t, reach(cc), 3.0);
+        float b = bar(r, h);
+        if (shift != 0.0) b = b > 0.0 ? 1.0 : (hash(vec2(c, r + k)) > 0.8 ? 0.35 : 0.0);
+        if (hash(vec2(c, k + 0.5)) > 0.95) b = 0.0;                      // dropout
+        if (hash(vec2(c * 7.0 + r, floor(t / 5.0))) > 0.985) b = 1.0;    // stuck pixel
+        return b;
+    }
+    if (s == 13) {  // static: snow shaped like the spectrum, new every tick
+        float shape = isLive() ? clamp(band(c) * 1.3, 0.0, 1.0) : reach(c) / rowCount * 0.6;
+        float chance = shape * (1.0 - 0.7 * r / rowCount);
+        float n = hash(vec2(c * 1.37 + r * 7.1, floor(t)));
+        return n < chance ? 0.45 + 0.55 * hash(vec2(r, c + floor(t))) : 0.0;
+    }
+    if (s == 14) {  // corrupt: the spectrum in 3x2 blocks, some showing the
+                    // wrong block; now and then a column hangs upside down
+        float k = floor(t / 2.0);
+        vec2 blk = vec2(floor(c / 3.0), floor(r / 2.0));
+        float cc = c, rr = r;
+        if (hash(blk + k * 1.31) > 0.86 - (isLive() ? 0.3 * bass : 0.05)) {
+            cc = mod(c + floor(hash(blk + k) * 5.0 - 2.0) * 3.0 + cols, cols);
+            rr = mod(r + floor(hash(blk.yx + k) * 3.0 - 1.0) * 2.0 + rowCount, rowCount);
+        }
+        if (hash(vec2(cc, floor(t / 4.0) + 9.0)) > 0.9) rr = rowCount - 1.0 - rr;
+        float h = isLive() ? ceil(band(cc) * rowCount) : level(cc, t, reach(cc), 3.0);
+        return bar(rr, h);
+    }
     // spectrum: the music's bands, or random heights without it
     if (isLive()) return bar(r, ceil(band(c) * rowCount));
     return bar(r, level(c, t, reach(c), 3.0));
@@ -267,7 +282,23 @@ void main() {
         return;
     }
     float r = rowCount - 1.0 - rowTop;  // row 0 at the bottom
-    float b = mute > 0.5 ? (r == 0.0 ? 1.0 : 0.0) : brightness(c, r, tick, int(styleIndex + 0.5));
+    int st = int(styleIndex + 0.5);
+    float b;
+    if (mute > 0.5) b = r == 0.0 ? 1.0 : 0.0;
+    else if (st >= 12) b = brightness(c, r, tick, st);   // the glitch family: glitched already
+    else {
+        // The glitch layer over the older styles, driven by the bass: rows
+        // torn sideways, a dim echo a column behind on the beat, a column
+        // dropping out, a stuck pixel.
+        float k = floor(tick);
+        float kick = live > 0.5 ? bass : 0.3;
+        float shift = hash(vec2(r, k)) > 0.88 - 0.4 * kick ? floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.5) : 0.0;
+        float cc = mod(c + shift + cols, cols);
+        b = brightness(cc, r, tick, st);
+        if (kick > 0.45) b = max(b, 0.35 * brightness(mod(cc - 1.0 + cols, cols), r, tick, st));
+        if (hash(vec2(c, k + 0.5)) > 0.985 - 0.025 * kick) b = 0.0;
+        if (hash(vec2(c * 7.0 + r, floor(tick / 5.0))) > 0.99) b = 1.0;
+    }
     float a = clamp(b, 0.0, 1.0) * ink.a * qt_Opacity;
     fragColor = vec4(ink.rgb * a, a);
 }

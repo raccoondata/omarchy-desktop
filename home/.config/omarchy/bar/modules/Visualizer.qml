@@ -1,12 +1,14 @@
 import QtQuick
 import qs.Commons
 import "AudioLevels.js" as AudioLevels
+import "Visuals.js" as Visuals
 
 // The now-playing card's visualizer scenes, after Windows Media Player's,
 // drawn on the GPU by shaders/visualizer.frag, following the music (cava, via
 // AudioLevels.js). The CPU only hands over the spectrum and advances `tick`
 // (15 a second) while `playing`, so a scene costs the same as a still one.
 //   tunnel  kaleido  starfield  battery  lava  lissajous  aurora  woods
+//   glitch  signal  blocks  sorted (the glitch family)
 ShaderEffect {
   id: vis
 
@@ -17,7 +19,8 @@ ShaderEffect {
   property color colorA: Color.accent
   property color colorB: Color.foreground
 
-  readonly property var scenes: ["tunnel", "kaleido", "starfield", "battery", "lava", "lissajous", "aurora", "woods"]
+  // The order is the shader's scene index (Visuals.js).
+  readonly property var scenes: Visuals.values(Visuals.scenes)
 
   // The shader's inputs (names match shaders/visualizer.frag).
   property real tick: Math.floor(Math.random() * 1000)

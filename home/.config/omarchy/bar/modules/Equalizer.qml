@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "AudioLevels.js" as AudioLevels
+import "Visuals.js" as Visuals
 
 // The pixel equalizer behind a taskbar icon while its app plays sound, and
 // the now-playing card's visualizer. Drawn entirely on the GPU by one shader
@@ -22,9 +23,14 @@ import "AudioLevels.js" as AudioLevels
 //   swirl     two spiral arms turning ("Ambience")
 //   plasma    a slow interference pattern in four steps ("Alchemy")
 //   rain      drops falling a row at a time
-//   flashlights  two beams sweeping the dark from the lower corners
 //   woods     walking through a pixel forest: pines in layers passing at
 //             their own pace, canopies glowing with the music, motes rising
+// The glitch family:
+//   glitch    the spectrum torn: rows jump sideways on the bass, a column
+//             drops out, a pixel sticks
+//   static    snow in the spectrum's shape, new every tick
+//   corrupt   the spectrum in blocks, some showing the wrong one, a column
+//             now and then upside down
 //   shuffle   a different one every 20 seconds, the same for every equalizer
 ShaderEffect {
   id: eq
@@ -39,7 +45,8 @@ ShaderEffect {
   property string style: "spectrum"
   property color color: Color.accent
 
-  readonly property var styles: ["spectrum", "wave", "embers", "ripple", "scope", "mist", "fire", "radar", "swirl", "plasma", "rain", "flashlights", "woods"]
+  // The order is the shader's style index (Visuals.js).
+  readonly property var styles: Visuals.values(Visuals.eqStyles)
   // Shuffle: the same style everywhere at once, by the clock.
   property string shown: style === "shuffle" ? styles[Math.floor(Date.now() / 20000) % styles.length] : style
 

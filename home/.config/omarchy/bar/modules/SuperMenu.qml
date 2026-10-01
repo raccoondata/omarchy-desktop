@@ -11,6 +11,7 @@ import qs.services
 import "MediaWindow.js" as MediaWindow
 import "AudioLevels.js" as AudioLevels
 import "taskbar-icons.js" as TaskbarIcons
+import "Visuals.js" as Visuals
 
 // Super menu: double-tap Super (or Caps Lock, which is Super here) for your
 // common apps in a grid, drawn like Omarchy's own menu.
@@ -962,7 +963,7 @@ property real live: 0
           // (GPU, only while the menu is open and it's playing).
           readonly property string eqChoice: String(menu.taskbar.pref("superMenuEq", "same"))
           readonly property string fxChoice: String(menu.taskbar.pref("superMenuArtFx", "off"))
-          readonly property var fxModes: ["off", "glitch", "chroma", "pixel", "crt", "melt", "solar", "night", "torch"]
+          readonly property var fxModes: Visuals.values(Visuals.artEffects)
           Equalizer {
             id: npEq
             anchors.right: npControls.left
