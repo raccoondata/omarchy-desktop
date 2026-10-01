@@ -887,6 +887,22 @@ Item {
           }
         }
         SettingRow {
+          label: "Double-click an agent"
+          description: tbTab.pick("doubleClickGather", "same") === "agents" ? "gathers every coding agent's windows (Claude, Codex, ...)"
+            : tbTab.pick("doubleClickGather", "same") === "agentsTerminals" ? "an agent or a terminal: gathers every agent's and terminal's windows"
+            : "gathers just that app's windows"
+          ButtonGroup {
+            options: [{ value: "same", label: "Same app" }, { value: "agents", label: "All agents" },
+                      { value: "agentsTerminals", label: "+ terminals" }]
+            value: tbTab.pick("doubleClickGather", "same")
+            foreground: Color.menu.text
+            background: Color.menu.background
+            fontFamily: Style.font.menuFamily
+            fontSize: Style.font.bodySmall
+            onChanged: function(v) { settings.set("doubleClickGather", v) }
+          }
+        }
+        SettingRow {
           label: "Double-click a single window"
           description: "maximize or restore it"
           ButtonGroup {

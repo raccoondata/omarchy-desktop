@@ -113,6 +113,10 @@ BarWidget {
   // taskbar-action.)
   readonly property string doubleClickGroup: String(pref("doubleClickGroup", "tile"))     // tile | here | none
   readonly property string doubleClickWindow: String(pref("doubleClickWindow", "maximize")) // maximize | none
+  // Double-clicking an agent (or terminal) gathers: same (just that app's
+  // windows) | agents (every coding agent's) | agentsTerminals (those and
+  // every terminal's).
+  readonly property string doubleClickGather: String(pref("doubleClickGather", "same"))
   readonly property bool clickActiveMinimizes: pref("clickActive", "none") === "minimize"
   readonly property int hoverDelay: Math.max(150, Math.min(1500, Number(pref("hoverDelay", 450))))
   readonly property int previewSize: Math.max(130, Math.min(320, Number(pref("previewSize", 190))))
@@ -430,6 +434,45 @@ BarWidget {
     return toplevel ? (programByAddress[hexAddress(toplevel)] || "") : ""
   }
 
+  // A coding agent's window: a terminal running one, or an agent's own
+  // window class. A terminal: a terminal's window class, or any window with a
+  // program in the foreground of a terminal (window-programs).
+  function isAgentWindow(toplevel) {
+    return !!toplevel && (TaskbarStatus.isAgentProgram(programOf(toplevel)) || TaskbarStatus.isAgentClass(classOf(toplevel)))
+  }
+  function isTerminalWindow(toplevel) {
+    return !!toplevel && (TaskbarStatus.isTerminalClass(classOf(toplevel)) || programOf(toplevel) !== "")
+  }
+
+  // Every open window of a kind ("agents" or "agentsTerminals"), for
+  // bringing them together. Windows parked on special workspaces (other
+  // than minimized) stay out.
+  function gatherSet(kind) {
+    var list = []
+    for (var i = 0; i < toplevels.length; i++) {
+      var t = toplevels[i]
+      var ws = t.workspace
+      if (ws && ws.id < 0 && !isMinimized(t)) continue
+      if (isAgentWindow(t) || (kind === "agentsTerminals" && isTerminalWindow(t))) list.push(t)
+    }
+    return list
+  }
+
+  // What double-clicking this group gathers (see doubleClickGather).
+  function doubleClickSet(windows) {
+    var anyAgent = windows.some(isAgentWindow)
+    var anyTerminal = windows.some(isTerminalWindow)
+    if (doubleClickGather === "agents" && anyAgent) return gatherSet("agents")
+    if (doubleClickGather === "agentsTerminals" && (anyAgent || anyTerminal)) return gatherSet("agentsTerminals")
+    return windows
+  }
+
+  function sameWindows(a, b) {
+    if (a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (b.indexOf(a[i]) === -1) return false
+    return true
+  }
+
   function agentOf(toplevel) {
     return toplevel ? TaskbarStatus.agentState(toplevel.title, programOf(toplevel)) : ""
   }
@@ -593,6 +636,17 @@ BarWidget {
     // The same without keyboard focus, for a look (screenshots, tests).
     function settingsPreview(tab: string): void { taskbarSettings.preview(tab) }
     function settingsClose(): void { taskbarSettings.close() }
+    // For checking without opening anything: a group's right-click menu
+    // labels, and the windows a gather would bring together (by title).
+    function menuLabels(key: string): string {
+      for (var i = 0; i < root.groups.length; i++)
+        if (root.groups[i].key === key)
+          return JSON.stringify(root.buildMenu(root.groups[i]).map(function(m) { return m.label || m.kind }))
+      return "[]"
+    }
+    function gatherPreview(kind: string): string {
+      return JSON.stringify(root.gatherSet(kind).map(function(t) { return root.classOf(t) + " | " + root.title(t) }))
+    }
     // Print Screen (~/.config/omarchy/screenshot): the screenshot card.
     // ~/.config/omarchy/lock: show the lock card before locking; it goes away
     // by itself on unlock (or if the lock doesn't happen).
@@ -1258,6 +1312,16 @@ BarWidget {
     if (bar && windows.length > 0) bar.run(actionScript + " " + action + " " + addresses(windows))
   }
 
+  // Bring every agent (and terminal) together, the way double-clicking a
+  // group does (its own workspace, or here): the window used last leads, then
+  // this group's, then the rest.
+  function gatherTogether(group, kind) {
+    var set = byRecent(gatherSet(kind))
+    var mine = set.filter(function(w) { return group.windows.indexOf(w) !== -1 })
+    var rest = set.filter(function(w) { return group.windows.indexOf(w) === -1 })
+    runAction(doubleClickGroup === "here" ? "here" : "tile", mine.concat(rest), true)
+  }
+
   function byRecent(windows, order) {
     var list = order && order.length ? order : mru
     var ranked = windows.map(function(w, i) {
@@ -1279,6 +1343,8 @@ BarWidget {
     else if (item.action === "here-off") setOpensHere(group, false)
     else if (item.action === "titlebar-on") setTitlebar(group, true)
     else if (item.action === "titlebar-off") setTitlebar(group, false)
+    else if (item.action === "gather-agents") gatherTogether(group, "agents")
+    else if (item.action === "gather-agents-terminals") gatherTogether(group, "agentsTerminals")
     else runAction(item.action, item.windows)
   }
 
@@ -1339,6 +1405,16 @@ BarWidget {
       var sound = audioOf(windows)
       if (sound.playing) items.push({ action: sound.muted ? "unmute" : "mute", label: sound.muted ? "Unmute" : "Mute" })
       if (n > 1) items.push({ action: "tile", label: "Tile together" })
+      // Agents and terminals: bring the others to them too (only when that's
+      // more than this group already is).
+      var agentsHere = windows.some(isAgentWindow), terminalsHere = windows.some(isTerminalWindow)
+      if (agentsHere || terminalsHere) {
+        var allAgents = gatherSet("agents"), allBoth = gatherSet("agentsTerminals")
+        if (agentsHere && allAgents.length > 1 && !sameWindows(allAgents, windows))
+          items.push({ action: "gather-agents", glyphKey: "tile", label: "Bring agents together" })
+        if (allBoth.length > 1 && !sameWindows(allBoth, windows) && !sameWindows(allBoth, allAgents))
+          items.push({ action: "gather-agents-terminals", glyphKey: "tile", label: "Bring agents and terminals together" })
+      }
       if (minimized < n) items.push({ action: "minimize", label: n > 1 ? "Minimize all" : "Minimize" })
       if (minimized > 0) items.push({ action: "restore", label: n > 1 ? "Restore all" : "Restore" })
       if (n === 1 && minimized === 0) {
@@ -1993,11 +2069,14 @@ BarWidget {
           // The window you were using before the double-click leads the tile
           // (biggest spot, focused).
           // "Bring to current workspace" apps: all of them come here.
+          // Agents (and terminals) can gather all of their kind
+          // (Taskbar & Desktop > Windows: double-click an agent or terminal).
+          var gathered = root.opensHere(modelData) ? windows : root.doubleClickSet(windows)
           if (count > 1 && root.opensHere(modelData)) {
             root.runAction("here", root.byRecent(windows, mruAtClick), true)
-          } else if (count > 1) {
+          } else if (gathered.length > 1) {
             if (root.doubleClickGroup === "tile" || root.doubleClickGroup === "here")
-              root.runAction(root.doubleClickGroup, root.byRecent(windows, mruAtClick), true)
+              root.runAction(root.doubleClickGroup, root.byRecent(gathered, mruAtClick), true)
           } else if (root.doubleClickWindow === "maximize") {
             root.runAction("maximize", [primary])
           }

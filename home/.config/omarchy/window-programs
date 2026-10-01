@@ -57,6 +57,35 @@ def cwd(pid):
     return "~" + p[len(HOME):] if p == HOME or p.startswith(HOME + "/") else p
 
 
+INTERPRETERS = {"node", "bun", "deno", "python", "python3", "MainThread"}
+
+
+def script_name(pid):
+    """What an interpreter is running, by the command it was started as
+    (gemini, grok and other agents written in JavaScript show up as node):
+    /usr/bin/gemini -> gemini, .../@scope/some-cli/dist/index.js -> some-cli."""
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            args = f.read().decode(errors="replace").split("\0")[1:]
+    except OSError:
+        return ""
+    for a in args:
+        if not a or a.startswith("-"):
+            continue
+        parts = [x for x in a.split("/") if x]
+        if not parts:
+            return ""
+        name = parts[-1].rsplit(".", 1)[0] if parts[-1].endswith((".js", ".mjs", ".cjs", ".ts", ".py")) else parts[-1]
+        # A package's entry file: name the package instead.
+        if name in ("index", "cli", "main", "bin", "run", "__main__") and len(parts) > 1:
+            for x in reversed(parts[:-1]):
+                if x not in ("dist", "bin", "lib", "build", "src", "out", "cli"):
+                    name = x
+                    break
+        return name.removesuffix("-cli") if name.endswith("-cli") else name
+    return ""
+
+
 def terminals(pid):
     """The window process's shells: [(program or "" when idle, folder)]."""
     out = []
@@ -68,6 +97,8 @@ def terminals(pid):
         if not leader:
             continue
         name = leader[1]
+        if name in INTERPRETERS:
+            name = script_name(st[0]) or name
         out.append(("" if name in SHELLS else name, cwd(st[0])))
     return out
 
