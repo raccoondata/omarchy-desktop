@@ -7,8 +7,9 @@
 //   0 spectrum  1 wave  2 embers  3 ripple  4 scope  5 mist
 //   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 woods
 //   12 glitch   13 static  14 corrupt
-// Styles 0-11 get a glitch layer on top (main): rows torn sideways on the
-// bass, an echo on the beat, dropouts, stuck pixels.
+// Styles 0-11 get a glitch layer on top (main), all from the music, none in
+// silence: rows torn on the hits, an echo while the bass swells, dropouts and
+// stuck pixels on the kicks.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 
@@ -32,6 +33,8 @@ layout(std140, binding = 0) uniform buf {
     float live;
     float loudness;
     float bass;
+    float beatLevel;  // kicks, decaying
+    float pump;       // the bass, rising at once and falling slowly
 };
 
 float hash(vec2 p) {
@@ -51,6 +54,11 @@ float band(float c) {
     return mix(bandAt(int(fi)), bandAt(int(min(fi + 1.0, 15.0))), fract(x));
 }
 bool isLive() { return live > 0.5; }
+
+// How hard the music hits right now, 0 in silence: the kicks most, the
+// bass's swell some (a steady 0.25 without cava). Glitches happen only as
+// often as this says.
+float hit() { return isLive() ? clamp(beatLevel * 0.9 + pump * pump * 0.5, 0.0, 1.0) : 0.25; }
 
 // How tall a column may get: tallest in the middle.
 float reach(float c) {
@@ -232,24 +240,26 @@ float brightness(float c, float r, float t, int s) {
         }
         return b;
     }
-    if (s == 12) {  // glitch: the spectrum, torn: rows jump sideways (more on
-                    // the bass), a column drops out, a pixel sticks
+    if (s == 12) {  // glitch: the spectrum, torn: rows jump sideways on the
+                    // hits, a column drops out, a pixel sticks
         float k = floor(t);
         float shift = 0.0;
-        if (hash(vec2(r, k)) > 0.84 - (isLive() ? 0.45 * bass : 0.1))
+        if (hash(vec2(r, k)) < 0.55 * hit())
             shift = floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.6);
         float cc = mod(c + shift + cols, cols);
         float h = isLive() ? ceil(band(cc) * rowCount) : level(cc, t, reach(cc), 3.0);
         float b = bar(r, h);
         if (shift != 0.0) b = b > 0.0 ? 1.0 : (hash(vec2(c, r + k)) > 0.8 ? 0.35 : 0.0);
-        if (hash(vec2(c, k + 0.5)) > 0.95) b = 0.0;                      // dropout
-        if (hash(vec2(c * 7.0 + r, floor(t / 5.0))) > 0.985) b = 1.0;    // stuck pixel
+        if (hash(vec2(c, k + 0.5)) < 0.08 * hit()) b = 0.0;                  // dropout
+        if (hash(vec2(c * 7.0 + r, floor(t / 5.0))) < 0.02 * hit()) b = 1.0; // stuck pixel
         return b;
     }
     if (s == 13) {  // static: snow shaped like the spectrum, new every tick
         float shape = isLive() ? clamp(band(c) * 1.3, 0.0, 1.0) : reach(c) / rowCount * 0.6;
-        float chance = shape * (1.0 - 0.7 * r / rowCount);
+        float chance = shape * (1.0 - 0.7 * r / rowCount) * (0.6 + 1.0 * hit());
         float n = hash(vec2(c * 1.37 + r * 7.1, floor(t)));
+        // A kick sweeps a row of solid static across.
+        if (isLive() && hash(vec2(r, floor(t) + 3.0)) < 0.25 * beatLevel) return 0.8;
         return n < chance ? 0.45 + 0.55 * hash(vec2(r, c + floor(t))) : 0.0;
     }
     if (s == 14) {  // corrupt: the spectrum in 3x2 blocks, some showing the
@@ -257,11 +267,11 @@ float brightness(float c, float r, float t, int s) {
         float k = floor(t / 2.0);
         vec2 blk = vec2(floor(c / 3.0), floor(r / 2.0));
         float cc = c, rr = r;
-        if (hash(blk + k * 1.31) > 0.86 - (isLive() ? 0.3 * bass : 0.05)) {
+        if (hash(blk + k * 1.31) < 0.04 + 0.45 * hit()) {
             cc = mod(c + floor(hash(blk + k) * 5.0 - 2.0) * 3.0 + cols, cols);
             rr = mod(r + floor(hash(blk.yx + k) * 3.0 - 1.0) * 2.0 + rowCount, rowCount);
         }
-        if (hash(vec2(cc, floor(t / 4.0) + 9.0)) > 0.9) rr = rowCount - 1.0 - rr;
+        if (hash(vec2(cc, floor(t / 4.0) + 9.0)) < 0.15 * hit()) rr = rowCount - 1.0 - rr;
         float h = isLive() ? ceil(band(cc) * rowCount) : level(cc, t, reach(cc), 3.0);
         return bar(rr, h);
     }
@@ -287,17 +297,19 @@ void main() {
     if (mute > 0.5) b = r == 0.0 ? 1.0 : 0.0;
     else if (st >= 12) b = brightness(c, r, tick, st);   // the glitch family: glitched already
     else {
-        // The glitch layer over the older styles, driven by the bass: rows
-        // torn sideways, a dim echo a column behind on the beat, a column
-        // dropping out, a stuck pixel.
+        // The glitch layer over the older styles, all of it from the music
+        // (none in silence): rows torn sideways on the hits, a dim echo a
+        // column behind while the bass swells, columns dropping out and
+        // pixels sticking on the kicks.
         float k = floor(tick);
-        float kick = live > 0.5 ? bass : 0.3;
-        float shift = hash(vec2(r, k)) > 0.88 - 0.4 * kick ? floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.5) : 0.0;
+        float h = hit();
+        float shift = hash(vec2(r, k)) < 0.45 * h ? floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.5) : 0.0;
         float cc = mod(c + shift + cols, cols);
         b = brightness(cc, r, tick, st);
-        if (kick > 0.45) b = max(b, 0.35 * brightness(mod(cc - 1.0 + cols, cols), r, tick, st));
-        if (hash(vec2(c, k + 0.5)) > 0.985 - 0.025 * kick) b = 0.0;
-        if (hash(vec2(c * 7.0 + r, floor(tick / 5.0))) > 0.99) b = 1.0;
+        float swell = isLive() ? pump : 0.3;
+        if (swell > 0.4) b = max(b, 0.45 * swell * brightness(mod(cc - 1.0 + cols, cols), r, tick, st));
+        if (hash(vec2(c, k + 0.5)) < 0.06 * h) b = 0.0;
+        if (hash(vec2(c * 7.0 + r, k)) < 0.015 * h) b = 1.0;
     }
     float a = clamp(b, 0.0, 1.0) * ink.a * qt_Opacity;
     fragColor = vec4(ink.rgb * a, a);

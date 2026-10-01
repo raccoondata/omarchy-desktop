@@ -93,15 +93,15 @@ void main() {
         float slice = floor(uv.y * rows);
         float jolt = hash(vec2(slice, floor(t))) ;
         float edge = 0.9 - 0.45 * highs;                                    // more slices on the treble
-        float shift = (jolt > edge ? (jolt - edge) * 0.9 : 0.0) * (0.3 + b + pm) * sign(hash(vec2(slice, t)) - 0.5);
+        float shift = (jolt > edge ? (jolt - edge) * 0.9 : 0.0) * (b + pm * pm) * sign(hash(vec2(slice, t)) - 0.5);
         vec2 p = uv + vec2(shift, 0.0);
         float split = 0.003 + 0.04 * pm;
         c = vec4(tex(p + vec2(split, 0.0)).r, tex(p).g, tex(p - vec2(split, 0.0)).b, tex(p).a);
         // Corrupt blocks: a patch shows another part of the picture.
         vec2 block = floor(uv * vec2(8.0, 10.0));
-        if (hash(block + floor(t / 2.0)) > 0.97 - 0.25 * mids * mids - 0.1 * b) c.rgb = tex(fract(uv + vec2(hash(block), hash(block.yx)) * 0.3)).rgb * vec3(1.1, 0.9, 1.2);
+        if (hash(block + floor(t / 2.0)) > 1.0 - 0.25 * mids * mids - 0.1 * b) c.rgb = tex(fract(uv + vec2(hash(block), hash(block.yx)) * 0.3)).rgb * vec3(1.1, 0.9, 1.2);
         // A bright noise line now and then.
-        if (abs(uv.y - hash(vec2(floor(t), 9.0))) < 0.004 && hash(vec2(t, 4.0)) > 0.6) c.rgb = vec3(hash(uv * t));
+        if (abs(uv.y - hash(vec2(floor(t), 9.0))) < 0.004 && hash(vec2(t, 4.0)) < 0.5 * highs) c.rgb = vec3(hash(uv * t));
     } else if (m == 2) {  // chroma
         float a = t * 0.15;
         vec2 dir = vec2(cos(a), sin(a)) * (0.003 + 0.05 * pm + 0.02 * b);
@@ -128,7 +128,7 @@ void main() {
         // Each column drips as far as its band (32 columns over 16 bands).
         float col = floor(uv.x * 32.0);
         float drip = 0.5 + 0.5 * hash(vec2(col, 5.0));
-        float fall = drip * (0.01 + 0.3 * spec(col / 31.0, t)) * smoothstep(0.0, 1.0, uv.y);
+        float fall = drip * (0.01 + 0.3 * spec(col / 31.0, t)) * (1.0 + b) * smoothstep(0.0, 1.0, uv.y);
         vec2 p = uv - vec2(0.012 * sin(uv.y * 14.0 + t * 0.35) * (0.4 + b), fall);
         c = tex(p);
     } else if (m == 6) {  // solar
@@ -161,7 +161,7 @@ void main() {
         float row = floor(uv.y * 40.0);
         float f = spec(1.0 - row / 39.0, t);
         float dir = hash(vec2(row, floor(t / 2.0))) > 0.5 ? 1.0 : -1.0;
-        float shift = pow(f, 1.6) * 0.4 * dir;
+        float shift = pow(f, 1.6) * 0.4 * dir * (0.7 + 1.2 * b);         // wider on the kicks
         float split = 0.004 + 0.06 * abs(shift);
         vec2 p = vec2(fract(uv.x + shift), uv.y);
         c = vec4(tex(vec2(fract(p.x + split), p.y)).r, tex(p).g, tex(vec2(fract(p.x - split), p.y)).b, tex(p).a);
@@ -171,7 +171,7 @@ void main() {
         float f = spec(col / 63.0, t);
         // Some column runs sort, some don't (changing every so often).
         if (hash(vec2(col, floor(t / 8.0))) < 0.35 + 0.6 * f) {
-            float thr = 0.72 - 0.4 * loud;
+            float thr = 0.72 - 0.4 * loud - 0.25 * b;                     // more pixels sort on a kick
             float len = 0.04 + 0.45 * f;
             float best = lum(c.rgb);
             for (int i = 1; i <= 12; i++) {
@@ -192,8 +192,8 @@ void main() {
         // Flipped bits: a row swaps channels or wraps around.
         float row = q.y;
         float hr = hash(vec2(row, floor(t)));
-        if (hr > 0.97 - 0.12 * highs) c.rgb = c.gbr;
-        else if (hr < 0.02 + 0.06 * highs) c.rgb = fract(c.rgb + 0.5);
+        if (hr > 1.0 - 0.12 * highs - 0.05 * b) c.rgb = c.gbr;
+        else if (hr < 0.06 * highs) c.rgb = fract(c.rgb + 0.5);
         c.rgb = clamp(c.rgb, 0.0, 1.0);
     } else if (m == 11) {  // vhs
         vec2 p = uv;
