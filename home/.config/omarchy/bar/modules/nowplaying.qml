@@ -435,6 +435,58 @@ BarWidget {
     stdout: StdioCollector { onStreamFinished: root.outputSinkName = this.text.trim() }
   }
 
+  // Where the sound goes: the outputs by name (audio-outputs: Speakers,
+  // Headphones, the monitor, a Bluetooth device), switchable from the card.
+  // Read when the card opens and, while it's open, whenever a sink or sound
+  // card changes (`pactl subscribe`), so plugging in headphones shows up; a
+  // switch nobody clicked is announced over the art.
+  property var outputs: []
+  property string pickedOutput: ""
+  readonly property var currentOutput: {
+    for (var i = 0; i < outputs.length; i++) if (outputs[i].current) return outputs[i]
+    return null
+  }
+  function outputGlyph(kind) {
+    return kind === "headphones" ? "󰋋" : kind === "display" ? "󰍹" : kind === "bluetooth" ? "󰂯" : "󰓃"
+  }
+  function setOutput(o) {
+    if (!o || o.current) return
+    pickedOutput = o.key
+    outputs = outputs.map(function(x) { return Object.assign({}, x, { current: x.key === o.key }) })
+    Util.execArgv([omarchyDir + "/audio-outputs", "set", o.sink, o.port])
+  }
+  Process {
+    id: outputsProc
+    command: [root.omarchyDir + "/audio-outputs"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var list
+        try { list = JSON.parse(this.text) } catch (e) { return }
+        var before = root.currentOutput ? root.currentOutput.key : ""
+        root.outputs = list
+        var now = root.currentOutput
+        if (now && before !== "" && now.key !== before && now.key !== root.pickedOutput && root.popupOpen)
+          fxToast.show(root.outputGlyph(now.kind) + "  " + now.label)
+        if (now && now.key === root.pickedOutput) root.pickedOutput = ""
+      }
+    }
+  }
+  Process {
+    running: root.popupOpen
+    command: ["pactl", "subscribe"]
+    stdout: SplitParser {
+      onRead: function(line) { if (/ on (sink|card|server) /.test(line)) outputsRefresh.restart() }
+    }
+  }
+  Timer {
+    id: outputsRefresh
+    interval: 300
+    onTriggered: {
+      if (!outputsProc.running) outputsProc.running = true
+      if (!outputSinkProc.running) outputSinkProc.running = true
+    }
+  }
+
   // This app's volume: its PipeWire stream, else what the player reports.
   readonly property bool hasAppVolume: (!!playerStream && !!playerStream.audio) || hasVolume
   readonly property real appVolume: playerStream && playerStream.audio ? playerStream.audio.volume
@@ -462,7 +514,7 @@ BarWidget {
   function close() { popupOpen = false; previewOnly = false }
   onHasMediaChanged: if (!hasMedia) popupOpen = false
   onPopupOpenChanged: {
-    if (popupOpen) { streamSnapshot.restart(); if (!outputSinkProc.running) outputSinkProc.running = true }
+    if (popupOpen) { streamSnapshot.restart(); outputsRefresh.restart() }
     else { streamSnapshot.stop(); streams = []; previewOnly = false }
   }
 
@@ -1665,9 +1717,9 @@ BarWidget {
               anchors.verticalCenter: parent.verticalCenter
               fontFamily: root.fontFamily
               readonly property bool isApp: root.hasAppVolume
-              name: isApp ? (root.appName || "This app") : "System"
+              name: isApp ? (root.appName || "This app") : (root.currentOutput ? root.currentOutput.label : "System")
               icon: isApp ? root.playerAppIcon() : ""
-              glyph: isApp ? "󰝚" : "󰓃"
+              glyph: isApp ? "󰝚" : (root.currentOutput ? root.outputGlyph(root.currentOutput.kind) : "󰓃")
               level: isApp ? root.appVolume : (root.outputSink && root.outputSink.audio ? root.outputSink.audio.volume : 0)
               muted: isApp ? root.appMuted : (!!root.outputSink && !!root.outputSink.audio && root.outputSink.audio.muted)
               highlight: isApp
@@ -1717,8 +1769,8 @@ BarWidget {
                 width: parent.width
                 visible: appRow.isApp
                 fontFamily: root.fontFamily
-                name: "System"
-                glyph: "󰓃"
+                name: root.currentOutput ? root.currentOutput.label : "System"
+                glyph: root.currentOutput ? root.outputGlyph(root.currentOutput.kind) : "󰓃"
                 level: root.outputSink && root.outputSink.audio ? root.outputSink.audio.volume : 0
                 muted: !!root.outputSink && !!root.outputSink.audio && root.outputSink.audio.muted
                 onChangeLevel: function(v) { if (root.outputSink && root.outputSink.audio) root.outputSink.audio.volume = v }
@@ -1759,6 +1811,60 @@ BarWidget {
                 color: root.tint(root.text, 0.4)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
+              }
+            }
+          }
+        }
+
+        // Where the sound goes: every output, the current one lit; click to
+        // switch (playing apps move along).
+        Flow {
+          width: parent.width
+          spacing: Style.space(6)
+          visible: root.outputs.length > 0
+          opacity: card.enter
+
+          Repeater {
+            model: root.outputs
+
+            Rectangle {
+              id: outChip
+              required property var modelData
+              readonly property bool selected: modelData.current
+              width: outRow.implicitWidth + Style.space(14)
+              height: outRow.implicitHeight + Style.space(8)
+              radius: Style.cornerRadius
+              color: selected ? root.tint(root.accent, 0.16) : (outMouse.containsMouse ? root.tint(root.text, 0.08) : "transparent")
+              border.width: 1
+              border.color: selected ? root.accent : root.tint(root.text, 0.16)
+              Behavior on color { ColorAnimation { duration: 120 } }
+
+              Row {
+                id: outRow
+                anchors.centerIn: parent
+                spacing: Style.space(6)
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: root.outputGlyph(outChip.modelData.kind)
+                  color: outChip.selected ? root.accent : root.tint(root.text, 0.6)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.PlainText
+                  text: outChip.modelData.label
+                  color: outChip.selected ? root.text : root.tint(root.text, 0.7)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+              }
+              MouseArea {
+                id: outMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: outChip.selected ? Qt.ArrowCursor : Qt.PointingHandCursor
+                onClicked: root.setOutput(outChip.modelData)
               }
             }
           }

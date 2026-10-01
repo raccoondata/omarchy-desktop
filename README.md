@@ -62,7 +62,9 @@ back; your settings files stay).
   asks about files from Files' right-click menu or about selected text
   (Super+Alt+A), and puts their "done" / "needs you" notices on the taskbar.
 - **Now playing**: title and artist on the bar, a card with album art and
-  controls, a volume mixer; scroll for volume. Visualizers after Windows
+  controls, a volume mixer, the audio outputs by name (Speakers,
+  Headphones, your monitor, a Bluetooth device: click to switch); scroll
+  for volume. Visualizers after Windows
   Media Player's (pixel equalizers, and scenes like Tunnel, Battery, Lava)
   and album-art effects (Glitch, CRT, Melt...): right-click the art for the
   next visualizer, middle-click for the next effect; Taskbar & Desktop >

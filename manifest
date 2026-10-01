@@ -13,6 +13,7 @@
 .config/omarchy/agents
 .config/omarchy/ask-agent
 .config/omarchy/audio-owners
+.config/omarchy/audio-outputs
 .config/omarchy/backup-lock
 .config/omarchy/bar-height
 .config/omarchy/hotcorner
