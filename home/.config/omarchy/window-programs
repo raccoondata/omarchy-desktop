@@ -1,31 +1,155 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
+#!/usr/bin/python3 -S
 # Print {"0x<address>": "<program>", ...}: for every window, the program in
 # the foreground of the terminal it hosts (nvim, lazygit, claude, ...). Idle
 # shells are left out. The taskbar uses it to show that program's icon.
+#
+# A terminal's shells are the children of the window's process; each one's
+# tty foreground process is whatever has the keyboard. Some terminals
+# (Ghostty, kitty, foot --server) run every window from one process, so its
+# shells can't be told apart by process: each window is matched to one by its
+# title (an idle shell's title is its folder; a program's usually names it),
+# and a window that can't be matched is left out rather than guessed.
+# Reads only the windows' processes in /proc: it runs on every window title
+# change (at most every 3 seconds), so it's kept quick.
 
-ps -eo pid=,ppid=,tpgid=,comm= | awk -v clients="$(hyprctl clients -j | jq -r '.[] | "\(.address)=\(.pid)"' | tr '\n' ' ')" '
-  BEGIN { split("bash zsh fish sh dash ghostty", s, " "); for (i in s) shell[s[i]] = 1 }
-  { children[$2] = children[$2] " " $1; fg[$1] = $3; name[$1] = $4 }
-  END {
-    n = split(clients, list, " ")
-    printf "{"
-    first = 1
-    for (i = 1; i <= n; i++) {
-      split(list[i], kv, "=")
-      program = ""
-      # A child of the window process owns the terminal; its tty foreground
-      # process group leader is whatever currently has the keyboard.
-      m = split(children[kv[2]], kids, " ")
-      for (j = 1; j <= m && program == ""; j++) {
-        leader = fg[kids[j]]
-        if (leader > 0 && (leader in name) && !(name[leader] in shell)) program = name[leader]
-      }
-      if (program != "") {
-        printf "%s\"%s\":\"%s\"", (first ? "" : ","), kv[1], program
-        first = 0
-      }
-    }
-    print "}"
-  }'
+import json
+import os
+import socket
+
+SHELLS = {"bash", "zsh", "fish", "sh", "dash", "ghostty"}
+HOME = os.path.expanduser("~")
+
+
+def stat(pid):
+    """(tty foreground pid, name) of a process, or None if it's gone."""
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            s = f.read()
+    except OSError:
+        return None
+    # The name is in parentheses and may hold spaces or ")": split at the last.
+    i, j = s.index("("), s.rindex(")")
+    return int(s[j + 2:].split()[5]), s[i + 1:j]
+
+
+def children(pid):
+    """A process's children (all its threads': GTK terminals start shells
+    from other threads)."""
+    out = []
+    try:
+        tasks = os.listdir(f"/proc/{pid}/task")
+    except OSError:
+        return out
+    for t in tasks:
+        try:
+            with open(f"/proc/{pid}/task/{t}/children") as f:
+                out += [int(c) for c in f.read().split()]
+        except OSError:
+            pass
+    return out
+
+
+def cwd(pid):
+    try:
+        p = os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        return ""
+    return "~" + p[len(HOME):] if p == HOME or p.startswith(HOME + "/") else p
+
+
+def terminals(pid):
+    """The window process's shells: [(program or "" when idle, folder)]."""
+    out = []
+    for kid in children(pid):
+        st = stat(kid)
+        if not st or st[0] <= 0:
+            continue  # no terminal (a helper, a finished process)
+        leader = stat(st[0])
+        if not leader:
+            continue
+        name = leader[1]
+        out.append(("" if name in SHELLS else name, cwd(st[0])))
+    return out
+
+
+def score(title, term):
+    """How well a window title fits a shell: 0 (not at all) to 3."""
+    program, folder = term
+    t = title.lower()
+    if not program:
+        # Idle: the title is the folder, whole or shortened to its last parts
+        # ("…/data/deploy"), or ends with it ("bash: ~/x").
+        if not folder:
+            return 0
+        tail = title.lstrip(".…")
+        if title == folder or title.endswith(folder) or tail == os.path.basename(folder) \
+                or ("/" in tail and folder.endswith(tail)):
+            return 3
+        return 0
+    if program.lower() in t:
+        return 2
+    # Coding agents title the window with a status glyph and the task.
+    if program in ("claude", "codex", "opencode", "gemini", "pi", "grok") and title[:1] and not title[:1].isalnum() \
+            and title[:1] not in "~/.":
+        return 1
+    return 0
+
+
+def clients():
+    """Hyprland's windows, from its socket (quicker than starting hyprctl)."""
+    sock = os.path.join(os.environ.get("XDG_RUNTIME_DIR", ""), "hypr",
+                        os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", ""), ".socket.sock")
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as c:
+            c.connect(sock)
+            c.sendall(b"j/clients")
+            data = b"".join(iter(lambda: c.recv(65536), b""))
+        return json.loads(data or b"[]")
+    except (OSError, ValueError):
+        import subprocess
+        try:
+            return json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout)
+        except (OSError, ValueError):
+            return []
+
+
+def main():
+    windows = {}
+    for c in clients():
+        windows.setdefault(c["pid"], []).append(c)
+
+    result = {}
+    for pid, wins in windows.items():
+        terms = terminals(pid)
+        if not terms:
+            continue
+        if len(wins) == 1 and len(terms) == 1:
+            if terms[0][0]:
+                result[wins[0]["address"]] = terms[0][0]
+            continue
+        if len(wins) == 1 and len({t[0] for t in terms}) == 1:
+            # Tabs all running the same thing (or one window, several shells).
+            if terms[0][0]:
+                result[wins[0]["address"]] = terms[0][0]
+            continue
+        # Several windows (or tabs) on one process: best title matches first.
+        pairs = sorted(((score(w["title"], t), wi, ti) for wi, w in enumerate(wins) for ti, t in enumerate(terms)),
+                       reverse=True)
+        got, used = {}, set()
+        for s, wi, ti in pairs:
+            if s > 0 and wi not in got and ti not in used:
+                got[wi] = terms[ti][0]
+                used.add(ti)
+        # The rest: only when what's left is all the same.
+        left_w = [wi for wi in range(len(wins)) if wi not in got]
+        left_t = {terms[ti][0] for ti in range(len(terms)) if ti not in used}
+        if left_w and len(left_t) == 1:
+            for wi in left_w:
+                got[wi] = next(iter(left_t))
+        for wi, program in got.items():
+            if program:
+                result[wins[wi]["address"]] = program
+    print(json.dumps(result, separators=(",", ":")))
+
+
+main()
