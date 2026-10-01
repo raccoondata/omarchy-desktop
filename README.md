@@ -64,7 +64,7 @@ back; your settings files stay).
 - **Now playing**: title and artist on the bar, a card with album art and
   controls, a volume mixer, the audio outputs by name (Speakers, Headphones,
   your monitor, a Bluetooth device: click to switch); scroll for volume.
-  Glitch-styled visualizers (pixel equalizers like Glitch, Static, Corrupt;
+  Glitch-styled visualizers (pixel equalizers like Static, Corrupt, Radar;
   card scenes like Signal loss, Macroblocks, Pixel sort, and torn takes on
   Windows Media Player's) and album-art effects (Glitch, Datamosh, Tear,
   VHS...): click the visualizer for the next one, right-click the art for
