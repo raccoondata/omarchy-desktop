@@ -191,12 +191,9 @@ Item {
     var v = ownFolderAction(row, how) || globalFolderAction(how)
     return v === "smart" ? (row && (row.git || row.repos > 0) ? "agent" : "files") : v
   }
-  // Step a folder's own action for a key: default (the settings'), smart,
-  // files, terminal, agent, editor, copy, then back to default.
+  // A folder's own action for a key ("": back to the settings' default).
   readonly property var folderActionOrder: ["", "smart", "files", "terminal", "agent", "editor", "copy"]
-  function cycleFolderAction(row, how) {
-    var cur = ownFolderAction(row, how)
-    var next = folderActionOrder[(folderActionOrder.indexOf(cur) + 1) % folderActionOrder.length]
+  function setFolderAction(row, how, next) {
     var all = Object.assign({}, folderActions)
     var mine = Object.assign({}, all[row.path] || {})
     if (next === "") delete mine[how]
@@ -210,12 +207,7 @@ Item {
     return a === "smart" ? "Agent for repos, else Files" : a === "agent" && askAgents.length ? askAgents[0].name
       : a === "files" ? "Files" : a === "terminal" ? "Terminal" : a === "editor" ? "Editor" : a === "copy" ? "Copy path" : a
   }
-  // "Click: Terminal" / "Click: default (Files)", for the tile menu.
-  function folderActionLine(row, how) {
-    var key = how === "ctrl" ? "Ctrl+click" : how === "shift" ? "Shift+click" : "Click"
-    var own = ownFolderAction(row, how)
-    return key + ":  " + (own ? folderActionText(own) : "default (" + folderActionText(globalFolderAction(how)) + ")")
-  }
+
   function folderActionLabel(how, row) {
     var a = folderAction(how, row)
     return a === "agent" && askAgents.length ? askAgents[0].name : folderActionNames[a]
@@ -678,8 +670,36 @@ Item {
   function shadeColor(slot) {
     if (!slot) return ""
     if (slot === "accent") return String(Color.accent)
+    // A colour made to go with the theme: "hue:<degrees>:<b|s>" (bright or
+    // soft, in the style of the theme's own bright or soft colours).
+    var m = /^hue:(\d+):([bs])$/.exec(String(slot))
+    if (m) {
+      var style = m[2] === "b" ? shadeStyle.bright : shadeStyle.soft
+      return hexOf(parseInt(m[1], 10), style.s, style.v)
+    }
     return taskbar.themeColors[slot] || ""
   }
+  function hexOf(h, s, v) {
+    var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c
+    var rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+    return "#" + rgb.map(function(n) { var t = Math.round((n + m) * 255).toString(16); return t.length < 2 ? "0" + t : t }).join("")
+  }
+  function isBright(c) { return c.s >= 0.45 && c.v >= 0.5 }
+  // The theme's style: how saturated and bright its bright and its soft
+  // colours are, on average (made colours follow it).
+  readonly property var shadeStyle: {
+    var b = { s: 0, v: 0, n: 0 }, so = { s: 0, v: 0, n: 0 }
+    shadeChoices.forEach(function(slot) {
+      var c = hsvOf(shadeColor(slot)), t = isBright(c) ? b : so
+      t.s += c.s; t.v += c.v; t.n++
+    })
+    var dark = String(taskbar.themeColors.mode || "") !== "light"
+    return { bright: b.n ? { s: b.s / b.n, v: b.v / b.n } : { s: 0.6, v: 0.85 },
+             soft: so.n ? { s: so.s / so.n, v: so.v / so.n } : (dark ? { s: 0.5, v: 0.45 } : { s: 0.3, v: 0.9 }) }
+  }
+  // The colour wheel's families; one the theme has no colour near (in a
+  // row) gets one made to match.
+  readonly property var shadeFamilies: [0, 30, 55, 120, 175, 215, 270, 320]
   // The slots worth offering in this theme (a colour it doesn't have, or
   // one it repeats, is left out).
   readonly property var shadeChoices: {
@@ -693,8 +713,8 @@ Item {
     return out
   }
   // The picker's two rows: "none" and the bright colours, then the softer
-  // ones (pale, deep or greyish), each in hue order (red, orange, yellow,
-  // green, cyan, blue, purple). A theme with only one kind: split in two.
+  // ones (pale, deep or greyish), each in hue order round the colour wheel,
+  // the theme's own plus ones made to match it where it has none.
   function hsvOf(hex) {
     var n = parseInt(String(hex).slice(1, 7), 16)
     var r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255
@@ -705,16 +725,25 @@ Item {
   readonly property var shadeRows: {
     var all = shadeChoices.map(function(slot) { var c = hsvOf(shadeColor(slot)); return { slot: slot, h: c.h, s: c.s, v: c.v } })
     var byHue = function(a, b) { return a.h - b.h || b.v - a.v }
-    var bright = function(c) { return c.s >= 0.45 && c.v >= 0.5 }
-    var strong = all.filter(bright).sort(byHue)
-    var soft = all.filter(function(c) { return !bright(c) }).sort(byHue)
-    if (!strong.length || !soft.length) {
-      var sorted = all.sort(byHue), half = Math.ceil(sorted.length / 2)
-      strong = sorted.slice(0, half)
-      soft = sorted.slice(half)
+    var strong = all.filter(isBright)
+    var soft = all.filter(function(c) { return !isBright(c) })
+    // Families with nothing near them: a made colour each.
+    var near = function(list, h) { return list.some(function(c) { var d = Math.abs(c.h - h) % 360; return Math.min(d, 360 - d) <= 22 }) }
+    var fill = function(list, cls) {
+      shadeFamilies.forEach(function(h) {
+        if (!near(list, h)) list.push({ slot: "hue:" + h + ":" + cls, h: h, s: 1, v: 1 })
+      })
+      return list.sort(byHue)
     }
     var slots = function(list) { return list.map(function(c) { return c.slot }) }
-    return [[""].concat(slots(strong)), slots(soft)]
+    return [[""].concat(slots(fill(strong, "b"))), slots(fill(soft, "s"))]
+  }
+
+  function shadeName(slot) {
+    var m = /^hue:(\d+):([bs])$/.exec(String(slot))
+    if (!m) return String(slot).replace(/_/g, " ")
+    var names = { 0: "red", 30: "orange", 55: "yellow", 120: "green", 175: "cyan", 215: "blue", 270: "purple", 320: "pink" }
+    return (m[2] === "s" ? "soft " : "") + (names[m[1]] || m[1] + "\u00b0") + " (to go with the theme)"
   }
 
   function setShade(sec, slot) {
@@ -925,17 +954,31 @@ Item {
       return list
     }
     var sec = sectionOf(e.id)
+    var _ = folderActions   // re-read when they change
+    // A pinned folder's click, opened: its choices, ticked.
+    if (tileMenuDrill !== "") {
+      var keyName = tileMenuDrill === "ctrl" ? "Ctrl+click" : tileMenuDrill === "shift" ? "Shift+click" : "Click"
+      var own = ownFolderAction(e, tileMenuDrill)
+      var list2 = [{ label: "\u2039  Back", act: "back" }, { header: keyName + " opens", gap: true }]
+      folderActionOrder.forEach(function(a) {
+        list2.push({ label: a === "" ? "Default (" + folderActionText(globalFolderAction(tileMenuDrill)) + ")" : folderActionText(a),
+                     act: "folderAction", how: tileMenuDrill, value: a, checkable: true, checked: a === own })
+      })
+      return list2
+    }
     var items = [{ label: sec === -1 ? "Pin" : "Unpin", act: "pin" }]
+    items.push({ header: sec === -1 ? "Pin to" : "Move to", gap: true })
     for (var i = 0; i < sections.length; i++)
-      if (i !== sec) items.push({ label: (sec === -1 ? "Pin to " : "Move to ") + sections[i].name, act: "move", sec: i })
+      if (i !== sec) items.push({ label: sections[i].name, act: "move", sec: i })
     items.push({ label: e.folder ? "New group with this folder" : "New group with this app", act: "group" })
-    if (isFrequent(e)) items.push({ label: "Remove from Frequent", act: "hide" })
-    // A pinned folder: what each click does for it (click a line to step it).
+    if (isFrequent(e)) items.push({ label: "Remove from Frequent", act: "hide", gap: true })
+    // A pinned folder: what each click opens it with (each opens its choices).
     if (e.folder && sec !== -1) {
-      var _ = folderActions   // re-read when they change
-      items.push({ label: folderActionLine(e, "enter"), act: "cycle", how: "enter", gap: true })
-      items.push({ label: folderActionLine(e, "shift"), act: "cycle", how: "shift" })
-      items.push({ label: folderActionLine(e, "ctrl"), act: "cycle", how: "ctrl" })
+      items.push({ header: "Opens with", gap: true })
+      ;[["enter", "Click"], ["shift", "Shift+click"], ["ctrl", "Ctrl+click"]].forEach(function(k) {
+        var mine = ownFolderAction(e, k[0])
+        items.push({ label: k[1], value: (mine ? folderActionText(mine) : "Default") + "  \u203a", act: "drill", how: k[0] })
+      })
     }
     return items
   }
@@ -944,13 +987,20 @@ Item {
 
   function openBlockMenu(sec, scenePoint) { openTileMenu({ blockMenu: sec }, scenePoint) }
 
+  // A pinned folder's menu opened on one click's choices ("" none).
+  property string tileMenuDrill: ""
+
   function openTileMenu(entry, scenePoint) {
+    tileMenuDrill = ""
     tileMenuEntry = entry
     tileMenuPoint = scenePoint
   }
   function runTileMenu(item) {
     var e = tileMenuEntry
-    if (e && item && item.act === "cycle") { cycleFolderAction(e, item.how); return }   // stays open
+    // These keep the menu open.
+    if (e && item && item.act === "drill") { tileMenuDrill = item.how; return }
+    if (e && item && item.act === "back") { tileMenuDrill = ""; return }
+    if (e && item && item.act === "folderAction") { setFolderAction(e, item.how, item.value); tileMenuDrill = ""; return }
     tileMenuEntry = null
     if (!e || !item) return
     if (item.act === "shade") setShade(item.sec, item.slot)
@@ -1202,20 +1252,33 @@ Item {
   Timer {
     id: previewMenuTimer
     property int sec: 0
+    property int tile: -1
+    property string drill: ""
     interval: 500
     onTriggered: {
+      if (tile >= 0) {
+        var c = menu.tileCells[tile]
+        if (!c || !menu.tiles[tile]) return
+        menu.openTileMenu(menu.tiles[tile], blockCanvas.mapToItem(null, (c.c + 0.7) * menu.colPitch, c.r * menu.rowPitch + menu.bandHeight * 2))
+        menu.tileMenuDrill = drill
+        return
+      }
       var L = menu.layouts[sec]
       if (L) menu.openBlockMenu(sec, blockCanvas.mapToItem(null, (L.x + L.w) * menu.colPitch - menu.tileGap, L.y * menu.rowPitch + menu.bandHeight))
     }
   }
-  // "#menu:N" opens block N's ⋯ menu instead of typing (for screenshots).
+  // "#menu:N" opens block N's ⋯ menu instead of typing, "#tile:N[:enter]"
+  // tile N's right-click menu (on a click's choices) (for screenshots).
   function preview(text) {
     previewOnly = true
     open()
     var m = /^#menu:(\d+)$/.exec(String(text || ""))
-    if (m) {
+    var t = /^#tile:(\d+)(?::(\w+))?$/.exec(String(text || ""))
+    if (m || t) {
       // Once the menu has settled in (its entrance moves it).
-      previewMenuTimer.sec = parseInt(m[1], 10)
+      previewMenuTimer.sec = m ? parseInt(m[1], 10) : 0
+      previewMenuTimer.tile = t ? parseInt(t[1], 10) : -1
+      previewMenuTimer.drill = t && t[2] ? t[2] : ""
       previewMenuTimer.restart()
     } else {
       query = text || ""
@@ -2210,7 +2273,8 @@ property real live: 0
       readonly property real widest: menu.tileMenuItems.reduce(function(w, it) {
         if (it.swatches) return Math.max(w, Math.max(menu.shadeRows[0].length, menu.shadeRows[1].length) * Style.space(24))
         if (it.header) return w
-        return Math.max(w, tileMenuMetrics.advanceWidth(it.label) + (it.checkable ? Style.space(20) : 0))
+        return Math.max(w, tileMenuMetrics.advanceWidth(it.label) + (it.checkable ? Style.space(20) : 0)
+                           + (it.value && !it.checkable ? tileMenuMetrics.advanceWidth(it.value) + Style.space(24) : 0))
       }, 0)
       visible: menu.tileMenuEntry !== null
       z: 21
@@ -2284,7 +2348,7 @@ property real live: 0
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onEntered: menu.hoverDetail = parent.modelData === "" ? "No shade" : "Shade: " + parent.modelData.replace(/_/g, " ")
+                    onEntered: menu.hoverDetail = parent.modelData === "" ? "No shade" : "Shade: " + menu.shadeName(parent.modelData)
                     onExited: menu.hoverDetail = ""
                     onClicked: menu.runTileMenu({ act: "shade", sec: menu.tileMenuEntry.blockMenu, slot: parent.modelData })
                   }
@@ -2318,12 +2382,25 @@ property real live: 0
               font.family: Style.font.menuFamily
               font.pixelSize: Style.font.bodySmall
             }
+            // A value on the right (a folder's click: what it opens with).
+            Text {
+              id: rowValue
+              visible: !!menuRow.modelData.value && !menuRow.modelData.checkable
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(10)
+              anchors.verticalCenter: rowLabel.verticalCenter
+              text: menuRow.modelData.value || ""
+              color: itemMouse.containsMouse ? Color.menu.selectedText : Color.menu.text
+              opacity: 0.6
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.bodySmall
+            }
             Text {
               id: rowLabel
               visible: !menuRow.modelData.swatches && !menuRow.modelData.header
               anchors.left: parent.left
               anchors.leftMargin: Style.space(menuRow.modelData.checkable ? 30 : 10)
-              anchors.right: parent.right
+              anchors.right: rowValue.visible ? rowValue.left : parent.right
               anchors.rightMargin: Style.space(10)
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(6)
