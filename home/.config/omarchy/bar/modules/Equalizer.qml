@@ -8,27 +8,17 @@ import "Visuals.js" as Visuals
 // (shaders/equalizer.frag): the CPU only hands it the music's spectrum and a
 // tick, 10 times a second, and only while playing and shown, whatever the
 // style or size. The music comes from cava (AudioLevels.js): bars follow the
-// real bands, sparks and speed the loudness. Without cava: generated motion.
+// real bands, speed and glitches the loudness and kicks. Without cava: generated motion.
 // Muted, or saving power (`saving`, AudioLevels.saving): one flat row.
 //
-//   spectrum  columns step toward random heights, tallest in the middle
-//   wave      a wave rolls across the columns
-//   embers    pixels rise from the bottom and fade as they climb
-//   ripple    rings pulse out from the bottom centre, like a speaker cone
-// After Windows Media Player's visualizations, on the same pixel grid:
-//   scope     an oscilloscope line ("Bars and Waves: Scope")
+// Styles (Visuals.js), one per look; spectrum to plasma also get a glitch
+// layer (rows torn on the hits, an echo on the bass, dropouts on kicks):
+//   spectrum  the music's bands as bars
 //   mist      bars mirrored from the middle, leaving a trail ("Ocean Mist")
-//   fire      flames that cool as they rise ("Fire Storm")
+//   scope     an oscilloscope line ("Bars and Waves: Scope")
 //   radar     a sweeping beam with an afterglow ("Battery")
-//   swirl     two spiral arms turning ("Ambience")
-//   plasma    a slow interference pattern in four steps ("Alchemy")
-//   rain      drops falling a row at a time
-//   woods     walking through a pixel forest: pines in layers passing at
-//             their own pace, canopies glowing with the music, motes rising
-// The glitch family:
-//   glitch    the spectrum torn: rows jump sideways on the bass, a column
-//             drops out, a pixel sticks
-//   static    snow in the spectrum's shape, new every tick
+//   plasma    an interference pattern in four steps ("Alchemy")
+//   static    snow in the spectrum's shape, a row of solid static on kicks
 //   corrupt   the spectrum in blocks, some showing the wrong one, a column
 //             now and then upside down
 //   shuffle   a different one every 20 seconds, the same for every equalizer
