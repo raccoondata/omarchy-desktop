@@ -683,6 +683,27 @@ Item {
             }
           }
         }
+        Repeater {
+          model: [{ key: "superMenuFolderEnter", label: "Folder: Enter", fallback: "files",
+                    description: "in search, zoxide's folders (the ones you cd into most)" },
+                  { key: "superMenuFolderShift", label: "Folder: Shift+Enter", fallback: "terminal", description: "" },
+                  { key: "superMenuFolderCtrl", label: "Folder: Ctrl+Enter", fallback: "agent", description: "" }]
+          SettingRow {
+            required property var modelData
+            label: modelData.label
+            description: modelData.description
+            Dropdown {
+              width: Style.space(180)
+              showLabel: false
+              fontFamily: Style.font.menuFamily
+              options: [{ value: "files", label: "Open in Files" }, { value: "terminal", label: "Terminal there" },
+                        { value: "agent", label: "Coding agent there" }, { value: "editor", label: "Open in editor" },
+                        { value: "copy", label: "Copy the path" }]
+              value: (settings.taskbar.prefs || {})[modelData.key] || modelData.fallback
+              onChanged: function(v) { settings.set(modelData.key, v) }
+            }
+          }
+        }
         SettingRow {
           label: "Frequent apps"
           description: "the apps you use most that aren't pinned; hover one and click × (or Delete) to take it out"

@@ -23,7 +23,10 @@ import "Visuals.js" as Visuals
 //             switch to an app, and launches from here). Optional (setting
 //             superMenuFrequent); × on a tile, or Delete, keeps that app out
 //             of it ("hiddenFrequent" in supermenu.json)
-//   Search    just type: all apps, Omarchy's own launcher search
+//   Search    just type: all apps, Omarchy's own launcher search; under the
+//             apps, rows for maths, folders (zoxide's best matches: Enter,
+//             Shift+Enter, Ctrl+Enter do what settings say), settings,
+//             Omarchy menu actions, asking an agent, the web
 //   Ask       always there under the search line: "Ask [Claude] [Codex] …".
 //             Nothing typed: click one for a new session. Typed: click one,
 //             or Ctrl+Enter for the first (Enter too when no app matches), to
@@ -56,6 +59,68 @@ Item {
 
   property bool opened: false
   property string query: ""
+  onQueryChanged: folderSearch.restart()
+
+  // ------------------------------------------------------------- folders
+  // zoxide's best matches for what's typed (the folders you cd into most),
+  // as rows under the apps. Looked up a moment after typing stops; nothing
+  // without zoxide. Opening one tells zoxide, so the menu teaches it too.
+  property var folderResults: []
+  property string folderQuery: ""
+  Timer {
+    id: folderSearch
+    interval: 120
+    onTriggered: {
+      var q = menu.query.trim()
+      if (q.length < 2) { menu.folderResults = []; return }
+      folderProc.forQuery = q
+      folderProc.command = ["zoxide", "query", "--list", "--"].concat(q.split(/\s+/))
+      folderProc.running = true
+    }
+  }
+  Process {
+    id: folderProc
+    property string forQuery: ""
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var home = Quickshell.env("HOME")
+        var paths = this.text.split("\n").filter(function(p) { return p !== "" && p !== home }).slice(0, 3)
+        menu.folderQuery = folderProc.forQuery
+        menu.folderResults = paths.map(function(p) {
+          var cut = p.lastIndexOf("/")
+          var parent = p.slice(0, cut) || "/"
+          return { kind: "folder", glyph: "", label: p.slice(cut + 1), path: p,
+                   detail: parent.indexOf(home) === 0 ? "~" + parent.slice(home.length) : parent }
+        })
+      }
+    }
+  }
+
+  // What Enter / Shift+Enter / Ctrl+Enter (or click, with the same keys) do
+  // on a folder row (settings superMenuFolderEnter/Shift/Ctrl).
+  readonly property var folderActionNames: ({ files: "Files", terminal: "Terminal", agent: "Agent", editor: "Editor", copy: "Copy path" })
+  function folderAction(how) {
+    var key = how === "ctrl" ? "superMenuFolderCtrl" : how === "shift" ? "superMenuFolderShift" : "superMenuFolderEnter"
+    var fallback = how === "ctrl" ? "agent" : how === "shift" ? "terminal" : "files"
+    var v = String(taskbar.pref(key, fallback))
+    return folderActionNames[v] ? v : fallback
+  }
+  function folderActionLabel(how) {
+    var a = folderAction(how)
+    return a === "agent" && askAgents.length ? askAgents[0].name : folderActionNames[a]
+  }
+  readonly property string folderHint: "Enter: " + folderActionLabel("enter") + " · Shift+Enter: " + folderActionLabel("shift")
+    + " · Ctrl+Enter: " + folderActionLabel("ctrl")
+  function openFolderRow(r, how) {
+    var a = folderAction(how)
+    Util.execArgv(["zoxide", "add", "--", r.path])
+    if (a === "files") Util.execArgv(["uwsm-app", "--", "nautilus", "--new-window", r.path])
+    else if (a === "terminal") Util.execArgv(["setsid", "uwsm-app", "--", "xdg-terminal-exec", "--dir=" + r.path])
+    else if (a === "agent") Util.execArgv([taskbar.omarchyDir + "/agents", "launch", askAgents.length ? askAgents[0].id : "claude", "--cwd", r.path])
+    else if (a === "editor") Util.execArgv(["omarchy-launch-editor", r.path])
+    else if (a === "copy") Util.execArgv(["wl-copy", r.path])
+    close()
+  }
   property int selected: 0
   property var pinnedIds: []
   property var usage: ({})
@@ -327,6 +392,7 @@ Item {
     var matches = function(text) { return words.every(function(w) { return text.indexOf(w) !== -1 }) }
     var value = calc(q)
     if (value !== null) out.push({ kind: "calc", glyph: "=", label: String(value), detail: "Enter copies it" })
+    if (folderQuery === q) out = out.concat(folderResults)
     if (q.length >= 2) {
       settingsTargets.filter(function(t) { return matches(searchable(t.label + " " + t.words)) }).slice(0, 2)
         .forEach(function(t) { out.push({ kind: "settings", glyph: "\uf013", label: t.label, detail: "Taskbar & Desktop", tab: t.tab }) })
@@ -338,8 +404,10 @@ Item {
     return out
   }
 
-  function runExtra(r) {
+  // how: "enter", "shift" or "ctrl" (the key or click modifiers).
+  function runExtra(r, how) {
     if (!r) return
+    if (r.kind === "folder") { openFolderRow(r, how || "enter"); return }
     var q = query.trim()
     if (r.kind === "ask") { ask(r.agent); return }
     if (r.kind === "calc") Util.execArgv(["wl-copy", r.label])
@@ -753,6 +821,12 @@ Item {
             menu.hideFrequent(current)
           } else if (event.key === Qt.Key_Escape) {
             menu.close()
+          } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && menu.selected >= menu.tiles.length
+                     && menu.extraResults[menu.selected - menu.tiles.length]
+                     && menu.extraResults[menu.selected - menu.tiles.length].kind === "folder") {
+            // A folder row: its Enter / Shift+Enter / Ctrl+Enter actions.
+            menu.runExtra(menu.extraResults[menu.selected - menu.tiles.length],
+                          ctrl ? "ctrl" : (event.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
           } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && menu.query.trim() !== "") {
             // Ctrl+Enter: ask the first agent.
             menu.ask("")
@@ -907,7 +981,10 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onEntered: menu.selected = menu.tiles.length + extraRow.index
-                onClicked: menu.runExtra(extraRow.modelData)
+                onClicked: function(mouse) {
+                  menu.runExtra(extraRow.modelData, (mouse.modifiers & Qt.ControlModifier) ? "ctrl"
+                                : (mouse.modifiers & Qt.ShiftModifier) ? "shift" : "enter")
+                }
               }
             }
           }
@@ -1261,7 +1338,9 @@ property real live: 0
 
         Text {
           width: parent.width
+          readonly property var selectedExtra: menu.selected >= menu.tiles.length ? menu.extraResults[menu.selected - menu.tiles.length] : null
           text: menu.hoverDetail !== "" ? menu.hoverDetail
+            : selectedExtra && selectedExtra.kind === "folder" ? menu.folderHint
             : menu.query.length > 0
             ? "Enter opens (Shift: new window) · Ctrl+Enter asks an agent · + or Ctrl+P pins · Esc closes"
             : "Drag or Ctrl+Arrows to rearrange · +/− or Ctrl+P to pin · Shift: new window · type to find more"
