@@ -10,18 +10,10 @@
 // card). "shuffle" isn't a style: Equalizer.qml picks one by the clock.
 var eqStyles = [
   { value: "spectrum", label: "Spectrum" },
-  { value: "wave", label: "Wave" },
-  { value: "embers", label: "Embers" },
-  { value: "ripple", label: "Ripple" },
-  { value: "scope", label: "Scope" },
   { value: "mist", label: "Mist" },
-  { value: "fire", label: "Fire" },
+  { value: "scope", label: "Scope" },
   { value: "radar", label: "Radar" },
-  { value: "swirl", label: "Swirl" },
   { value: "plasma", label: "Plasma" },
-  { value: "rain", label: "Rain" },
-  { value: "woods", label: "Woods" },
-  { value: "glitch", label: "Glitch" },
   { value: "static", label: "Static" },
   { value: "corrupt", label: "Corrupt" }
 ]

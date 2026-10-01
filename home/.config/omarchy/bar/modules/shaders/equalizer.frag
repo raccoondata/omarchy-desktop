@@ -4,10 +4,8 @@
 // second while playing), so the CPU work per frame is one number. Styles are
 // deterministic: "random" motion is hashed from (column, tick), so no state.
 // Compile: shaders/build (qsb). Styles, by index (Visuals.js eqStyles):
-//   0 spectrum  1 wave  2 embers  3 ripple  4 scope  5 mist
-//   6 fire      7 radar 8 swirl   9 plasma  10 rain  11 woods
-//   12 glitch   13 static  14 corrupt
-// Styles 0-11 get a glitch layer on top (main), all from the music, none in
+//   0 spectrum  1 mist  2 scope  3 radar  4 plasma  5 static  6 corrupt
+// Styles 0-4 get a glitch layer on top (main), all from the music, none in
 // silence: rows torn on the hits, an echo while the bass swells, dropouts and
 // stuck pixels on the kicks.
 layout(location = 0) in vec2 qt_TexCoord0;
@@ -80,10 +78,6 @@ float level(float c, float t, float most, float speed) {
     return 1.0 + floor(mix(a, b, f) * most);
 }
 
-float waveAt(float c, float t) {
-    return 0.6 * sin(t * 0.42 + c * 0.75) + 0.4 * sin(t * 0.23 - c * 0.4);
-}
-
 float scopeRow(float c, float t) {
     float mid = (rowCount - 1.0) / 2.0;
     float v = 0.6 * sin(t * 0.35 + c * 0.8) + 0.4 * sin(t * 0.6 - c * 0.45);
@@ -104,68 +98,9 @@ float radarBeam(float c, float r, float a) {
     return len > 0.82 ? 0.18 : 0.0;
 }
 
-// Woods: one layer of pines scrolling past (0 far .. 2 near): how lit this
-// pixel is by that layer's trees.
-float woodsLayer(float c, float r, float t, int layer) {
-    float L = float(layer);
-    float speed = 0.12 + 0.22 * L;               // near layers pass quicker
-    float density = 0.09 + 0.03 * L;
-    float x = c + t * speed + L * 37.0;
-    float wx = floor(x);
-    float lit = 0.0;
-    for (int dx = -2; dx <= 2; dx++) {
-        float tree = wx + float(dx);
-        if (hash(vec2(tree, L * 11.0 + 3.0)) > density) continue;
-        float h = rowCount * (0.45 + 0.15 * L + 0.35 * hash(vec2(tree, L + 5.0)));
-        float fromTrunk = abs(wx - tree);
-        // The trunk, then a pine canopy widening toward the ground.
-        if (fromTrunk < 0.5 && r < h) lit = 1.0;
-        float canopyBase = h * 0.3;
-        if (r >= canopyBase && r < h && fromTrunk <= floor((h - r) * 0.28 + 0.3)) lit = max(lit, 0.8);
-    }
-    return lit;
-}
-
 float brightness(float c, float r, float t, int s) {
     float mid = (cols - 1.0) / 2.0;
-    if (s == 1) {  // wave (its height follows the loudness)
-        float amp = isLive() ? clamp(loudness * 1.6, 0.15, 1.0) : 1.0;
-        float h = 1.0 + floor((waveAt(c, t) * 0.5 + 0.5) * amp * (reach(c) - 1.0) + 0.5);
-        return bar(r, h);
-    }
-    if (s == 2) {  // embers: sparks born along the bottom, rising a row a tick
-        float b = 0.0;
-        for (int k = 0; k < 16; k++) {
-            if (float(k) >= rowCount) break;
-            float born = floor(t) - float(k);
-            float chance = isLive() ? 0.04 + 0.5 * band(c) : 0.08 + 0.18 * reach(c) / rowCount;
-            if (hash(vec2(c, born)) < chance) {
-                float top = 2.0 + floor(hash(vec2(born, c + 7.0)) * (rowCount - 1.0));
-                if (float(k) < top && r == float(k)) b = max(b, 1.0 - r / rowCount);
-            }
-        }
-        return b;
-    }
-    if (s == 3) {  // ripple
-        float d = sqrt((c - mid) * (c - mid) * 0.55 + r * r);
-        float period = rowCount * 0.9;
-        float front = mod(d - t * 0.5, period);
-        // Live: brighter and further out the stronger the bass.
-        float glow = isLive() ? 0.12 + 1.3 * bass : 1.0;
-        float far = isLive() ? rowCount * (0.4 + 1.1 * bass) : rowCount * 1.3;
-        return front < 1.0 ? clamp(glow * (1.0 - d / far), 0.0, 1.0) : 0.0;
-    }
-    if (s == 4) {  // scope, with a faint trail
-        float b = 0.0;
-        for (int k = 0; k < 2; k++) {
-            float tt = t - float(k);
-            float y = scopeRow(c, tt), yp = c > 0.0 ? scopeRow(c - 1.0, tt) : y;
-            float lit = r == y ? 1.0 : (r >= min(y, yp) && r <= max(y, yp) ? 0.8 : 0.0);
-            b = max(b, lit * (k == 0 ? 1.0 : 0.35));
-        }
-        return b;
-    }
-    if (s == 5) {  // mist: mirrored from the middle row, with a trail
+    if (s == 1) {  // mist: mirrored from the middle row, with a trail
         float halfRows = max(1.0, floor(rowCount / 2.0));
         float most = max(1.0, floor(halfRows * reach(c) / rowCount + 0.5));
         float m = (rowCount - 1.0) / 2.0;
@@ -177,84 +112,29 @@ float brightness(float c, float r, float t, int s) {
         }
         return b;
     }
-    if (s == 6) {  // fire: uneven tongues that flicker and cool upward
-        float base = 0.45 + 0.55 * reach(c) / rowCount;
-        float height = isLive() ? rowCount * (0.2 + 0.95 * band(c))
-            : rowCount * base * (0.55 + 0.45 * mix(hash(vec2(c, floor(t / 2.0))), hash(vec2(c, floor(t / 2.0) + 1.0)), fract(t / 2.0)));
-        float heat = 1.0 - r / max(1.0, height) - 0.25 * hash(vec2(c * 3.0 + r, floor(t)));
-        return heat > 0.12 ? min(1.0, heat * 1.25) : 0.0;
+    if (s == 2) {  // scope, with a faint trail
+        float b = 0.0;
+        for (int k = 0; k < 2; k++) {
+            float tt = t - float(k);
+            float y = scopeRow(c, tt), yp = c > 0.0 ? scopeRow(c - 1.0, tt) : y;
+            float lit = r == y ? 1.0 : (r >= min(y, yp) && r <= max(y, yp) ? 0.8 : 0.0);
+            b = max(b, lit * (k == 0 ? 1.0 : 0.35));
+        }
+        return b;
     }
-    if (s == 7) {  // radar, with an afterglow
+    if (s == 3) {  // radar, with an afterglow
         float b = 0.0;
         for (int k = 0; k < 3; k++) b = max(b, radarBeam(c, r, (t - float(k)) * 0.4) * pow(0.6, float(k)));
         return isLive() ? b * (0.12 + 1.5 * bass) : b;
     }
-    if (s == 8) {  // swirl
-        float cx = mid, cy = (rowCount - 1.0) / 2.0;
-        float dx = c - cx, dy = (r - cy) * 1.4;
-        float d = sqrt(dx * dx + dy * dy);
-        float v = cos(2.0 * atan(dy, dx) - d * 0.9 + t * 0.28);
-        float swirlGlow = isLive() ? 0.1 + loudness * 1.9 : 1.0;
-        return v > 0.3 ? min(1.0, swirlGlow * v * max(0.25, 1.0 - d / (max(cx, cy) * 1.6))) : 0.0;
-    }
-    if (s == 9) {  // plasma, in four steps
+    if (s == 4) {  // plasma, in four steps
         float p = t * 0.18;
         float v = sin(c * 0.55 + p) + sin(r * 0.8 - p * 1.3) + sin((c + r) * 0.4 + p * 0.7) + sin(sqrt(c * c + r * r) * 0.6 - p);
         if (isLive()) v += (loudness - 0.35) * 3.0;
         float l = floor((v + 4.0) / 8.0 * 4.0) / 3.0;
         return l > 0.34 ? l : 0.0;
     }
-    if (s == 11) {  // woods: walking through a pixel forest (faster when louder)
-        float b = 0.0;
-        for (int k = 0; k < 3; k++) {
-            float lit = woodsLayer(c, r, t, k);
-            if (lit > 0.0) {
-                float tone = 0.18 + 0.32 * float(k);          // far dim, near bright
-                // The trees glow with the music at their column.
-                if (isLive()) tone *= 0.3 + 1.8 * band(c);
-                b = lit * tone;                                // nearer layers cover farther ones
-            }
-        }
-        // The path underfoot, scrolling.
-        if (r == 0.0 && b == 0.0) b = mod(floor(c + t * 0.6), 3.0) == 0.0 ? 0.22 : 0.08;
-        // Data motes rising like fireflies; more on the beat.
-        float born = floor(t / 3.0);
-        for (int k = 0; k < 3; k++) {
-            float seed = born - float(k);
-            float mx = floor(hash(vec2(seed, 1.7)) * cols);
-            float chance = isLive() ? 0.35 + 1.4 * bass : 0.55;
-            if (hash(vec2(seed, 9.1)) < chance && c == mx && r == floor(1.0 + (t / 3.0 - seed) * 1.5)) b = max(b, 1.0);
-        }
-        return min(b, 1.0);
-    }
-    if (s == 10) {  // rain: drops falling a row a tick, with a short trail
-        float b = 0.0;
-        for (int k = 0; k < 16; k++) {
-            if (float(k) >= rowCount) break;
-            float born = floor(t) - float(k);
-            if (hash(vec2(c, born)) < (isLive() ? 0.03 + 0.4 * band(c) : 0.12)) {
-                float y = rowCount - 1.0 - float(k);
-                if (r == y) b = max(b, 1.0);
-                else if (r == y + 1.0) b = max(b, 0.45);
-            }
-        }
-        return b;
-    }
-    if (s == 12) {  // glitch: the spectrum, torn: rows jump sideways on the
-                    // hits, a column drops out, a pixel sticks
-        float k = floor(t);
-        float shift = 0.0;
-        if (hash(vec2(r, k)) < 0.55 * hit())
-            shift = floor((hash(vec2(r + 5.0, k)) - 0.5) * cols * 0.6);
-        float cc = mod(c + shift + cols, cols);
-        float h = isLive() ? ceil(band(cc) * rowCount) : level(cc, t, reach(cc), 3.0);
-        float b = bar(r, h);
-        if (shift != 0.0) b = b > 0.0 ? 1.0 : (hash(vec2(c, r + k)) > 0.8 ? 0.35 : 0.0);
-        if (hash(vec2(c, k + 0.5)) < 0.08 * hit()) b = 0.0;                  // dropout
-        if (hash(vec2(c * 7.0 + r, floor(t / 5.0))) < 0.02 * hit()) b = 1.0; // stuck pixel
-        return b;
-    }
-    if (s == 13) {  // static: snow shaped like the spectrum, new every tick
+    if (s == 5) {  // static: snow shaped like the spectrum, new every tick
         float shape = isLive() ? clamp(band(c) * 1.3, 0.0, 1.0) : reach(c) / rowCount * 0.6;
         float chance = shape * (1.0 - 0.7 * r / rowCount) * (0.6 + 1.0 * hit());
         float n = hash(vec2(c * 1.37 + r * 7.1, floor(t)));
@@ -262,7 +142,7 @@ float brightness(float c, float r, float t, int s) {
         if (isLive() && hash(vec2(r, floor(t) + 3.0)) < 0.25 * beatLevel) return 0.8;
         return n < chance ? 0.45 + 0.55 * hash(vec2(r, c + floor(t))) : 0.0;
     }
-    if (s == 14) {  // corrupt: the spectrum in 3x2 blocks, some showing the
+    if (s == 6) {  // corrupt: the spectrum in 3x2 blocks, some showing the
                     // wrong block; now and then a column hangs upside down
         float k = floor(t / 2.0);
         vec2 blk = vec2(floor(c / 3.0), floor(r / 2.0));
@@ -295,7 +175,7 @@ void main() {
     int st = int(styleIndex + 0.5);
     float b;
     if (mute > 0.5) b = r == 0.0 ? 1.0 : 0.0;
-    else if (st >= 12) b = brightness(c, r, tick, st);   // the glitch family: glitched already
+    else if (st >= 5) b = brightness(c, r, tick, st);    // the glitch family: glitched already
     else {
         // The glitch layer over the older styles, all of it from the music
         // (none in silence): rows torn sideways on the hits, a dim echo a

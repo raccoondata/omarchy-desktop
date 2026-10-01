@@ -13,6 +13,7 @@ import "IconColors.js" as IconColors
 import "MediaWindow.js" as MediaWindow
 import "AudioLevels.js" as AudioLevels
 import "TaskbarStatus.js" as TaskbarStatus
+import "Visuals.js" as Visuals
 
 // Taskbar built from Hyprland's own window list, so each entry knows its
 // workspace. Windows with the same icon share one entry; the dots under it are
@@ -59,7 +60,11 @@ BarWidget {
   // Minimize/restore outline and app open/close pixel effects.
   readonly property bool motionEffects: pref("motionEffects", true) !== false
   // spectrum | wave | embers | ripple (Equalizer.qml)
-  readonly property string equalizerStyle: String(pref("equalizerStyle", "spectrum"))
+  // A style that's since been removed falls back to spectrum.
+  readonly property string equalizerStyle: {
+    var v = String(pref("equalizerStyle", "spectrum"))
+    return v === "shuffle" || Visuals.values(Visuals.eqStyles).indexOf(v) !== -1 ? v : "spectrum"
+  }
   readonly property string minimizedWorkspace: "special:scratchpad"
   readonly property string restoreScript: root.omarchyDir + "/window-restore"
   readonly property string actionScript: root.omarchyDir + "/taskbar-action"
