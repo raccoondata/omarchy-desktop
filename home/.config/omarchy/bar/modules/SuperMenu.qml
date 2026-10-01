@@ -797,6 +797,19 @@ Item {
     return { kind: "new", sec: -1, c: 0, r: 0, gx: gx, gy: gy, idx: -1 }
   }
 
+  // Drop whatever's being dragged without doing anything (the menu closed,
+  // or the drag was cancelled).
+  function cancelDrag() {
+    dragSection = -1
+    dragIndex = -1
+    dropSection = -1
+    dropIndex = -1
+    dropPlan = null
+    blockAction = ""
+    blockSection = -1
+    blockGhost = null
+  }
+
   function updateDrop(point) {
     var plan = planDrop(point)
     dropPlan = plan
@@ -1091,6 +1104,7 @@ Item {
     usageFile.reload()
     query = ""
     selected = 0
+    cancelDrag()
     opened = true
     refreshFolderInfo()
   }
@@ -1112,6 +1126,7 @@ Item {
     hoveredAction = ""
     tileMenuEntry = null
     renaming = -1
+    cancelDrag()
   }
 
   // Open windows that belong to an app (by launcher entry), via the same
