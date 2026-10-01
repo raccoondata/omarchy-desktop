@@ -16,6 +16,7 @@ Flow {
   property var current: null
   property int labelWidth: 0
   property int maxChipWidth: Style.space(200)
+  property color textColor: Color.popups.text
   signal picked(var value)
 
   spacing: Style.space(6)
@@ -26,7 +27,7 @@ Flow {
     height: Style.space(24)
     verticalAlignment: Text.AlignVCenter
     text: chips.label
-    color: Color.popups.text
+    color: chips.textColor
     opacity: 0.5
     font.family: Style.font.menuFamily
     font.pixelSize: Style.font.caption
@@ -42,9 +43,9 @@ Flow {
       width: Math.min(chips.maxChipWidth, chipContent.implicitWidth + Style.space(16))
       height: Style.space(24)
       radius: Style.cornerRadius
-      color: selected ? Util.alpha(Color.accent, 0.18) : (chipMouse.containsMouse ? Util.alpha(Color.popups.text, 0.06) : "transparent")
+      color: selected ? Util.alpha(Color.accent, 0.18) : (chipMouse.containsMouse ? Util.alpha(chips.textColor, 0.06) : "transparent")
       border.width: 1
-      border.color: selected ? Color.accent : Util.alpha(Color.popups.text, 0.2)
+      border.color: selected ? Color.accent : Util.alpha(chips.textColor, 0.2)
       Behavior on color { ColorAnimation { duration: 90 } }
 
       Row {
@@ -58,7 +59,7 @@ Flow {
           height: width
           sourceSize.width: width * 2
           sourceSize.height: height * 2
-          source: chip.hasIcon ? TaskbarIcons.svg(chip.modelData.icon, String(chip.selected ? Color.accent : Color.popups.text)) : ""
+          source: chip.hasIcon ? TaskbarIcons.svg(chip.modelData.icon, String(chip.selected ? Color.accent : chips.textColor)) : ""
         }
         Text {
           id: chipLabel
@@ -66,7 +67,7 @@ Flow {
           width: Math.min(implicitWidth, chips.maxChipWidth - Style.space(16) - (chip.hasIcon ? Style.space(20) : 0))
           text: chip.modelData.label
           elide: Text.ElideRight
-          color: chip.selected ? Color.accent : Color.popups.text
+          color: chip.selected ? Color.accent : chips.textColor
           font.family: Style.font.menuFamily
           font.pixelSize: Style.font.caption
         }

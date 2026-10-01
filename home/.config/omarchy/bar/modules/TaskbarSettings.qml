@@ -1220,7 +1220,7 @@ Item {
         Text {
           width: parent.width
           wrapMode: Text.WordWrap
-          text: "Clicking brings their window to the workspace you're on (double-click: all of them; a preview: that one) instead of taking you to it. Add one: right-click its icon > Bring to current workspace."
+          text: "Clicking brings their window to the workspace you're on (double-click: all of them; a preview: that one) instead of taking you to it. Add one here, or right-click its icon > Bring to current workspace."
           color: Color.menu.text
           opacity: 0.45
           font.family: Style.font.menuFamily
@@ -1246,7 +1246,7 @@ Item {
                 spacing: Style.space(8)
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
-                  text: settings.taskbar.appNames[hereChip.modelData] || String(hereChip.modelData).replace(/^app:/, "")
+                  text: bringCol.appLabel(hereChip.modelData)
                   color: Color.menu.text
                   font.family: Style.font.menuFamily
                   font.pixelSize: Style.font.bodySmall
@@ -1270,13 +1270,65 @@ Item {
               }
             }
           }
-          Text {
-            visible: settings.taskbar.hereApps.length === 0
-            text: "None"
-            color: Color.menu.text
-            opacity: 0.45
-            font.family: Style.font.menuFamily
-            font.pixelSize: Style.font.caption
+          // "+ Add": pick from the apps on the taskbar (open or pinned).
+          Rectangle {
+            visible: bringCol.hereCandidates.length > 0
+            width: addRow.implicitWidth + Style.space(16)
+            height: Style.space(26)
+            radius: Style.cornerRadius
+            color: bringCol.addingHere ? Util.alpha(Color.accent, 0.18) : (addMouse.containsMouse ? Util.alpha(Color.menu.text, 0.06) : "transparent")
+            border.width: 1
+            border.color: bringCol.addingHere ? Color.accent : Util.alpha(Color.menu.text, 0.2)
+            Text {
+              id: addRow
+              anchors.centerIn: parent
+              text: bringCol.addingHere ? "Done" : "+ Add"
+              color: bringCol.addingHere ? Color.accent : Color.menu.text
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+            MouseArea {
+              id: addMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: bringCol.addingHere = !bringCol.addingHere
+            }
+          }
+        }
+
+        // An app's name, from the taskbar's groups (else the built-in names).
+        function appLabel(key) {
+          var groups = settings.taskbar.groups || []
+          for (var i = 0; i < groups.length; i++) if (groups[i].key === key) return groups[i].name
+          return settings.taskbar.appNames[key] || String(key).replace(/^app:/, "")
+        }
+        property bool addingHere: false
+        // Apps on the taskbar (open or pinned) that don't come to you yet.
+        readonly property var hereCandidates: {
+          var groups = settings.taskbar.groups || [], out = []
+          for (var i = 0; i < groups.length; i++) {
+            var g = groups[i]
+            if (g.key && settings.taskbar.hereApps.indexOf(g.key) === -1) out.push({ value: g.key, label: g.name })
+          }
+          return out
+        }
+        Text {
+          visible: bringCol.addingHere
+          text: "Open and pinned apps:"
+          color: Color.menu.text
+          opacity: 0.7
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.caption
+        }
+        ChoiceChips {
+          visible: bringCol.addingHere
+          width: parent.width
+          options: bringCol.hereCandidates
+          textColor: Color.menu.text
+          onPicked: function(v) {
+            settings.set("hereApps", JSON.stringify(settings.taskbar.hereApps.concat([v])))
+            if (bringCol.hereCandidates.length <= 1) bringCol.addingHere = false
           }
         }
 
