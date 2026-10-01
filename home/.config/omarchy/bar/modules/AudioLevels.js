@@ -10,11 +10,14 @@
 //   level   overall loudness 0..1
 //   bass    the lowest bands 0..1
 //   beat    0..1: a kick (bass jumping above its recent average), decaying
+//   pulse   0..1: the bass, rising at once and falling slowly (for things
+//           that should pump with the music rather than only on kicks)
 
 var bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var level = 0
 var bass = 0
 var beat = 0
+var pulse = 0
 var frameAt = 0
 // The bands packed for shaders (four vec4s), made once per frame; frame
 // counts frames, so a visualizer can skip work when nothing's new.
@@ -37,8 +40,9 @@ function set(line) {
   level = sum / 16
   bass = (next[0] + next[1] + next[2]) / 3
   bassAverage = bassAverage * 0.9 + bass * 0.1
-  var kick = Math.max(0, Math.min(1, (bass - bassAverage * 1.08) * 4))
-  beat = Math.max(kick, beat * 0.78)
+  var kick = Math.max(0, Math.min(1, (bass - bassAverage * 0.98) * 6))
+  beat = Math.max(kick, beat * 0.75)
+  pulse = Math.max(bass, pulse * 0.82)
   frameAt = Date.now()
   packedBands = [Qt.vector4d(next[0], next[1], next[2], next[3]), Qt.vector4d(next[4], next[5], next[6], next[7]),
                  Qt.vector4d(next[8], next[9], next[10], next[11]), Qt.vector4d(next[12], next[13], next[14], next[15])]
@@ -53,6 +57,22 @@ function want() {
 // Fresh data (cava is running and sending)?
 function live() {
   return Date.now() - frameAt < 400
+}
+
+// Hand the music to a visualizer shader: sets its live, beatLevel, pump,
+// loudness and bandsA..bandsD (the names shaders/visualizer.frag and
+// artfx.frag use), only when there's a new frame. Calls want() too.
+function feed(item) {
+  wantAt = Date.now()
+  var on = live()
+  item.live = on ? 1 : 0
+  if (!on || item.seenFrame === frame) return
+  item.seenFrame = frame
+  item.beatLevel = beat
+  item.pump = pulse
+  item.loudness = level
+  item.bandsA = packedBands[0]; item.bandsB = packedBands[1]
+  item.bandsC = packedBands[2]; item.bandsD = packedBands[3]
 }
 
 // The 16 bands as four vec4s for a shader.

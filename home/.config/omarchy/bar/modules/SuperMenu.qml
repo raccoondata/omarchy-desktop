@@ -928,17 +928,22 @@ Item {
               property real tick: 0
               readonly property real mode: Math.max(0, nowPlaying.fxModes.indexOf(nowPlaying.fxChoice))
               readonly property real aspect: 1
-              property real live: 0
+property real live: 0
               property real beatLevel: 0
+              property real pump: 0
+              property real loudness: 0
+              property vector4d bandsA: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsB: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsC: Qt.vector4d(0, 0, 0, 0)
+              property vector4d bandsD: Qt.vector4d(0, 0, 0, 0)
+              property int seenFrame: -1
               fragmentShader: Qt.resolvedUrl("shaders/artfx.frag.qsb")
               Timer {
                 running: npFx.visible && menu.opened && nowPlaying.p !== null && nowPlaying.p.isPlaying
                 interval: 66
                 repeat: true
                 onTriggered: {
-                  AudioLevels.want()
-                  npFx.live = AudioLevels.live() ? 1 : 0
-                  npFx.beatLevel = AudioLevels.beat
+                  AudioLevels.feed(npFx)
                   npFx.tick += 1
                 }
               }
