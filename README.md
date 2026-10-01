@@ -62,15 +62,15 @@ back; your settings files stay).
   asks about files from Files' right-click menu or about selected text
   (Super+Alt+A), and puts their "done" / "needs you" notices on the taskbar.
 - **Now playing**: title and artist on the bar, a card with album art and
-  controls, a volume mixer, the audio outputs by name (Speakers,
-  Headphones, your monitor, a Bluetooth device: click to switch); scroll
-  for volume. Visualizers after Windows
-  Media Player's (pixel equalizers, and scenes like Tunnel, Battery, Lava)
-  and album-art effects (Glitch, CRT, Melt...): right-click the art for the
-  next visualizer, middle-click for the next effect; Taskbar & Desktop >
-  Media picks them per place. They follow the music (its spectrum, from
-  cava), are drawn on the GPU, and only run while something plays; on
-  battery or in power saver they rest (equalizers flat, cava stopped).
+  controls, a volume mixer, the audio outputs by name (Speakers, Headphones,
+  your monitor, a Bluetooth device: click to switch); scroll for volume.
+  Visualizers after Windows Media Player's (pixel equalizers, and scenes
+  like Tunnel, Battery, Lava) and album-art effects (Glitch, CRT, Melt...):
+  right-click the art for the next visualizer, middle-click for the next
+  effect; Taskbar & Desktop > Media picks them per place. They follow the
+  music (its spectrum, from cava), are drawn on the GPU, and only run while
+  something plays; on battery or in power saver they rest (equalizers flat,
+  cava stopped).
 - **Safety nets**: a backup lock screen if Omarchy's ever fails, a rescue
   console (Ctrl+Alt+Esc) that can undo recent config changes, and a local
   history of your desktop config (`~/.config/omarchy/config-history log`).
