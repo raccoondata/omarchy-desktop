@@ -125,6 +125,7 @@ need_plugin hot-corners "Hot Corners" omarchy-hot-corners
 need_plugin agent-tools "Agent Tools" omarchy-agent-tools
 need_plugin screenshots "Screenshots" omarchy-screenshots
 need_plugin windows "Windows" omarchy-windows
+need_plugin taskbar "Taskbar" omarchy-taskbar widget
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -237,9 +238,9 @@ if ! grep -q 'require("hypr.desktop")' "$hl"; then
   echo "  hyprland.lua loads hypr/desktop.lua"
 fi
 
-# The bar: the taskbar after the workspaces, Now Playing (the plugin) after
-# the clock, in place of Omarchy's media widget and of the desktop's old
-# now-playing module.
+# The bar: the Taskbar (the plugin; in place of the desktop's old taskbar
+# module) after the workspaces, Now Playing (the plugin) after the clock, in
+# place of Omarchy's media widget and of the desktop's old now-playing module.
 shell="$omarchy/shell.json"
 [[ -f $shell ]] || cp /usr/share/omarchy/config/omarchy/shell.json "$shell"
 tmp="$(mktemp)"
@@ -249,7 +250,8 @@ jq '
     .bar.layout[$side] = (.bar.layout[$side] // [] | (map(.id) | index($prev)) as $i
       | if $i == null then . + [$entry] else .[:$i+1] + [$entry] + .[$i+1:] end);
   .bar.layout |= with_entries(.value |= map(select(.id != "omarchy.media")))
-  | if has_id("taskbar") then . else after("left"; "omarchy.workspaces"; {"id": "taskbar", "type": "qml"}) end
+  | .bar.layout |= with_entries(.value |= map(if .id == "taskbar" then {"id": "taskbar"} else . end))
+  | if has_id("taskbar") then . else after("left"; "omarchy.workspaces"; {"id": "taskbar"}) end
   | .bar.layout |= with_entries(.value |= map(if .id == "nowplaying" then {"id": "now-playing"} else . end))
   | if has_id("now-playing") then . else after("center"; "omarchy.clock"; {"id": "now-playing"}) end
 ' "$shell" > "$tmp" && if ! cmp -s "$tmp" "$shell"; then
@@ -267,10 +269,12 @@ menu="$omarchy/extensions/omarchy-menu.jsonc"
 # Hot Corners is its own plugin now, with its own Setup entry: the
 # desktop's old one goes.
 sed -i '/"setup.hotcorners":.*taskbar settings corners/d' "$menu"
+# The Taskbar plugin has its own Setup entry (in its marked block): the
+# desktop's old one, outside any block, goes.
+sed -i '/"setup.taskbar":.*"label": "Taskbar & Desktop"/d' "$menu"
 entries=(
   '"system.lock": {"icon": "", "label": "Lock", "action": "$HOME/.config/omarchy/lock"},'
   '"system.reboot-windows": {"when":"\"$HOME/.config/omarchy/reboot-to-windows\" --check","icon":"","label":"Reboot to Windows","description":"Boot Windows once, then back to Omarchy","action":"$HOME/.config/omarchy/reboot-to-windows"},'
-  '"setup.taskbar": {"icon": "", "label": "Taskbar & Desktop", "description": "taskbar, windows, agents, effects, hot corners, title bars, now playing, screenshots, icons, mouse", "action": "omarchy-shell -q taskbar settings taskbar"},'
   '"update.desktop": {"icon": "", "label": "Desktop", "description": "omarchy-desktop: taskbar, Super menu, windows", "action": "omarchy-launch-floating-terminal-with-presentation omarchy-desktop update"},'
 )
 added=0

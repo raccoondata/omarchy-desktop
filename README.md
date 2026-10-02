@@ -46,7 +46,7 @@ added it yourself).
 
 ## What you get
 
-- **Taskbar** (on Omarchy's bar): pinned and open apps with live window
+- **Taskbar** (the Taskbar plugin, on Omarchy's bar): pinned and open apps with live window
   previews, drag to reorder, drop on a workspace number to move a window
   there, right-click for options. Click to switch, double-click to gather an
   app's windows onto a workspace, laid out evenly. Files (and any app you
@@ -55,7 +55,7 @@ added it yourself).
   Bring agents (and terminals) together, or set double-clicking one to do it
   (Taskbar & Desktop > Taskbar); Windows > Bring together picks which agents
   and terminals count (Omarchy's tool windows like btop don't, by default).
-- **Super menu** (double-tap Super, or Caps Lock): apps and folders (pinned,
+- **Super menu** (the Super Menu plugin; double-tap Super, or Caps Lock): apps and folders (pinned,
   and in named groups: blocks anywhere on the grid whose tiles stay where
   you drop them, so a group is the shape you arrange: past its edge grows
   it, open space starts a new one; each can be shaded in a theme colour and

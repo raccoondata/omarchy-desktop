@@ -6,15 +6,11 @@
 
 .config/hypr/desktop.lua
 .config/hypr/desktop/
-.config/omarchy/bar/modules/
-.config/omarchy/audio-owners
 .config/omarchy/backup-lock
-.config/omarchy/bar-height
 
 .config/omarchy/lock
 .config/omarchy/lock-guard
 .config/omarchy/lock-on-autologin
-.config/omarchy/mouse-setting
 .config/omarchy/reboot-to-windows
 .config/omarchy/remote-screen
 .config/omarchy/selfcheck
@@ -25,8 +21,6 @@
 .config/systemd/user/config-history.service
 .config/systemd/user/config-history.timer
 .config/omarchy/share-picker
-.config/omarchy/taskbar-action
-.config/omarchy/taskbar-setting
 .config/systemd/user/lock-guard.service
 .config/systemd/user/remote-screen.service
 .local/bin/rescue
