@@ -19,10 +19,9 @@ do
 end
 
 require("hypr.desktop.input")
-require("hypr.desktop.autostart")
-require("hypr.desktop.remote")
 -- The keys are the plugins' own (each adds a line to hyprland.lua): Rescue's
--- Ctrl+Alt+Del, Ctrl+Alt+Esc, Super+Ctrl+L and Super+Shift+Esc; the Windows,
+-- Ctrl+Alt+Del, Ctrl+Alt+Esc, Super+Ctrl+L and Super+Shift+Esc; Remote
+-- Access's REMOTE screen and autologin lock; the Windows,
 -- Taskbar, Super Menu, Agent Tools and Screenshots plugins' theirs. The
 -- mouse settings (hypr/mouse.lua) are loaded by Desktop Core, the workspace
 -- pins (hypr/workspace-pins.lua) by the Taskbar plugin.

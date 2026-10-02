@@ -318,25 +318,25 @@ fi
 step 5 "Background services"
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
-# Rescue's setup again: step 1 moved the desktop's old copies of its files
-# (the lock guard's service, the rescue command) aside.
+# Rescue's and Remote Access's setup again: step 1 moved the desktop's old
+# copies of their files (the lock guard's and remote screen's services, the
+# rescue command) aside.
 "$omarchy/plugins/rescue/bin/setup" || warn "Rescue's setup failed"
-# The remote screen only restarts when its script changed (a restart while
-# you're connected with the monitor off would drop the virtual screen).
-if [[ "$(conf_get remote)" == on ]]; then
-  sum="$(sha256sum < "$omarchy/remote-screen" 2>/dev/null | cut -c1-64)"
-  if [[ $sum != "$(cat "$state/remote-screen.sum" 2>/dev/null)" ]]; then
-    systemctl --user restart remote-screen.service 2>/dev/null
-    echo "$sum" > "$state/remote-screen.sum"
-  fi
-fi
+[[ -x $omarchy/plugins/remote-access/bin/setup ]] && { "$omarchy/plugins/remote-access/bin/setup" || warn "Remote Access's setup failed"; }
 echo "  config history (local undo); Rescue's backup lock guard"
 
 # --- 6 optional ------------------------------------------------------------------
 step 6 "Optional"
+# Remote access is the Remote Access plugin; its system part asks for your
+# password (re-applied on a full install; RustDesk only restarts if
+# something changed).
+remote_sys="$omarchy/plugins/remote-access/bin/setup-system"
 if [[ "$(conf_get remote)" == on ]]; then
-  # Re-applied on a full install (only restarts RustDesk if something changed).
-  $update || "$omarchy/setup-remote" || warn "setup-remote failed; run ~/.config/omarchy/setup-remote"
+  need_plugin remote-access "Remote Access" omarchy-remote-access
+  "$omarchy/plugins/remote-access/bin/setup" >/dev/null 2>&1 || true
+  if $system && ! { $update && "$remote_sys" --check; }; then
+    OMARCHY_DESKTOP_INSTALL=1 "$remote_sys" || warn "Remote Access's setup-system failed; run $remote_sys"
+  fi
   echo "  remote access (RustDesk): on ${dim}(omarchy-desktop remote off to undo)${off}"
 elif $update || [[ "$(conf_get remote)" == off ]]; then
   echo "  remote access (RustDesk): off ${dim}(omarchy-desktop remote on)${off}"
@@ -345,7 +345,9 @@ else
   echo "  even after a reboot or with the monitor off. It also logs you in"
   echo "  automatically after a reboot (then locks the screen at once)."
   if ask "Set up remote access?"; then
-    "$omarchy/setup-remote" || warn "setup-remote failed; run ~/.config/omarchy/setup-remote"
+    conf_set remote on
+    need_plugin remote-access "Remote Access" omarchy-remote-access
+    OMARCHY_DESKTOP_INSTALL=1 "$remote_sys" || warn "Remote Access's setup-system failed; run $remote_sys"
   else
     conf_set remote off
     echo "  ${dim}skipped; omarchy-desktop remote on, any time${off}"

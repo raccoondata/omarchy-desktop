@@ -7,7 +7,8 @@ set -euo pipefail
 #                                    (also Super+Alt+Space > Update > Desktop)
 #   omarchy-desktop status           the installed version, and what's new
 #   omarchy-desktop check            is everything working? (selfcheck)
-#   omarchy-desktop remote on|off    remote access with RustDesk (setup-remote)
+#   omarchy-desktop remote on|off    remote access with RustDesk (the Remote
+#                                    Access plugin; asks for your password)
 #   omarchy-desktop keys [all|new|off]
 #                                    which keybindings: all, only the ones that
 #                                    don't change Omarchy's, or none
@@ -27,6 +28,12 @@ repo="$(cd "$(dirname "$self")/.." && pwd)"
 omarchy="$HOME/.config/omarchy"
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 g() { git -C "$repo" "$@"; }
+set_conf() {  # set_conf <key> <value>  (desktop.conf)
+  local conf="$omarchy/desktop.conf" tmp
+  tmp="$(mktemp)"
+  { [[ -f $conf ]] && grep -v "^$1=" "$conf" || true; echo "$1=$2"; } > "$tmp"
+  mv "$tmp" "$conf"
+}
 
 # No personal information in the repo (AGENTS.md): home paths, email
 # addresses, and the names this machine knows (the login, the global git
@@ -119,8 +126,27 @@ case "${1:-status}" in
 
   remote)
     case "${2:-}" in
-      on) exec "$omarchy/setup-remote" ;;
-      off) exec "$omarchy/setup-remote" --off ;;
+      on)
+        plugin="$omarchy/plugins/remote-access"
+        if [[ ! -d $plugin ]]; then
+          omarchy-plugin-add "https://github.com/raccoondata/omarchy-remote-access.git" --yes >/dev/null 2>&1 || true
+          [[ -d $plugin ]] || { echo "couldn't add the Remote Access plugin (check the internet connection)"; exit 1; }
+          set_conf plugin_remote_access added
+        fi
+        omarchy-plugin-enable remote-access >/dev/null 2>&1 || true
+        set_conf remote on
+        "$plugin/bin/setup"
+        exec "$plugin/bin/setup-system" ;;
+      off)
+        plugin="$omarchy/plugins/remote-access"
+        if [[ -d $plugin ]]; then
+          "$plugin/bin/setup-system" --off
+          "$plugin/bin/teardown" >/dev/null
+          omarchy-plugin-disable remote-access >/dev/null 2>&1 || true
+          omarchy-plugin-remove remote-access --yes >/dev/null 2>&1 || true
+        fi
+        set_conf remote off
+        echo "Remote access is off." ;;
       *) echo "usage: omarchy-desktop remote on|off"; exit 2 ;;
     esac
     ;;

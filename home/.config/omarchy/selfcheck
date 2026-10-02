@@ -110,7 +110,8 @@ else
   bad "taskbar isn't answering (omarchy restart shell; check: qs log)"
 fi
 
-# Remote access is optional (setup-remote); desktop.conf says whether it's on.
+# Remote access is optional (the Remote Access plugin); desktop.conf says
+# whether it's wanted.
 remote=false
 grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null && remote=true
 units=(config-history.timer)
@@ -128,7 +129,9 @@ command -v hyprlock >/dev/null && ok "backup lock screen (hyprlock) installed" \
   || warn "hyprlock missing: no backup lock screen (run ~/.config/omarchy/plugins/rescue/bin/setup-system)"
 if $remote; then
   grep -q 'share-picker' "$HOME/.config/hypr/xdph.conf" 2>/dev/null && ok "screen-share picker answers for RustDesk" \
-    || warn "xdph.conf doesn't use ~/.config/omarchy/share-picker: RustDesk may get stuck on 'select the screen' (run setup-remote)"
+    || warn "xdph.conf doesn't use Remote Access's share-picker: RustDesk may get stuck on 'select the screen' (omarchy restart shell)"
+  "$omarchy/plugins/remote-access/bin/setup-system" --check 2>/dev/null && ok "remote access's system parts in place" \
+    || warn "remote access's system parts missing: run ~/.config/omarchy/plugins/remote-access/bin/setup-system"
 fi
 grep -q 'require("hypr.desktop")' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null && ok "hyprland.lua loads the desktop (hypr/desktop.lua)" \
   || bad "hyprland.lua doesn't load hypr/desktop.lua: no desktop keybindings (run omarchy-desktop update)"
@@ -177,6 +180,7 @@ plugin_check screenshots "Screenshots" bin/screenshot "Print Screen is Omarchy's
 plugin_check windows "Windows" bin/load-plugins "no window keys, switcher, title bars or snapping" omarchy-windows
 plugin_check taskbar "Taskbar" Taskbar.qml "no taskbar" omarchy-taskbar
 plugin_check rescue "Rescue" bin/rescue "no rescue console, backup lock or Restart into Windows" omarchy-rescue
+$remote && plugin_check remote-access "Remote Access" bin/remote-screen "no RustDesk after a reboot or with the monitor off" omarchy-remote-access
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi
