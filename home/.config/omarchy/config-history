@@ -90,8 +90,23 @@ sync_in() {
     mapfile -t ex < <(desktop_excludes "$p")
     copy "$HOME" "$repo" "$p" --delete --delete-excluded "${ex[@]}"
   done
+  # The desktop's files: only the ones edited live (they differ from what its
+  # installer last put there, install.sh's installed-sums), so an edit made in
+  # the repo and not installed yet isn't overwritten by the older live copy.
+  # Nothing is deleted from the repo here: removing a file is a repo edit.
+  local sums="$HOME/.local/state/omarchy-desktop/installed-sums" f live
   for p in "${desktop[@]}"; do
-    copy "$HOME" "$desktop_repo/home" "${p%/}" --delete
+    if [[ ! -s $sums ]]; then
+      copy "$HOME" "$desktop_repo/home" "${p%/}"
+      continue
+    fi
+    while IFS= read -r f; do
+      live="$HOME/$f"
+      [[ -f $live ]] || continue
+      [[ "$(sha256sum < "$live" | cut -c1-64)  $f" == "$(grep -F -m1 -x -- "$(sha256sum < "$live" | cut -c1-64)  $f" "$sums")" ]] && continue
+      mkdir -p "$(dirname "$desktop_repo/home/$f")"
+      rsync -a "$live" "$desktop_repo/home/$f"
+    done < <(cd "$HOME" && if [[ -d ${p%/} ]]; then find "${p%/}" -type f -not -name '*.bak*' -not -path '*/__pycache__/*'; elif [[ -e ${p%/} ]]; then echo "${p%/}"; fi)
   done
   local f
   for f in "${system_files[@]}"; do

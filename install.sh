@@ -164,6 +164,12 @@ if [[ -f $state/installed-files ]]; then
   done < <(comm -23 <(sort -u "$state/installed-files") <(sort -u "$list_new"))
 fi
 mv "$list_new" "$state/installed-files"
+# What each file was when installed: the config history (maintainer) copies
+# back into the repo only the files you then edited live.
+(cd "$HOME" && while read -r f; do
+  if [[ -d $f ]]; then find "$f" -type f -not -name '*.bak*' -not -path '*/__pycache__/*'; elif [[ -f $f ]]; then echo "$f"; fi
+done < "$state/installed-files" | sort -u | xargs -d '\n' -r sha256sum) > "$state/installed-sums.tmp" 2>/dev/null \
+  && mv "$state/installed-sums.tmp" "$state/installed-sums"
 # Settings files the desktop reads, only where there are none yet.
 (cd "$repo/templates" && find . -type f -printf '%P\n') | while read -r f; do
   [[ -e $HOME/$f ]] && continue
