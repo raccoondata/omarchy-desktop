@@ -173,8 +173,6 @@ plugin_check super-menu "Super Menu" Main.qml "no Super menu" omarchy-super-menu
 plugin_check hot-corners "Hot Corners" bin/hotcorner "no hot corners" omarchy-hot-corners
 plugin_check agent-tools "Agent Tools" bin/agents "no ask card, Files agent menu or agent keys" omarchy-agent-tools
 plugin_check screenshots "Screenshots" bin/screenshot "Print Screen is Omarchy's own (no editor dock or preview)" omarchy-screenshots
-plugin_check windows "Windows" bin/load-plugins "no window keys, switcher, title bars or snapping" omarchy-windows
-plugin_check taskbar "Taskbar" Taskbar.qml "no taskbar" omarchy-taskbar
 if [[ -d $omarchy/plugins/desktop-core ]] && ! [[ -s ${XDG_RUNTIME_DIR:-/run/user/$UID}/desktop-core/mru.json ]]; then
   warn "Desktop Core isn't publishing its state (is its service on? omarchy-shell desktop-core state)"
 fi

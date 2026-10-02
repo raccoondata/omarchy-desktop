@@ -49,4 +49,40 @@ end
 -- The Super menu (double-tap Super) is the Super Menu plugin's: it adds its
 -- own key (plugins/super-menu/hypr/super_menu.lua).
 
--- Super+Return twice is the Taskbar plugin's (plugins/taskbar/hypr/).
+if ALL then
+  -- SUPER+RETURN opens a terminal as in Omarchy, after a 300ms pause: a second
+  -- tap within it opens another window of the focused app instead (the same as
+  -- the taskbar's middle-click / "New window": a web app's page, an app's own
+  -- launcher entry, or the window's command line). The terminal waits so a
+  -- double-tap doesn't also leave a terminal behind.
+  hl.unbind("SUPER + RETURN")
+  do
+    local pending_tap = nil
+
+    o.bind("SUPER + RETURN", "Terminal (double-tap: another window of this app)", function()
+      if pending_tap then
+        pending_tap = nil
+        local window = hl.get_active_window()
+        if window then
+          local address = tostring(window.address)
+          if address:sub(1, 2) ~= "0x" then
+            address = "0x" .. address
+          end
+          hl.exec_cmd(D .. "taskbar-action new " .. address)
+        else
+          hl.exec_cmd("omarchy-launch-terminal")
+        end
+        return
+      end
+
+      local tap = {}
+      pending_tap = tap
+      hl.timer(function()
+        if pending_tap == tap then
+          pending_tap = nil
+          hl.exec_cmd("omarchy-launch-terminal")
+        end
+      end, { timeout = 300, type = "oneshot" })
+    end)
+  end
+end

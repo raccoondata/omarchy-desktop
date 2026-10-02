@@ -19,8 +19,10 @@ do
 end
 
 require("hypr.desktop.input")
+require("hypr.desktop.core")
 require("hypr.desktop.bindings")
 require("hypr.desktop.autostart")
 require("hypr.desktop.remote")
--- The mouse settings (hypr/mouse.lua) are loaded by Desktop Core, the
--- workspace pins (hypr/workspace-pins.lua) by the Taskbar plugin.
+-- Written by the desktop's settings (yours; may not exist yet):
+pcall(require, "hypr.mouse")             -- Taskbar & Desktop > Mouse
+pcall(require, "hypr.workspace-pins")    -- right-click an icon > Always open on workspace
