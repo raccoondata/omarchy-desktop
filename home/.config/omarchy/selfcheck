@@ -128,6 +128,10 @@ fi
 # --- backup lock, remote screen sharing -------------------------------------
 command -v hyprlock >/dev/null && ok "backup lock screen (hyprlock) installed" \
   || warn "hyprlock missing: no backup lock screen (run ~/.config/omarchy/plugins/rescue/bin/setup-system)"
+if [[ -x $omarchy/plugins/rescue/bin/setup-system ]]; then
+  "$omarchy/plugins/rescue/bin/setup-system" --check && ok "Rescue's system parts in place" \
+    || warn "Rescue's system parts are missing or older: run ~/.config/omarchy/plugins/rescue/bin/setup-system (asks for your password)"
+fi
 if $remote; then
   grep -q 'share-picker' "$HOME/.config/hypr/xdph.conf" 2>/dev/null && ok "screen-share picker answers for RustDesk" \
     || warn "xdph.conf doesn't use Remote Access's share-picker: RustDesk may get stuck on 'select the screen' (omarchy restart shell)"
