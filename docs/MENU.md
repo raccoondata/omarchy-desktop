@@ -118,7 +118,8 @@ while open (sandbox, Agents tile showing).
 
 Left: an "unfold" entrance from the bar; the Agents tile's Tab (ask that
 session something) from the grid; screenshots plugin's bar on the shared
-Send to list.
+Send to list; Now playing in the Rows layout (four of its narrow cells
+squeeze the title to a few letters).
 
 ## Checks for every phase
 
@@ -135,3 +136,17 @@ Send to list.
 After the build: Codex reviews the changes (read-only), three rounds at
 most; findings fixed between rounds, a ledger of fixed / deliberate /
 deferred kept with the work.
+
+Done, three rounds (each plugin's "Review round N" commit lists the fixes):
+
+| Round | super-menu | agent-tools | taskbar | Outcome |
+|---|---|---|---|---|
+| 1 | 6 | 7 | 3 | 14 fixed, 1 already fixed, 1 kept by design |
+| 2 | 4 | 6 | 2 | all fixed |
+| 3 | 4 | 5 | 0 | all fixed |
+
+Round 3's: a resized tile keeps its place; Rows in the Cards look, with
+hero tiles; narrow search rows; "size" in the inspector; Send to when the
+chosen session closes; one fallback folder without `XDG_RUNTIME_DIR`;
+More agents folds again; no error with no agents; ask mode on short,
+narrow screens.
