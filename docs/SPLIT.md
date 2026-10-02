@@ -46,7 +46,7 @@ listing the installed elements' settings.
   `bin/teardown` (undoes everything outside the plugin folder), its own
   settings file `~/.config/omarchy/<id>/settings.json`, its own Setup entry
   in Omarchy's menu, `bin/check`, README, MIT. No personal details; commit as
-  `<repo name> <334392459+raccoondata@users.noreply.github.com>`.
+  `<repo name>` with the GitHub account's noreply address.
 - Migration: setup imports the old keys from `taskbar-settings.json` once.
 - Every phase leaves the desktop working; omarchy-desktop's installer adds
   each plugin as it's split out.

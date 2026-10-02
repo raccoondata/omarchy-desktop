@@ -183,7 +183,13 @@ done < "$state/installed-files" | sort -u | xargs -d '\n' -r sha256sum) > "$stat
   echo "  default $f"
 done
 mkdir -p "$HOME/.local/bin"
-ln -sfn "$repo/bin/omarchy-desktop" "$HOME/.local/bin/omarchy-desktop"
+# The command: only where the name is free or already ours.
+link="$HOME/.local/bin/omarchy-desktop"
+if [[ ! -e $link && ! -L $link ]] || [[ "$(readlink "$link")" == */bin/omarchy-desktop ]]; then
+  ln -sfn "$repo/bin/omarchy-desktop" "$link"
+else
+  warn "~/.local/bin/omarchy-desktop is something else; left alone (run $repo/bin/omarchy-desktop)"
+fi
 gtk-update-icon-cache -q -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 conf_set repo "$repo"
 if [[ -d $backup ]]; then
@@ -257,6 +263,13 @@ fi
 # place of Omarchy's media widget and of the desktop's old now-playing module.
 shell="$omarchy/shell.json"
 [[ -f $shell ]] || cp /usr/share/omarchy/config/omarchy/shell.json "$shell"
+# Where Omarchy's media widget was (side and the widget before it), so
+# uninstall can put it back.
+if [[ -z "$(conf_get media_was)" ]]; then
+  was=$(jq -r '.bar.layout | to_entries[] | .key as $side | .value | (map(.id) | index("omarchy.media")) as $i
+    | select($i != null) | "\($side):\(if $i > 0 then .[$i-1].id else "" end)"' "$shell" 2>/dev/null | head -1)
+  [[ -n $was ]] && conf_set media_was "$was"
+fi
 tmp="$(mktemp)"
 jq '
   def has_id($id): any(.bar.layout[][]?; .id == $id);
@@ -318,7 +331,8 @@ fi
 
 # --- 5 services ------------------------------------------------------------------
 step 5 "Background services"
-systemctl --user daemon-reload
+# No user systemd (not in a session): the plugins start theirs at login.
+systemctl --user daemon-reload 2>/dev/null || warn "no user systemd here; the services start at your next login"
 # Rescue's and Remote Access's setup again: step 1 moved the desktop's old
 # copies of their files (the lock guard's and remote screen's services, the
 # rescue command) aside.

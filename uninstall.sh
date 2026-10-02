@@ -10,6 +10,9 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 omarchy="$HOME/.config/omarchy"
 state="$HOME/.local/state/omarchy-desktop"
+# Whether the bundle added a plugin (desktop.conf plugin_<id>=added): only
+# then does uninstall take it, and its system parts, out.
+added() { [[ "$(sed -n "s/^plugin_${1//-/_}=//p" "$omarchy/desktop.conf" 2>/dev/null | tail -1)" == added ]]; }
 bold=$'\e[1m' off=$'\e[0m'
 
 echo "${bold}Uninstall omarchy-desktop${off}"
@@ -19,7 +22,7 @@ read -r -p "Go ahead? [y/N] " a || true
 sudo -v
 
 # Remote access's system parts first (the plugin goes with the others below).
-if [[ -x $omarchy/plugins/remote-access/bin/setup-system ]] && "$omarchy/plugins/remote-access/bin/setup-system" --check; then
+if added remote-access && [[ -x $omarchy/plugins/remote-access/bin/setup-system ]] && "$omarchy/plugins/remote-access/bin/setup-system" --check; then
   "$omarchy/plugins/remote-access/bin/setup-system" --off || true
 fi
 
@@ -29,16 +32,27 @@ sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hyp
 shell="$omarchy/shell.json"
 if [[ -f $shell ]]; then
   tmp="$(mktemp)"
-  jq '.bar.layout |= with_entries(.value |= map(select(.id != "taskbar" and .id != "nowplaying" and .id != "now-playing")))' "$shell" > "$tmp" && mv "$tmp" "$shell"
+  # The bundle's widgets go; Omarchy's media widget comes back where it was.
+  was="$(sed -n 's/^media_was=//p' "$omarchy/desktop.conf" 2>/dev/null | tail -1)"
+  # An install from before that was noted: where Omarchy's default has it.
+  [[ -z $was ]] && was=$(jq -r '.bar.layout | to_entries[] | .key as $side | .value | (map(.id) | index("omarchy.media")) as $i
+    | select($i != null) | "\($side):\(if $i > 0 then .[$i-1].id else "" end)"' /usr/share/omarchy/config/omarchy/shell.json 2>/dev/null | head -1)
+  jq --arg side "${was%%:*}" --arg prev "${was#*:}" '
+    .bar.layout |= with_entries(.value |= map(select(.id != "taskbar" and .id != "nowplaying" and .id != "now-playing")))
+    | if $side == "" or any(.bar.layout[][]?; .id == "omarchy.media") then .
+      else .bar.layout[$side] = (.bar.layout[$side] // [] | (map(.id) | index($prev)) as $i
+        | if $prev == "" then [{"id": "omarchy.media"}] + . elif $i == null then . + [{"id": "omarchy.media"}]
+          else .[:$i+1] + [{"id": "omarchy.media"}] + .[$i+1:] end) end' "$shell" > "$tmp" && mv "$tmp" "$shell"
 fi
 menu="$omarchy/extensions/omarchy-menu.jsonc"
 [[ -f $menu ]] && sed -i -E '/^\s*"(system\.lock|system\.reboot-windows|setup\.taskbar|update\.desktop)":/d' "$menu"
-# The rescue console block in ~/.bashrc (from its comment to its fi).
-[[ -f $HOME/.bashrc ]] && python3 - "$HOME/.bashrc" <<'PY'
+# The rescue console block in ~/.bashrc (from its comment to its fi), when
+# the bundle added Rescue.
+added rescue && [[ -f $HOME/.bashrc ]] && python3 - "$HOME/.bashrc" <<'PY'
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
-s = re.sub(r"\n*# Text console 3 \(Ctrl\+Alt\+Delete.*?\nfi\n", "\n", s, flags=re.S)
+s = re.sub(r"\n*# Text console 3 \(Ctrl\+Alt\+Esc.*?\nfi\n", "\n", s, flags=re.S)
 open(p, "w").write(s)
 PY
 echo "- the desktop's files"
@@ -52,8 +66,9 @@ if [[ -f $state/installed-files ]]; then
   rm -f "$state/installed-files"
 fi
 rmdir "$HOME/.config/hypr/desktop" 2>/dev/null || true
-rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprland/libhyprbars-fixed.so" "$state/plugins-built"
-rm -f "$HOME/.local/bin/omarchy-desktop"
+added windows && rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprland/libhyprbars-fixed.so"
+rm -f "$state/plugins-built"
+[[ "$(readlink "$HOME/.local/bin/omarchy-desktop" 2>/dev/null)" == "$repo/bin/omarchy-desktop" ]] && rm -f "$HOME/.local/bin/omarchy-desktop"
 # The desktop's plugins: removed if the desktop added them; ones you added
 # yourself stay.
 for id in remote-access taskbar windows rescue screenshots agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
@@ -64,15 +79,24 @@ for id in remote-access taskbar windows rescue screenshots agent-tools hot-corne
   if [[ $mark == added && -d $dir && ! -L $dir ]]; then
     "$dir/bin/teardown" >/dev/null 2>&1 || true
     omarchy-plugin-disable "$id" >/dev/null 2>&1 || true
-    omarchy-plugin-remove "$id" --yes >/dev/null 2>&1 && echo "  removed the $id plugin (the desktop added it)"
+    omarchy-plugin-remove "$id" --yes >/dev/null 2>&1
+    if [[ -d $dir ]]; then
+      # No shell to ask (not in a session): out of shell.json, the folder aside.
+      tmp="$(mktemp)"
+      jq --arg id "$id" '.plugins = ((.plugins // []) | map(select(.id != $id)))' "$omarchy/shell.json" > "$tmp" 2>/dev/null \
+        && mv "$tmp" "$omarchy/shell.json" || rm -f "$tmp"
+      mkdir -p "$backup/plugins" && mv "$dir" "$backup/plugins/$id"
+    fi
+    [[ -d $dir ]] && echo "  ! couldn't remove the $id plugin ($dir)" || echo "  removed the $id plugin (the desktop added it)"
   elif [[ -d $dir ]]; then
     echo "  (the $id plugin stays, you added it: $dir/bin/teardown, then omarchy plugin remove $id)"
   fi
 done
-systemctl --user daemon-reload
+systemctl --user daemon-reload 2>/dev/null || true
 
 echo "- system files"
-sudo rm -f /etc/omarchy-rescue.issue "/etc/systemd/system/getty@tty3.service.d/rescue-issue.conf" \
+# Rescue's (only when the bundle added Rescue).
+added rescue && sudo rm -f /etc/omarchy-rescue.issue "/etc/systemd/system/getty@tty3.service.d/rescue-issue.conf" \
   /etc/sudoers.d/50-chvt /etc/sudoers.d/50-reboot-to-windows /usr/local/lib/omarchy-rescue/bootnext
 sudo systemctl daemon-reload
 

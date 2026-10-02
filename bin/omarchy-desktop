@@ -133,7 +133,13 @@ case "${1:-status}" in
           [[ -d $plugin ]] || { echo "couldn't add the Remote Access plugin (check the internet connection)"; exit 1; }
           set_conf plugin_remote_access added
         fi
-        omarchy-plugin-enable remote-access >/dev/null 2>&1 || true
+        if ! omarchy-plugin-enable remote-access >/dev/null 2>&1 \
+           && ! jq -e 'any(.plugins[]?; .id == "remote-access")' "$omarchy/shell.json" >/dev/null 2>&1; then
+          # No shell to ask (not in a session): on from the next login.
+          tmp="$(mktemp)"
+          jq '.plugins = ((.plugins // []) + [{"id": "remote-access"}])' "$omarchy/shell.json" > "$tmp" \
+            && mv "$tmp" "$omarchy/shell.json" || { rm -f "$tmp"; echo "couldn't turn on the Remote Access plugin"; exit 1; }
+        fi
         set_conf remote on
         "$plugin/bin/setup"
         exec "$plugin/bin/setup-system" ;;
