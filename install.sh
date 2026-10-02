@@ -333,7 +333,15 @@ chmod +x "$HOME/.local/bin/rescue" 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
 systemctl --user enable --now lock-guard.service >/dev/null 2>&1 || warn "couldn't start the lock guard"
-[[ "$(conf_get remote)" == on ]] && systemctl --user restart remote-screen.service 2>/dev/null
+# The remote screen only restarts when its script changed (a restart while
+# you're connected with the monitor off would drop the virtual screen).
+if [[ "$(conf_get remote)" == on ]]; then
+  sum="$(sha256sum < "$omarchy/remote-screen" 2>/dev/null | cut -c1-64)"
+  if [[ $sum != "$(cat "$state/remote-screen.sum" 2>/dev/null)" ]]; then
+    systemctl --user restart remote-screen.service 2>/dev/null
+    echo "$sum" > "$state/remote-screen.sum"
+  fi
+fi
 echo "  config history (local undo), backup lock guard"
 
 # --- 6 optional ------------------------------------------------------------------
