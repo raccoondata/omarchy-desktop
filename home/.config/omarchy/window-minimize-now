@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Title bar minimize button (hypr/desktop/titlebars.lua): minimize the focused window in
-# one go, even when it's maximized (Super+Down's ladder would only un-maximize
-# it). Goes through taskbar-action, so Super+Up and the taskbar restore it.
-address="$(hyprctl activewindow -j | jq -r '.address // empty')"
-[[ -n "$address" ]] || exit 0
-exec "$HOME/.config/omarchy/taskbar-action" minimize "$address"

@@ -16,40 +16,8 @@ local ALL = keys == "all"
 local NEW = ALL or keys == "new"
 
 
-if ALL then
-  -- Window navigation and controls.
-  -- SUPER+W and SUPER+S previously closed a window and toggled the scratchpad.
-  -- SUPER+Up and SUPER+Down previously focused the window above/below.
-  hl.unbind("SUPER + W")
-  hl.unbind("SUPER + S")
-  hl.unbind("SUPER + UP")
-  hl.unbind("SUPER + DOWN")
-  hl.unbind("SUPER + LEFT")
-  hl.unbind("SUPER + RIGHT")
-  hl.unbind("SUPER + SHIFT + UP")
-  hl.unbind("SUPER + SHIFT + DOWN")
-
-  o.bind("SUPER + W", "Focus window above", hl.dsp.focus({ direction = "u" }))
-  o.bind("SUPER + A", "Focus window left", hl.dsp.focus({ direction = "l" }))
-  o.bind("SUPER + S", "Focus window below", hl.dsp.focus({ direction = "d" }))
-  o.bind("SUPER + D", "Focus window right", hl.dsp.focus({ direction = "r" }))
-  o.bind("SUPER + UP", "Maximize or restore window", D .. "window-maximize-or-restore")
-  o.bind("SUPER + DOWN", "Minimize window", D .. "window-minimize")
-  o.bind("SUPER + LEFT", "Dock window left", D .. "window-dock left")
-  o.bind("SUPER + RIGHT", "Dock window right", D .. "window-dock right")
-  o.bind("SUPER + SHIFT + UP", "Restore all minimized windows", D .. "window-restore-all")
-  o.bind("SUPER + SHIFT + DOWN", "Minimize all windows", D .. "window-minimize-all")
-  -- SUPER+ALT+S was Omarchy's "move to scratchpad", which is where minimized
-  -- windows live; do it as a real minimize so the taskbar and Super+Up track it.
-  hl.unbind("SUPER + ALT + S")
-  o.bind("SUPER + ALT + S", "Minimize window", D .. "window-minimize-now")
-end
-
-if NEW then
-  -- SUPER+Q twice closes the window (Omarchy's close, Super+W, becomes focus
-  -- up when all the keybindings are on).
-  o.bind("SUPER + Q", "Close window (double-tap Q)", D .. "window-close-double-tap")
-end
+-- Window keys (Super+arrows, Super+WASD, Super+Q twice, Super+Tab, Super+G
+-- twice) are the Windows plugin's (plugins/windows/hypr/).
 
 if ALL then
   -- CTRL+ALT+DELETE: the task manager (btop, floating; focused if it's
@@ -76,48 +44,6 @@ if NEW then
   -- SUPER+SHIFT+ESCAPE twice within 2s reboots into Windows once (firmware
   -- BootNext); a single press only shows a warning. Also in the system menu.
   o.bind("SUPER + SHIFT + ESCAPE", "Reboot into Windows (press twice)", D .. "reboot-to-windows --tap")
-end
-
-if ALL then
-  -- SUPER+TAB: Windows-style window switcher from the taskbar (live thumbnails,
-  -- most recent first; see bar/modules/TaskbarSwitcher.qml). Hold Super and tap
-  -- Tab to step through, release Super to switch; Esc cancels. SUPER+TAB and
-  -- SUPER+SHIFT+TAB were next/previous workspace (SUPER+CTRL+TAB, former
-  -- workspace, still works). Omarchy's ALT+TAB tile cycling is untouched.
-  hl.unbind("SUPER + TAB")
-  hl.unbind("SUPER + SHIFT + TAB")
-  o.bind("SUPER + TAB", "Window switcher", "omarchy-shell -q taskbar switcherNext")
-  o.bind("SUPER + SHIFT + TAB", "Window switcher (backwards)", "omarchy-shell -q taskbar switcherPrev")
-end
-
-if ALL then
-  -- SUPER+G stays Toggle window grouping on a single tap, but the toggle waits
-  -- until the 400ms double-tap window has passed. A second tap opens Ghostty in
-  -- the focused terminal's directory instead. Unlike copy, grouping can't run on
-  -- the first tap: group:auto_group would pull the new terminal into the group.
-  hl.unbind("SUPER + G")
-  do
-    local pending_tap = nil
-
-    o.bind("SUPER + G", "Toggle window grouping (double-tap: Ghostty)", function()
-      if pending_tap then
-        pending_tap = nil
-        hl.exec_cmd(o.launch('ghostty --gtk-single-instance=true --working-directory="$(omarchy-cmd-terminal-cwd)"'))
-        return
-      end
-
-      -- A fresh token per first tap, so a timer left over from an earlier
-      -- double-tap can't toggle grouping for this one.
-      local tap = {}
-      pending_tap = tap
-      hl.timer(function()
-        if pending_tap == tap then
-          pending_tap = nil
-          hl.dispatch(hl.dsp.group.toggle())
-        end
-      end, { timeout = 400, type = "oneshot" })
-    end)
-  end
 end
 
 -- The Super menu (double-tap Super) is the Super Menu plugin's: it adds its

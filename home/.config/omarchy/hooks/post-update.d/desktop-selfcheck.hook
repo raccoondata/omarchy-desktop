@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# After `omarchy update`: check the desktop (the Windows plugin keeps its
+# Hyprland plugins in step with Hyprland with its own hook).
+
+set -uo pipefail
+"$HOME/.config/omarchy/selfcheck" --quiet >/dev/null 2>&1 || true
+exit 0

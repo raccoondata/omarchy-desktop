@@ -945,11 +945,6 @@ Item {
           description: "minimize/restore outline; apps assemble and dissolve in pixels"
           ToggleSwitch { checked: settings.taskbar.motionEffects; onToggled: settings.set("motionEffects", !checked) }
         }
-        SettingRow {
-          label: "Snap preview"
-          description: "outline where a dragged window will land at a screen edge"
-          ToggleSwitch { checked: settings.taskbar.snapPreview; onToggled: settings.set("snapPreview", !checked) }
-        }
       }
 
     }
@@ -1512,15 +1507,17 @@ Item {
     Column {
       spacing: Style.space(6)
 
+      // Title bars on or off, window keys, the switcher, snapping: the
+      // Windows plugin's own settings.
       SettingRow {
         label: "Title bars"
-        description: "minimize, maximize and close on every window; drag them to move, or onto a workspace number"
-        ToggleSwitch {
-          checked: settings.titlebarsOn
-          onToggled: {
-            settings.titlebarsOn = !checked
-            Util.execArgv([settings.dir + "/titlebars", checked ? "off" : "on"])
-          }
+        description: settings.titlebarsOn ? "on: Setup > Windows turns them off (and has the window keys, switcher and snapping)"
+                                          : "off: Setup > Windows turns them on"
+        Button {
+          text: "Setup > Windows"
+          foreground: Color.menu.text
+          fontFamily: Style.font.menuFamily
+          onClicked: Util.execArgv(["omarchy-shell", "-q", "shell", "summon", "windows"])
         }
       }
 

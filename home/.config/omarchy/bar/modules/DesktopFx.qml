@@ -7,11 +7,6 @@ import qs.Commons
 // like the rest of Omarchy: theme colours only (Color.*), the theme's corner
 // rounding and gaps (Style.*), thin accent borders, short calm motion.
 //
-//  - Snap preview: while a tiled window is dragged into a screen-edge zone
-//    (top = maximize, left/right = half), the area it will take is outlined
-//    like a focused window, with one soft sheen passing over it as the zone is
-//    entered. Zones and areas come from the dragevents plugin
-//    (windowdragzone events, via taskbar.qml).
 //  - Locking (~/.config/omarchy/lock): a "Locked, type your password" card
 //    just before the lock, so remote viewers see that, not the desktop.
 //  - Minimize/restore: an outline travels from the window into its taskbar
@@ -21,17 +16,9 @@ Item {
   id: fx
 
   required property var taskbar
-  // Snap preview, in layout (global) coordinates.
-  property string zone: "none"
-  property rect area: Qt.rect(0, 0, 0, 0)
-  property bool previewEnabled: true
-  readonly property bool previewShown: previewEnabled && zone !== "none" && area.width > 0
 
   // Matches Hyprland's window border (general:border_size in Omarchy).
   readonly property int borderWidth: 2
-
-  onZoneChanged: if (previewShown) sheen.restart()
-  onPreviewShownChanged: if (previewShown) sheen.restart()
 
   // Minimize/restore: an outline travels between a window and its taskbar
   // icon (rects in layout/global coordinates).
@@ -55,7 +42,7 @@ Item {
     id: overlay
 
     screen: fx.taskbar.QsWindow.window ? fx.taskbar.QsWindow.window.screen : null
-    visible: fx.previewShown || previewFade.running || morphAnimation.running
+    visible: morphAnimation.running
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
@@ -67,54 +54,6 @@ Item {
 
     readonly property real originX: screen ? screen.x : 0
     readonly property real originY: screen ? screen.y : 0
-
-    // ------------------------------------------------------- snap preview
-
-    Rectangle {
-      id: preview
-
-      x: fx.area.x - overlay.originX + Style.gapsOut
-      y: fx.area.y - overlay.originY + Style.gapsOut
-      width: Math.max(0, fx.area.width - Style.gapsOut * 2)
-      height: Math.max(0, fx.area.height - Style.gapsOut * 2)
-      radius: Style.cornerRadius
-      color: Util.alpha(Color.accent, 0.08)
-      border.color: Color.accent
-      border.width: fx.borderWidth
-      opacity: fx.previewShown ? 1 : 0
-      clip: true
-
-      Behavior on x { NumberAnimation { duration: fx.taskbar.motionMove; easing.type: Easing.OutCubic } }
-      Behavior on y { NumberAnimation { duration: fx.taskbar.motionMove; easing.type: Easing.OutCubic } }
-      Behavior on width { NumberAnimation { duration: fx.taskbar.motionMove; easing.type: Easing.OutCubic } }
-      Behavior on height { NumberAnimation { duration: fx.taskbar.motionMove; easing.type: Easing.OutCubic } }
-      Behavior on opacity { NumberAnimation { id: previewFade; duration: fx.taskbar.motionMove; easing.type: Easing.OutCubic } }
-
-      // One soft band of light across the area when a zone is entered.
-      Rectangle {
-        id: sheenBand
-        width: Math.max(120, preview.width * 0.3)
-        height: preview.height
-        x: -width
-        opacity: 0
-        gradient: Gradient {
-          orientation: Gradient.Horizontal
-          GradientStop { position: 0.0; color: "transparent" }
-          GradientStop { position: 0.5; color: Util.alpha(Color.accent, 0.14) }
-          GradientStop { position: 1.0; color: "transparent" }
-        }
-      }
-
-      ParallelAnimation {
-        id: sheen
-        NumberAnimation { target: sheenBand; property: "x"; from: -sheenBand.width; to: preview.width; duration: 520; easing.type: Easing.InOutCubic }
-        SequentialAnimation {
-          NumberAnimation { target: sheenBand; property: "opacity"; from: 0; to: 1; duration: 120 }
-          PauseAnimation { duration: 280 }
-          NumberAnimation { target: sheenBand; property: "opacity"; to: 0; duration: 120 }
-        }
-      }
-    }
 
     // ------------------------------------------------- minimize / restore
 

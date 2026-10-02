@@ -26,7 +26,7 @@ update=false
 [[ ${1:-} == --update ]] && update=true
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 failed=()
-steps=8
+steps=7
 
 step() { echo; echo "${bold}[$1/$steps] $2${off}"; }
 warn() { echo "  ! $*"; failed+=("$*"); }
@@ -124,6 +124,7 @@ need_plugin super-menu "Super Menu" omarchy-super-menu
 need_plugin hot-corners "Hot Corners" omarchy-hot-corners
 need_plugin agent-tools "Agent Tools" omarchy-agent-tools
 need_plugin screenshots "Screenshots" omarchy-screenshots
+need_plugin windows "Windows" omarchy-windows
 mapfile -t owned < <(sed 's/#.*//; s/[[:space:]]*$//; /^$/d' "$repo/manifest")
 backup="$state/backups/$(date +%F-%H%M%S)"
 mkdir -p "$state"
@@ -307,19 +308,8 @@ fi
 step 4 "System setup (packages, rescue console)"
 "$omarchy/setup-system" || warn "setup-system failed; run ~/.config/omarchy/setup-system"
 
-# --- 5 plugins -----------------------------------------------------------------
-step 5 "Hyprland plugins (title bars, window drag events)"
-stamp="$(hyprctl version -j 2>/dev/null | jq -r .commit)-$(cat "$omarchy"/hyprland-plugins/{build,hyprbars-commit,hyprbars-fixes.patch} "$omarchy"/hyprland-plugins/dragevents/* 2>/dev/null | md5sum | cut -c1-12)"
-if [[ "$(cat "$state/plugins-built" 2>/dev/null)" == "$stamp" && -f $HOME/.local/lib/hyprland/libhyprdragevents.so ]]; then
-  echo "  up to date"
-elif "$omarchy/hyprland-plugins/build"; then
-  echo "$stamp" > "$state/plugins-built"
-else
-  warn "plugin build failed (title bars fall back to off; window drops on workspaces don't work)"
-fi
-
-# --- 6 services ------------------------------------------------------------------
-step 6 "Background services"
+# --- 5 services ------------------------------------------------------------------
+step 5 "Background services"
 chmod +x "$HOME/.local/bin/rescue" 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
@@ -327,8 +317,8 @@ systemctl --user enable --now lock-guard.service >/dev/null 2>&1 || warn "couldn
 [[ "$(conf_get remote)" == on ]] && systemctl --user restart remote-screen.service 2>/dev/null
 echo "  config history (local undo), backup lock guard"
 
-# --- 7 optional ------------------------------------------------------------------
-step 7 "Optional"
+# --- 6 optional ------------------------------------------------------------------
+step 6 "Optional"
 if [[ "$(conf_get remote)" == on ]]; then
   # Re-applied on a full install (only restarts RustDesk if something changed).
   $update || "$omarchy/setup-remote" || warn "setup-remote failed; run ~/.config/omarchy/setup-remote"
@@ -347,8 +337,8 @@ else
   fi
 fi
 
-# --- 8 reload ---------------------------------------------------------------------
-step 8 "Reloading"
+# --- 7 reload ---------------------------------------------------------------------
+step 7 "Reloading"
 if hyprctl version >/dev/null 2>&1; then
   hyprctl reload >/dev/null 2>&1 && echo "  Hyprland config reloaded"
   omarchy-restart-shell >/dev/null 2>&1 && echo "  shell restarted"

@@ -21,7 +21,6 @@ end
 require("hypr.desktop.input")
 require("hypr.desktop.core")
 require("hypr.desktop.bindings")
-require("hypr.desktop.titlebars")
 require("hypr.desktop.autostart")
 require("hypr.desktop.remote")
 -- Written by the desktop's settings (yours; may not exist yet):

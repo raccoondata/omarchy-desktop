@@ -38,7 +38,7 @@ else
     warn "plugins-off is set: no title bars, no window drops (rm $omarchy/plugins-off)"
   else
     grep -q "^Plugin dragevents " <<<"$plugins" && ok "dragevents plugin loaded" \
-      || bad "dragevents plugin not loaded: window drops and snapping are off (see ~/.local/state/omarchy/titlebars.log)"
+      || bad "dragevents plugin not loaded: window drops and snapping are off (the Windows plugin loads it; see ~/.local/state/omarchy/titlebars.log)"
     if [[ -e $omarchy/titlebars-off ]]; then
       ok "title bars switched off (titlebars-off)"
     else
@@ -47,11 +47,13 @@ else
     fi
   fi
 
-  # The local plugin builds must match the running Hyprland.
+  # The local plugin builds (the Windows plugin's) must match the running Hyprland.
   running="$(hyprctl version -j 2>/dev/null | jq -r '.tag // empty' | sed 's/^v//')"
-  built="$(awk '{v=$1} END {print v}' "$omarchy/hyprland-plugins/hyprbars-commit" 2>/dev/null)"
+  record="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/windows/hyprbars-commit"
+  [[ -s $record ]] || record="$omarchy/plugins/windows/hyprland-plugins/hyprbars-commit"
+  built="$(awk '{v=$1} END {print v}' "$record" 2>/dev/null)"
   if [[ -n $running && -n $built && $running != "$built" ]]; then
-    warn "local plugins were built for Hyprland $built, running $running: run $omarchy/hyprland-plugins/build"
+    warn "local plugins were built for Hyprland $built, running $running: run $omarchy/plugins/windows/bin/build-plugins"
   elif [[ -n $running ]]; then
     ok "local plugins built for this Hyprland ($running)"
   fi

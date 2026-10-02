@@ -66,9 +66,11 @@ added it yourself).
   starts your coding agent in a repo or a folder of repos, Files elsewhere;
   every key configurable), now playing, a box to ask a coding agent, and
   lock / restart / shut down.
-- **Windows-style windows**: Super+Up / Down to maximize, restore and
-  minimize, Super+Left / Right to dock to a half, title bars with minimize
-  and maximize buttons, hot corners.
+- **Windows-style windows** (the Windows plugin): Super+Up / Down to
+  maximize, restore and minimize, Super+Left / Right to dock to a half, the
+  Super+Tab switcher with live previews, title bars with minimize and
+  maximize buttons, middle-drag by a window's top strip, snapping at screen
+  edges. Hot corners are the Hot Corners plugin.
 - **Screenshots** (the Screenshots plugin, on top of Agent Tools): Print
   Screen opens the editor (Tensaku) with an ask panel next to it: type a
   question and send the screenshot to Claude Code, Codex or whichever agents
@@ -165,11 +167,12 @@ new window. Esc in the screenshot editor folds its ask panel first.
   each sets itself up (and its `bin/teardown` undoes that).
 - `install.sh`: copies those, adds the plugins, hooks the desktop into
   Omarchy (one line in `hyprland.lua`, the bar widgets in `shell.json`, menu
-  entries), runs `setup-system` (packages, rescue console), builds
-  the two Hyprland plugins, starts the background services.
+  entries), runs `setup-system` (packages, rescue console), starts the
+  background services.
 - `bin/omarchy-desktop`: update / status / check / keys / remote / uninstall
   (`uninstall.sh`).
 
-After a Hyprland update the plugins rebuild themselves on the next
-`omarchy-desktop update` (or run `~/.config/omarchy/hyprland-plugins/build`);
-until then the title bars fall back to off.
+After a Hyprland update the Windows plugin rebuilds its Hyprland plugins
+(title bars, window drag events) by itself, from Omarchy's post-update hook
+(or run `~/.config/omarchy/plugins/windows/bin/build-plugins`); until then
+the title bars fall back to off.

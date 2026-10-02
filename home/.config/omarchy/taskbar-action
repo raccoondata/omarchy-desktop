@@ -9,7 +9,7 @@ set -euo pipefail
 #   taskbar-action newhere  <address>...   another window of the program, on the
 #                                          workspace you're on (apps set to "open on
 #                                          the current workspace", e.g. Files)
-#   taskbar-action minimize <address>...   via window-minimize, so Super+Up restores
+#   taskbar-action minimize <address>...   via Desktop Core's window, so Super+Up restores
 #   taskbar-action restore  <address>...
 #   taskbar-action maximize <address>      toggle maximized
 #   taskbar-action float    <address>      toggle floating/tiled
@@ -37,6 +37,8 @@ set -euo pipefail
 #                                          workspace pins, title-bar exceptions
 #                                          and "comes to you" apps
 scripts="$HOME/.config/omarchy"
+# Minimize and restore: Desktop Core's, the one way every plugin does it.
+window_cmd="$HOME/.config/omarchy/plugins/desktop-core/bin/window"
 pins="$HOME/.config/omarchy/taskbar-pins.json"
 wspins="$HOME/.config/omarchy/taskbar-workspaces.json"
 wsrules="$HOME/.config/hypr/workspace-pins.lua"
@@ -220,7 +222,7 @@ gather() {  # gather <workspace name> <address>...
   local addrs=("$@") a window group others i j anchor
   local depth=()
   for a in "${addrs[@]}"; do
-    is_minimized "$a" && "$scripts/window-restore" --address "$a"
+    is_minimized "$a" && "$window_cmd" restore "$a"
     window="$(client "$a")"
     [[ -n $window ]] || continue
     if (( $(jq -r '.fullscreen // 0' <<<"$window") > 0 )); then
@@ -308,14 +310,10 @@ case "$action" in
     ;;
 
   focus)
-    # Taskbar clicks and scrolling: Hyprland warps the pointer onto a window it
-    # focuses, so put it back and leave it on the taskbar.
-    pos="$(hyprctl cursorpos)"
-    "$scripts/window-restore" --address "$1"
-    x="${pos%%,*}" y="${pos##* }"
-    if [[ "$x" =~ ^-?[0-9]+$ && "$y" =~ ^-?[0-9]+$ ]]; then
-      dispatch "hl.dsp.cursor.move({ x = $x, y = $y })"
-    fi
+    # Taskbar clicks and scrolling: focused (restored first if minimized),
+    # and the pointer left on the taskbar (Hyprland warps it onto a window it
+    # focuses).
+    "$window_cmd" focus "$1" --keep-pointer
     ;;
 
   pin)
@@ -419,23 +417,19 @@ case "$action" in
   minimize)
     for address in "$@"; do
       is_minimized "$address" && continue
-      focus "$address"
-      # window-minimize walks the ladder: a maximized window only un-maximizes.
-      for _ in 1 2; do
-        "$scripts/window-minimize"
-        is_minimized "$address" && break
-      done
+      # A maximized one too, in one go.
+      "$window_cmd" minimize "$address"
     done
     ;;
 
   restore)
     for address in "$@"; do
-      is_minimized "$address" && "$scripts/window-restore" --address "$address"
+      is_minimized "$address" && "$window_cmd" restore "$address"
     done
     ;;
 
   maximize)
-    is_minimized "$1" && "$scripts/window-restore" --address "$1"
+    is_minimized "$1" && "$window_cmd" restore "$1"
     focus "$1"
     dispatch 'hl.dsp.window.fullscreen({ mode = "maximized" })'
     ;;

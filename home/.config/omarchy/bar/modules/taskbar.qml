@@ -38,11 +38,11 @@ import "../../plugins/desktop-core/media"
 // window(s) there (press and hold first to move the whole taskbar instead);
 // right-click opens a menu (incl. "Always open on workspace" and "Hide title
 // bar"); middle-click or Shift+click opens a new window. Dragging any window
-// onto a workspace number moves it there too (dragevents plugin).
-// Super+Tab opens TaskbarSwitcher.qml. Actions run
+// onto a workspace number moves it there too (the Windows plugin's dragevents;
+// it snaps drops elsewhere, and has the Super+Tab switcher). Actions run
 // ~/.config/omarchy/taskbar-action. Icons come from the Line Icons plugin (its lib/LineIcons.js), coloured
 // at runtime so they follow the theme. Minimized windows (moved to
-// special:scratchpad by ~/.config/omarchy/window-minimize) render dimmed.
+// special:scratchpad by Desktop Core's window) render dimmed.
 BarWidget {
   id: root
   // No "panel open" mark from Omarchy's bar under this module: it would sit
@@ -64,7 +64,6 @@ BarWidget {
   readonly property string omarchyDir: Quickshell.env("HOME") + "/.config/omarchy"
   readonly property int maxLabelWidth: Number(pref("maxLabelWidth", 120))
   readonly property bool showLabels: pref("showLabels", false) === true
-  readonly property bool snapPreview: pref("snapPreview", true) !== false
   // Super+Space > Setup > Taskbar (~/.config/omarchy/taskbar-setting).
   readonly property bool showBadges: pref("showBadges", true) !== false
   readonly property bool flashAttention: pref("flashAttention", true) !== false
@@ -82,7 +81,6 @@ BarWidget {
     return v === "shuffle" || Visuals.values(Visuals.eqStyles).indexOf(v) !== -1 ? v : "spectrum"
   }
   readonly property string minimizedWorkspace: "special:scratchpad"
-  readonly property string restoreScript: root.omarchyDir + "/window-restore"
   readonly property string actionScript: root.omarchyDir + "/taskbar-action"
   readonly property string pinsPath: root.omarchyDir + "/taskbar-pins.json"
   readonly property color foreground: root.bar ? root.bar.barForeground : Color.foreground
@@ -563,13 +561,6 @@ BarWidget {
   // Most recently focused first, for Alt+Tab (Desktop Core).
   readonly property var mru: core.mru
 
-  function switcherWindows() { return core.allByRecent() }
-
-  // Keyboard switching: let Hyprland move the pointer onto the window.
-  function switchTo(toplevel) {
-    if (bar && toplevel) bar.run(restoreScript + " --address " + hexAddress(toplevel))
-  }
-
   // Taskbar clicks and scrolling: focus (restoring a minimized window) but
   // leave the pointer on the taskbar.
   function focusWindow(toplevel) {
@@ -593,17 +584,9 @@ BarWidget {
     focusWindow(windows[next])
   }
 
-  TaskbarSwitcher {
-    id: switcher
-    taskbar: root
-  }
-
   IpcHandler {
     target: "taskbar"
 
-    function switcherNext(): void { switcher.move(1) }
-    function switcherPrev(): void { switcher.move(-1) }
-    function switcherCancel(): void { switcher.close() }
     // Mark a window as wanting you (0x-address), e.g. from a hook; it clears
     // when the window is focused.
     function attention(address: string): void {
@@ -612,8 +595,8 @@ BarWidget {
     // Hyprland's Shift+click bind (hypr/desktop/bindings.lua) calls this, since the
     // bar never sees modifier keys itself.
     function shiftClick(): void { root.noteShiftClick() }
-    // The workspace number under a point in layout coordinates, or 0. Used by
-    // ~/.config/omarchy/snap-tile-edge when a dragged window is dropped.
+    // The workspace number under a point in layout coordinates, or 0. The
+    // Windows plugin's snap asks, and leaves drops on a number to us.
     function workspaceAtPoint(x: int, y: int): int {
       var hit = root.workspaceAtGlobal(x, y)
       return hit ? hit.id : 0
@@ -682,12 +665,9 @@ BarWidget {
   // ---------------------------------------------------------- window drags
 
   // Dragging any window (title bar, Super+drag, middle-drag, or an app's own
-  // tab strip, as reported by the dragevents plugin): rings mark the
-  // workspace numbers, and a drop on one moves the window there.
+  // tab strip, as reported by the Windows plugin's dragevents): rings mark
+  // the workspace numbers, and a drop on one moves the window there.
   property bool windowDragging: false
-  // Only tiles snap (snap-tile-edge leaves floating windows alone), so only
-  // they get the snap preview.
-  property bool dragTiled: false
 
   function setWindowDragging(on) {
     windowDragging = on
@@ -695,22 +675,13 @@ BarWidget {
       windowDragSafety.restart()
     } else {
       windowDragSafety.stop()
-      desktopFx.zone = "none"
       dropItem = null
     }
   }
 
-  // windowdragzone>>ZONE,X,Y,W,H
-  function windowDragZone(data) {
-    var parts = String(data).split(",")
-    if (!windowDragging || !dragTiled || parts.length < 5) {
-      desktopFx.zone = "none"
-      return
-    }
-    desktopFx.area = Qt.rect(Number(parts[1]), Number(parts[2]), Number(parts[3]), Number(parts[4]))
-    desktopFx.zone = parts[0]
-    if (parts[0] !== "top") dropItem = null
-  }
+  // Over a workspace number the drop moves the window, so the Windows
+  // plugin shows no snap preview meanwhile.
+  onDropItemChanged: Util.execArgv(["omarchy-shell", "-q", "windows", "overTaskbar", dropItem !== null ? "true" : "false"])
 
   // windowdragpos>>X,Y (pointer over the bar): light the number under it.
   function windowDragPos(data) {
@@ -772,8 +743,6 @@ BarWidget {
   DesktopFx {
     id: desktopFx
     taskbar: root
-    // Over a workspace number the drop moves the window instead: no preview.
-    previewEnabled: root.snapPreview && root.dropItem === null
   }
 
   Timer {
@@ -791,12 +760,8 @@ BarWidget {
     var x = Number(parts[1])
     var y = Number(parts[2])
     var hit = workspaceAtGlobal(x, y)
-    if (!hit) {
-      // Not on a number: screen-edge snapping (top = maximize, sides = half),
-      // unless it was a click that never really moved.
-      if (parts[3] === "1") Util.execArgv([snapScript, "--no-taskbar"])
-      return
-    }
+    // Not on a number: the Windows plugin snaps it (at a screen edge).
+    if (!hit) return
     var toplevel = null
     for (var i = 0; i < toplevels.length; i++) if (hexAddress(toplevels[i]) === address) toplevel = toplevels[i]
     var group = { key: "window:" + address, icon: iconName(address, classOf(toplevel)), appIcon: appIconFor(classOf(toplevel), ""), windows: [toplevel || { address: address }] }
@@ -822,7 +787,6 @@ BarWidget {
     return workspaceAt(root, p.x, p.y)
   }
 
-  readonly property string snapScript: root.omarchyDir + "/snap-tile-edge"
 
   // -------------------------------------------------------------- popup
 
@@ -1737,12 +1701,9 @@ BarWidget {
       if (name === "movewindowv2") root.noteWindowMove(data)
       if (name === "movewindow" || name === "movewindowv2" || name === "openwindow") Hyprland.refreshToplevels()
 
-      // Window drags, from the dragevents plugin (see titlebars-load).
+      // Window drags, from the Windows plugin's dragevents.
       if (name === "windowdragstart") {
-        root.dragTiled = String(data).split(",")[1] === "1"
         root.setWindowDragging(true)
-      } else if (name === "windowdragzone") {
-        root.windowDragZone(data)
       } else if (name === "windowdragpos") {
         root.windowDragPos(data)
       } else if (name === "windowdragend") {
