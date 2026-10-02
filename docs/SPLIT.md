@@ -16,7 +16,7 @@ bundle that adds them all. Nothing should need the taskbar to be installed.
 | now-playing | the card, visualizers, output picker | Setup > Now Playing |
 | screenshots | Print Screen into the editor or a preview with the ask panel (requires agent-tools) | Setup > Screenshots |
 | agent-tools | the agents base: the agent list, starting and pasting into sessions, the ask panel and card, notifications; plus small entry points into the ask card (Files right-click, Super+Alt+A, Super+C/V twice, safe mode), each with an on/off switch | Setup > Agent Tools |
-| rescue | Ctrl+Alt+Del task manager, Ctrl+Alt+Esc rescue console, lock guard, backup lock, reboot to Windows | — |
+| rescue | done locally: Ctrl+Alt+Del task manager, Ctrl+Alt+Esc rescue console, lock guard, backup lock, reboot to Windows; its system parts are its bin/setup-system | — |
 | remote-access | RustDesk unattended setup | — |
 | line-icons | done (raccoondata/omarchy-line-icons) | Setup > Line Icons |
 
@@ -89,6 +89,10 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    rebuild) are its; the taskbar keeps drops on workspace numbers and tells
    it when the pointer is over one (IPC windows overTaskbar), and minimizes
    and restores through Desktop Core's window. Then taskbar (and the
-   settings window splits per plugin).
-5. rescue, remote-access, the bundle installer, config history to
+   settings window splits per plugin). Taskbar done locally: the bar
+   widget, its settings, Shift+click and pins; the desktop keeps only input
+   tweaks and autostart.
+5. rescue (done locally: keys, lock, backup lock and its guard, rescue
+   console, reboot to Windows; the desktop's setup-system calls its
+   setup-system), remote-access, the bundle installer, config history to
    omarchy-config.

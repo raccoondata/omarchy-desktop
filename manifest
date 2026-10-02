@@ -6,12 +6,8 @@
 
 .config/hypr/desktop.lua
 .config/hypr/desktop/
-.config/omarchy/backup-lock
 
-.config/omarchy/lock
-.config/omarchy/lock-guard
 .config/omarchy/lock-on-autologin
-.config/omarchy/reboot-to-windows
 .config/omarchy/remote-screen
 .config/omarchy/selfcheck
 .config/omarchy/hooks/post-update.d/desktop-selfcheck.hook
@@ -21,8 +17,6 @@
 .config/systemd/user/config-history.service
 .config/systemd/user/config-history.timer
 .config/omarchy/share-picker
-.config/systemd/user/lock-guard.service
 .config/systemd/user/remote-screen.service
-.local/bin/rescue
 .local/share/icons/hicolor/256x256/apps/teams.png
 .local/share/icons/hicolor/256x256/apps/youtube-music.png

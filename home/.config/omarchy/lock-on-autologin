@@ -16,4 +16,5 @@ for _ in {1..60}; do
 done
 
 # With the "Locked" card first, for a RustDesk viewer after a reboot.
-"$HOME/.config/omarchy/lock"
+lock="$HOME/.config/omarchy/plugins/rescue/bin/lock"
+if [[ -x $lock ]]; then "$lock"; else omarchy-lock-screen; fi

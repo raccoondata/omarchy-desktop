@@ -117,13 +117,13 @@ them). Health check: `omarchy-desktop check`.
 
 ## Keybindings
 
-What differs from stock Omarchy (in `~/.config/hypr/desktop/bindings.lua`).
+What differs from stock Omarchy (each plugin adds its own keys; Rescue has
+Ctrl+Alt+Del, Ctrl+Alt+Esc, Super+Ctrl+L and Super+Shift+Esc).
 Which ones you get is up to you (`omarchy-desktop keys`): **all**, only the
 **new** ones (marked ✚: they don't change any Omarchy key), or none.
 **Super+K** lists every binding, these included. They load after your own
 `~/.config/hypr/bindings.lua`, so to change one, put your version in a file
-of your own (say `hypr/mine.lua`) and add `require("hypr.mine")` after
-`require("hypr.desktop")` in `hyprland.lua`.
+of your own (say `hypr/mine.lua`) and load it at the end of `hyprland.lua`.
 
 | Keys | Does | Replaces Omarchy's |
 |---|---|---|
@@ -163,11 +163,11 @@ new window. Esc in the screenshot editor folds its ask panel first.
   have none, then yours.
 - Plugins, each its own repository and installable on its own: Desktop Core
   (what the others share), Line Icons, Now Playing, Super Menu, Hot Corners,
-  Agent Tools, Screenshots. The installer adds the ones you don't have;
+  Agent Tools, Screenshots, Windows, Taskbar, Rescue. The installer adds the ones you don't have;
   each sets itself up (and its `bin/teardown` undoes that).
 - `install.sh`: copies those, adds the plugins, hooks the desktop into
   Omarchy (one line in `hyprland.lua`, the bar widgets in `shell.json`, menu
-  entries), runs `setup-system` (packages, rescue console), starts the
+  entries), runs `setup-system` (packages, and Rescue's: the rescue console), starts the
   background services.
 - `bin/omarchy-desktop`: update / status / check / keys / remote / uninstall
   (`uninstall.sh`).

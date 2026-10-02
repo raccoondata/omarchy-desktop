@@ -6,14 +6,12 @@ set -euo pipefail
 # Asks for your password once.
 #
 #   packages   what the desktop's scripts use on top of Omarchy: the title-bar
-#              plugin (hyprland-plugin-hyprbars, AUR) and the backup lock
-#              screen (hyprlock), plus socat, jq, efibootmgr, nautilus-python
-#              (the Files menu), tensaku (the screenshot editor), cava (the
-#              music's spectrum, for the equalizers)
-#   consoles   Ctrl+Alt+Esc -> text console 3 (passwordless `chvt`), with a
-#              "Ctrl+Alt+F1 = back to the desktop" banner and the rescue menu
-#   Windows    on a PC that dual-boots Windows: passwordless
-#              `efibootmgr --bootnext` for Restart into Windows
+#              plugin (hyprland-plugin-hyprbars, AUR), plus socat, jq,
+#              nautilus-python (the Files menu), tensaku (the screenshot
+#              editor), cava (the music's spectrum, for the equalizers)
+#   Rescue     its system parts (its bin/setup-system): hyprlock and
+#              efibootmgr, the rescue console on Ctrl+Alt+Esc (passwordless
+#              `chvt`), passwordless `efibootmgr --bootnext` with Windows
 #
 # Remote access (RustDesk) is separate and optional: ./setup-remote.
 
@@ -23,7 +21,7 @@ echo "${bold}System setup for the desktop${off}"
 sudo -v
 
 # --- packages ---------------------------------------------------------------
-pkgs=(hyprland-plugin-hyprbars hyprlock socat jq efibootmgr nautilus-python tensaku cava
+pkgs=(hyprland-plugin-hyprbars socat jq nautilus-python tensaku cava
   inotify-tools rsync git make gcc)
 mapfile -t missing < <(comm -23 <(printf '%s\n' "${pkgs[@]}" | sort -u) <(pacman -Qq | sort))
 if (( ${#missing[@]} )); then
@@ -32,49 +30,13 @@ else
   echo "  packages: all installed"
 fi
 
-# --- files --------------------------------------------------------------------
-put() {  # put <path> [mode] < content
-  local tmp
-  tmp="$(mktemp)"
-  cat > "$tmp"
-  if ! sudo cmp -s "$tmp" "$1" 2>/dev/null; then
-    sudo install -D -m "${2:-644}" "$tmp" "$1"
-    echo "  installed $1"
-  fi
-  rm -f "$tmp"
-}
-put /etc/omarchy-rescue.issue <<'EOF'
-
-  \e{bold}Rescue console\e{reset}   Ctrl+Alt+F1 = back to the desktop
-  Log in to open the rescue menu (or type: rescue)
-
-EOF
-put "/etc/systemd/system/getty@tty3.service.d/rescue-issue.conf" <<'EOF'
-# Rescue console (Ctrl+Alt+Esc): also show /etc/omarchy-rescue.issue.
-[Service]
-ExecStart=
-ExecStart=-/usr/bin/agetty --noreset --noclear --issue-file /etc/issue:/etc/omarchy-rescue.issue - ${TERM}
-EOF
-
-# --- sudoers rules --------------------------------------------------------------
-rule() {  # rule <file> <line>
-  local tmp
-  tmp="$(mktemp)"
-  printf '%s\n' "$2" > "$tmp"
-  if sudo visudo -cf "$tmp" >/dev/null && ! sudo cmp -s "$tmp" "$1" 2>/dev/null; then
-    sudo install -m 440 -o root -g root "$tmp" "$1"
-    echo "  installed $1"
-  fi
-  rm -f "$tmp"
-}
-rule /etc/sudoers.d/50-chvt "$USER ALL=(root) NOPASSWD: /usr/bin/chvt"
-if "$HOME/.config/omarchy/reboot-to-windows" --check; then
-  rule /etc/sudoers.d/50-reboot-to-windows "$USER ALL=(root) NOPASSWD: /usr/bin/efibootmgr --bootnext *"
+# --- Rescue's ---------------------------------------------------------------
+rescue="$HOME/.config/omarchy/plugins/rescue/bin/setup-system"
+if [[ -x $rescue ]]; then
+  "$rescue"
 else
-  echo "  no Windows boot entry: Restart into Windows stays hidden"
+  echo "  no Rescue plugin: its system parts skipped"
 fi
-
-sudo systemctl daemon-reload
 echo
 echo "${bold}Done.${off}"
 [[ -n ${OMARCHY_DESKTOP_INSTALL:-${OMARCHY_CONFIG_INSTALL:-}} ]] || read -r -p "Press Enter to close." _

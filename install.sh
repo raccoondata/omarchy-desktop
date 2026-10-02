@@ -128,6 +128,7 @@ need_plugin now-playing "Now Playing" omarchy-now-playing widget
 need_plugin super-menu "Super Menu" omarchy-super-menu
 need_plugin hot-corners "Hot Corners" omarchy-hot-corners
 need_plugin agent-tools "Agent Tools" omarchy-agent-tools
+need_plugin rescue "Rescue" omarchy-rescue
 need_plugin screenshots "Screenshots" omarchy-screenshots
 need_plugin windows "Windows" omarchy-windows
 need_plugin taskbar "Taskbar" omarchy-taskbar widget
@@ -204,7 +205,7 @@ else
     Super+Ctrl+L             lock, with a backup lock screen   (same key)
     Ctrl+Alt+Esc             rescue console, for when the desktop misbehaves
 EOF
-  "$omarchy/reboot-to-windows" --check && \
+  "$omarchy/plugins/rescue/bin/reboot-to-windows" --check && \
   echo "    Super+Shift+Esc, twice   restart into Windows"
   cat <<EOF
   ${bold}Windows-style${off} (these change Omarchy's keys)
@@ -273,8 +274,8 @@ else
   rm -f "$tmp"
 fi
 
-# Omarchy's menu: lock (with the backup lock), Restart into Windows (only
-# with Windows), the settings window, and updating this desktop.
+# Omarchy's menu: updating this desktop. (Lock and Restart into Windows are
+# Rescue's, in its own marked block.)
 menu="$omarchy/extensions/omarchy-menu.jsonc"
 [[ -f $menu ]] || { mkdir -p "$(dirname "$menu")"; cp /usr/share/omarchy/config/omarchy/extensions/omarchy-menu.jsonc "$menu"; }
 # Hot Corners is its own plugin now, with its own Setup entry: the
@@ -283,9 +284,9 @@ sed -i '/"setup.hotcorners":.*taskbar settings corners/d' "$menu"
 # The Taskbar plugin has its own Setup entry (in its marked block): the
 # desktop's old one, outside any block, goes.
 sed -i '/"setup.taskbar":.*"label": "Taskbar & Desktop"/d' "$menu"
+# Rescue has Lock and Reboot to Windows (in its block): the desktop's go.
+sed -i '/"system.lock":.*\$HOME\/.config\/omarchy\/lock"/d; /"system.reboot-windows":.*\$HOME\/.config\/omarchy\/reboot-to-windows"/d' "$menu"
 entries=(
-  '"system.lock": {"icon": "", "label": "Lock", "action": "$HOME/.config/omarchy/lock"},'
-  '"system.reboot-windows": {"when":"\"$HOME/.config/omarchy/reboot-to-windows\" --check","icon":"","label":"Reboot to Windows","description":"Boot Windows once, then back to Omarchy","action":"$HOME/.config/omarchy/reboot-to-windows"},'
   '"update.desktop": {"icon": "", "label": "Desktop", "description": "omarchy-desktop: taskbar, Super menu, windows", "action": "omarchy-launch-floating-terminal-with-presentation omarchy-desktop update"},'
 )
 added=0
@@ -305,20 +306,6 @@ PY
 done
 (( added )) && echo "  $added entries in Omarchy's menu"
 
-# The rescue console (Ctrl+Alt+Esc): its menu opens on login at tty3.
-if ! grep -q 'RESCUE_SHOWN' "$HOME/.bashrc" 2>/dev/null; then
-  cat >> "$HOME/.bashrc" <<'EOF'
-
-# Text console 3 (Ctrl+Alt+Esc / Ctrl+Alt+F3) is the rescue console: log in
-# and the rescue menu opens (q = plain shell, d = back to the desktop).
-if [[ $(tty) == /dev/tty3 && -z ${RESCUE_SHOWN-} ]] && command -v rescue &> /dev/null; then
-  export RESCUE_SHOWN=1
-  rescue
-fi
-EOF
-  echo "  rescue console menu (~/.bashrc)"
-fi
-
 # --- 4 system ------------------------------------------------------------------
 step 4 "System setup (packages, rescue console)"
 if $system; then
@@ -329,10 +316,11 @@ fi
 
 # --- 5 services ------------------------------------------------------------------
 step 5 "Background services"
-chmod +x "$HOME/.local/bin/rescue" 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
-systemctl --user enable --now lock-guard.service >/dev/null 2>&1 || warn "couldn't start the lock guard"
+# Rescue's setup again: step 1 moved the desktop's old copies of its files
+# (the lock guard's service, the rescue command) aside.
+"$omarchy/plugins/rescue/bin/setup" || warn "Rescue's setup failed"
 # The remote screen only restarts when its script changed (a restart while
 # you're connected with the monitor off would drop the virtual screen).
 if [[ "$(conf_get remote)" == on ]]; then
@@ -342,7 +330,7 @@ if [[ "$(conf_get remote)" == on ]]; then
     echo "$sum" > "$state/remote-screen.sum"
   fi
 fi
-echo "  config history (local undo), backup lock guard"
+echo "  config history (local undo); Rescue's backup lock guard"
 
 # --- 6 optional ------------------------------------------------------------------
 step 6 "Optional"

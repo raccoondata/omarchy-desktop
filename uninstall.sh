@@ -24,7 +24,7 @@ if grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null; then
 fi
 
 echo "- services"
-for u in config-history.timer lock-guard.service remote-screen.service; do
+for u in config-history.timer remote-screen.service; do
   systemctl --user disable --now "$u" >/dev/null 2>&1 || true
 done
 
@@ -61,7 +61,7 @@ rm -f "$HOME/.local/lib/hyprland/libhyprdragevents.so" "$HOME/.local/lib/hyprlan
 rm -f "$HOME/.local/bin/omarchy-desktop"
 # The desktop's plugins: removed if the desktop added them; ones you added
 # yourself stay.
-for id in screenshots agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
+for id in taskbar windows rescue screenshots agent-tools hot-corners super-menu now-playing line-icons desktop-core; do
   dir="$HOME/.config/omarchy/plugins/$id"
   key="plugin_${id//-/_}"
   mark="$(sed -n "s/^$key=//p" "$HOME/.config/omarchy/desktop.conf" 2>/dev/null | tail -1)"
