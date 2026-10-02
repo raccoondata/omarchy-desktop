@@ -10,8 +10,5 @@
 .config/omarchy/selfcheck
 .config/omarchy/hooks/post-update.d/desktop-selfcheck.hook
 .config/omarchy/setup-system
-.config/omarchy/config-history
-.config/systemd/user/config-history.service
-.config/systemd/user/config-history.timer
 .local/share/icons/hicolor/256x256/apps/teams.png
 .local/share/icons/hicolor/256x256/apps/youtube-music.png

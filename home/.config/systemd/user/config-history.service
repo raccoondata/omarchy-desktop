@@ -1,6 +1,0 @@
-[Unit]
-Description=Snapshot the desktop config (~/.config/omarchy/config-history)
-
-[Service]
-Type=oneshot
-ExecStart=%h/.config/omarchy/config-history snapshot

@@ -96,5 +96,5 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    console, reboot to Windows; the desktop's setup-system calls its
    setup-system), remote-access (done locally: installed only when remote
    access is on; `omarchy-desktop remote on|off` adds or removes it), the
-   bundle installer, config history to
-   omarchy-config.
+   bundle installer, config history to omarchy-config (done: its script and
+   timer are omarchy-config's; Rescue offers its undo only when it's there).

@@ -154,7 +154,10 @@ done
 # deleted). Only ours: anything else in those folders is yours. Some kept
 # their place but belong to a plugin now (it updates them itself).
 plugin_owned=(.local/share/nautilus-python/extensions/omarchy_agents.py
-  .config/systemd/user/hyprland-safe-mode-agents.service)
+  .config/systemd/user/hyprland-safe-mode-agents.service
+  # Config history is the maintainer's personal config's (omarchy-config) now.
+  .config/omarchy/config-history .config/systemd/user/config-history.service
+  .config/systemd/user/config-history.timer)
 if [[ -f $state/installed-files ]]; then
   while read -r f; do
     [[ -f $HOME/$f ]] || continue
@@ -165,7 +168,7 @@ if [[ -f $state/installed-files ]]; then
   done < <(comm -23 <(sort -u "$state/installed-files") <(sort -u "$list_new"))
 fi
 mv "$list_new" "$state/installed-files"
-# What each file was when installed: the config history (maintainer) copies
+# What each file was when installed: the maintainer's config history copies
 # back into the repo only the files you then edited live.
 (cd "$HOME" && while read -r f; do
   if [[ -d $f ]]; then find "$f" -type f -not -name '*.bak*' -not -path '*/__pycache__/*'; elif [[ -f $f ]]; then echo "$f"; fi
@@ -317,13 +320,12 @@ fi
 # --- 5 services ------------------------------------------------------------------
 step 5 "Background services"
 systemctl --user daemon-reload
-systemctl --user enable --now config-history.timer >/dev/null 2>&1 || warn "couldn't start the config history timer"
 # Rescue's and Remote Access's setup again: step 1 moved the desktop's old
 # copies of their files (the lock guard's and remote screen's services, the
 # rescue command) aside.
 "$omarchy/plugins/rescue/bin/setup" || warn "Rescue's setup failed"
 [[ -x $omarchy/plugins/remote-access/bin/setup ]] && { "$omarchy/plugins/remote-access/bin/setup" || warn "Remote Access's setup failed"; }
-echo "  config history (local undo); Rescue's backup lock guard"
+echo "  Rescue's backup lock guard"
 
 # --- 6 optional ------------------------------------------------------------------
 step 6 "Optional"

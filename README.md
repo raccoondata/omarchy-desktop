@@ -90,9 +90,9 @@ added it yourself).
   follow the music (its spectrum, from cava), are drawn on the GPU, and only
   run while something plays; on battery or in power saver they rest
   (equalizers flat, cava stopped).
-- **Safety nets**: a backup lock screen if Omarchy's ever fails, a rescue
-  console (Ctrl+Alt+Esc) that can undo recent config changes, and a local
-  history of your desktop config (`~/.config/omarchy/config-history log`).
+- **Safety nets**: a backup lock screen if Omarchy's ever fails, and a
+  rescue console (Ctrl+Alt+Esc) that can hand the problem to a coding agent,
+  start without the Hyprland plugins, or boot Windows.
 - **Optional remote access** (`omarchy-desktop remote on`): RustDesk that
   works after a reboot and with the monitor off.
 - **Restart into Windows**, on PCs that dual-boot Windows (hidden otherwise).

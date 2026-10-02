@@ -114,7 +114,8 @@ fi
 # whether it's wanted.
 remote=false
 grep -qx 'remote=on' "$omarchy/desktop.conf" 2>/dev/null && remote=true
-units=(config-history.timer)
+units=()
+[[ -x $omarchy/config-history ]] && units+=(config-history.timer)
 [[ -d $omarchy/plugins/rescue ]] && units+=(lock-guard.service)
 $remote && units+=(remote-screen.service)
 for unit in "${units[@]}"; do

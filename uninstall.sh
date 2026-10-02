@@ -23,11 +23,6 @@ if [[ -x $omarchy/plugins/remote-access/bin/setup-system ]] && "$omarchy/plugins
   "$omarchy/plugins/remote-access/bin/setup-system" --off || true
 fi
 
-echo "- services"
-for u in config-history.timer; do
-  systemctl --user disable --now "$u" >/dev/null 2>&1 || true
-done
-
 echo "- hooks into Omarchy"
 hl="$HOME/.config/hypr/hyprland.lua"
 sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hypr.desktop")$/d' "$hl"

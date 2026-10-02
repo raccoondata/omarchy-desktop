@@ -176,7 +176,7 @@ case "${1:-status}" in
     msg="${2:-}"
     [[ -n $msg ]] || { echo 'usage: omarchy-desktop release "<what is new, one line>"'; exit 2; }
     [[ "$(g branch --show-current)" == main ]] || { echo "release from the main branch"; exit 1; }
-    "$omarchy/config-history" snapshot "before release" >/dev/null
+    [[ -x $omarchy/config-history ]] && "$omarchy/config-history" snapshot "before release" >/dev/null
     if [[ -n "$(g status --porcelain)" ]]; then
       echo "Uncommitted changes in $repo; commit them first:"
       g status --short
