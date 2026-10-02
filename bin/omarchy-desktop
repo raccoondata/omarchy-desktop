@@ -153,6 +153,13 @@ case "${1:-status}" in
         exec "$plugin/bin/setup-system" ;;
       off)
         plugin="$omarchy/plugins/remote-access"
+        if [[ -d $plugin && "$(sed -n 's/^plugin_remote_access=//p' "$omarchy/desktop.conf" 2>/dev/null | tail -1)" != added ]]; then
+          # Yours, not the bundle's: it stays (turn it off from it).
+          set_conf remote off
+          echo "Remote Access is a plugin you added yourself; turn it off there:"
+          echo "  $plugin/bin/setup-system --off && $plugin/bin/teardown && omarchy plugin remove remote-access"
+          exit 0
+        fi
         if [[ -d $plugin ]]; then
           "$plugin/bin/setup-system" --off
           "$plugin/bin/teardown" >/dev/null

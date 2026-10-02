@@ -53,7 +53,7 @@ added it yourself).
   choose) comes to you instead. Coding agents (Claude, Codex and the others
   Omarchy sets up) and terminals can be gathered together: right-click one >
   Bring agents (and terminals) together, or set double-clicking one to do it
-  (Taskbar & Desktop > Taskbar); Windows > Bring together picks which agents
+  (Setup > Taskbar); its Windows tab > Bring together picks which agents
   and terminals count (Omarchy's tool windows like btop don't, by default).
 - **Super menu** (the Super Menu plugin; double-tap Super, or Caps Lock): apps and folders (pinned,
   and in named groups: blocks anywhere on the grid whose tiles stay where
@@ -86,7 +86,7 @@ added it yourself).
   card scenes like Signal loss, Macroblocks, Pixel sort, and torn takes on
   Windows Media Player's) and album-art effects (Glitch, Datamosh, Tear,
   VHS...): click the visualizer for the next one, right-click the art for
-  the next effect; Taskbar & Desktop > Media picks them per place. They
+  the next effect; Setup > Now Playing (and Setup > Desktop for the default) picks them. They
   follow the music (its spectrum, from cava), are drawn on the GPU, and only
   run while something plays; on battery or in power saver they rest
   (equalizers flat, cava stopped).
@@ -105,14 +105,14 @@ added it yourself).
   icon for <app>" (the plugin's `line-icons` skill draws one in the same
   style), or click the notification that offers it when the app is
   installed. Yours are kept in `~/.config/omarchy/line-icons`, which updates
-  never touch. Taskbar & Desktop > Icons chooses, for the taskbar and
+  never touch. Setup > Taskbar > Appearance and Setup > Line Icons choose, for the taskbar and
   switcher, Super menu and now playing: line icons in the theme's colours,
   in each app's colour, or in that colour matched to your theme, or the
   apps' original icons (defaults: line on the taskbar, originals elsewhere);
   its Open button has the plugin's own settings, for Omarchy's app launcher
   and menu and the new-app offers.
 
-Settings: **Super+Space > Setup > Taskbar & Desktop** (type to search
+Settings: **Super+Space > Setup > Desktop**, which opens every plugin's own (type to search
 them). Health check: `omarchy-desktop check`.
 
 ## Keybindings

@@ -21,9 +21,13 @@ read -r -p "Go ahead? [y/N] " a || true
 [[ $a == [yY]* ]] || exit 0
 sudo -v
 
-# Remote access's system parts first (the plugin goes with the others below).
-if added remote-access && [[ -x $omarchy/plugins/remote-access/bin/setup-system ]] && "$omarchy/plugins/remote-access/bin/setup-system" --check; then
-  "$omarchy/plugins/remote-access/bin/setup-system" --off || true
+# Remote access first, when the bundle added it: its system parts (even a
+# partial setup) and its own; not while a RustDesk connection is open (both
+# refuse then), which stops the uninstall before anything is changed.
+ra="$omarchy/plugins/remote-access"
+if added remote-access && [[ -x $ra/bin/setup-system ]]; then
+  "$ra/bin/setup-system" --off || { echo "Remote access couldn't be turned off (above); nothing was changed."; exit 1; }
+  "$ra/bin/teardown" >/dev/null || { echo "Remote access couldn't be undone (above); nothing else was changed."; exit 1; }
 fi
 
 echo "- hooks into Omarchy"

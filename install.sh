@@ -401,7 +401,7 @@ cat <<EOF
 ${bold}Next${off}
   1. Log out and back in (loads the title bars and window drag plugins).
   2. $keys_line
-     Settings: Super+Space > Setup > Taskbar & Desktop.
+     Settings: Super+Space > Setup > Desktop (and each plugin's own Setup entry).
   3. Updates: omarchy-desktop update (or Super+Space > Update > Desktop).
   4. Something off? omarchy-desktop check. To remove it all: omarchy-desktop uninstall
   (What it printed is in ${log/#$HOME/\~}.)

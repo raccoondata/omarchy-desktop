@@ -82,6 +82,10 @@ main() {
   say "Step 4 of 4: Download and install"
   if [[ -d $dest/.git ]]; then
     tell "already downloaded; getting the newest version"
+    # The released branch (an older download may be on main): when it's clean.
+    if [[ -z "$(git -C "$dest" status --porcelain)" ]] && git -C "$dest" fetch -q origin stable 2>/dev/null; then
+      git -C "$dest" checkout -q stable 2>/dev/null || git -C "$dest" checkout -q -b stable --track origin/stable 2>/dev/null || true
+    fi
     git -C "$dest" pull -q --ff-only || tell "${dim}(couldn't update it; installing what's there)${off}"
   else
     mkdir -p "$(dirname "$dest")"
