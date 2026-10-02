@@ -106,6 +106,20 @@ plugin.
 7. **Live tile state**: a state line under tiles (needs you, 3 unread, 4
    windows, a folder's branch), a setting per menu / group / tile.
 
+## Progress
+
+All seven phases are built, in the plugins' working copies (not released):
+search and the map, the Agents component and session status, ask mode
+(and the spotlight rebuilt on the same body), edit mode with the
+inspector (plus a corner grip to resize Now playing and Agents), the Rows
+layout, "on the taskbar" placement with the taskbar's marks, state lines.
+Measured: the menu adds nothing while closed and about 0.1% of a core
+while open (sandbox, Agents tile showing).
+
+Left: an "unfold" entrance from the bar; the Agents tile's Tab (ask that
+session something) from the grid; screenshots plugin's bar on the shared
+Send to list.
+
 ## Checks for every phase
 
 - One grid: every tile on the same columns across groups, components
