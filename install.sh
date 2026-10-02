@@ -5,7 +5,8 @@ set -euo pipefail
 # Omarchy, plus screenshots and coding agents built in. See README.md.
 #
 #   ./install.sh            install (or repair); asks about the optional parts
-#   ./install.sh --update   what `omarchy-desktop update` runs after pulling:
+#   ./install.sh --update   what `omarchy-desktop update` runs after pulling
+#                           (--no-system: without the system setup, so no sudo):
 #                           the same, without questions
 #
 # Safe to run again. It only touches:
@@ -24,6 +25,10 @@ state="$HOME/.local/state/omarchy-desktop"
 conf="$omarchy/desktop.conf"
 update=false
 [[ ${1:-} == --update ]] && update=true
+# --no-system (with --update): skip the system setup (packages, sudoers, the
+# rescue console), which needs sudo: for updates that don't change it.
+system=true
+[[ " $* " == *" --no-system "* ]] && $update && system=false
 bold=$'\e[1m' dim=$'\e[2m' off=$'\e[0m'
 failed=()
 steps=7
@@ -73,7 +78,7 @@ else
   echo "A taskbar, Super menu and Windows-style window handling for Omarchy. Your own"
   echo "monitors, keybindings, theme and apps are left alone."
 fi
-sudo -v
+$system && sudo -v
 
 # --- 1 files -----------------------------------------------------------------
 step 1 "Desktop files"
@@ -310,7 +315,11 @@ fi
 
 # --- 4 system ------------------------------------------------------------------
 step 4 "System setup (packages, rescue console)"
-"$omarchy/setup-system" || warn "setup-system failed; run ~/.config/omarchy/setup-system"
+if $system; then
+  "$omarchy/setup-system" || warn "setup-system failed; run ~/.config/omarchy/setup-system"
+else
+  echo "  skipped (--no-system)"
+fi
 
 # --- 5 services ------------------------------------------------------------------
 step 5 "Background services"
