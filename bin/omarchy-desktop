@@ -161,11 +161,30 @@ case "${1:-status}" in
       exit 0
     fi
     [[ $2 =~ ^(all|new|off)$ ]] || { echo "usage: omarchy-desktop keys all|new|off"; exit 2; }
-    tmp="$(mktemp)"
-    { [[ -f $conf ]] && grep -v '^keys=' "$conf" || true; echo "keys=$2"; } > "$tmp"
-    mv "$tmp" "$conf"
+    set_conf keys "$2"
+    # The keys are the plugins' own: write each one's settings, then let its
+    # setup put them into Hyprland. new = only keys Omarchy doesn't use.
+    all=false new=false
+    [[ $2 == all ]] && all=true
+    [[ $2 != off ]] && new=true
+    plugset() {  # plugset <plugin id> <jq filter>: when the plugin is installed
+      local f="$omarchy/$1/settings.json"
+      [[ -d $omarchy/plugins/$1 ]] || return 0
+      mkdir -p "${f%/*}"
+      [[ -s $f ]] || echo '{}' > "$f"
+      jq --argjson all "$all" --argjson new "$new" "$2" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    }
+    plugset windows '.keys = $all | .closeTap = $new | .switcher = $all'
+    plugset rescue '.taskManagerKey = $all | .consoleKey = $new | .lockKey = $new | .windowsKey = $new'
+    plugset super-menu '.key = (if $new then "double-tap" else "none" end) | .capsSuper = $all'
+    plugset agent-tools '.keys = $new'
+    plugset screenshots '.key = $all'
+    plugset taskbar '.doubleTapReturn = $new'
+    for id in windows super-menu agent-tools screenshots rescue taskbar; do
+      [[ -x $omarchy/plugins/$id/bin/setup ]] && "$omarchy/plugins/$id/bin/setup" >/dev/null 2>&1
+    done
     hyprctl reload >/dev/null 2>&1 || true
-    echo "keybindings: $2 (applied)"
+    echo "keybindings: $2 (applied; each plugin's Setup page can change its own)"
     ;;
 
   uninstall)

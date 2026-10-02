@@ -13,9 +13,10 @@ set -euo pipefail
 #   - the desktop's own files (listed in ./manifest); the ones it replaces are
 #     kept in ~/.local/state/omarchy-desktop/backups/
 #   - defaults for its settings files, only where you have none (./templates)
-#   - one line each in ~/.config/hypr/hyprland.lua and ~/.bashrc, the
-#     plugins it adds (each its own changes: see their READMEs), the taskbar widgets in ~/.config/omarchy/shell.json and a few
-#     entries in Omarchy's menu (extensions/omarchy-menu.jsonc)
+#   - the plugins it adds (each its own changes, a line in hyprland.lua
+#     among them: see their READMEs), the taskbar widgets in
+#     ~/.config/omarchy/shell.json and an entry in Omarchy's menu
+#     (extensions/omarchy-menu.jsonc)
 #   - system files (setup-system: asks for your password)
 # Your own monitors, input, keybindings, theme and apps stay yours.
 
@@ -235,22 +236,20 @@ EOF
     [sS]*) conf_set keys off ;;
     *) conf_set keys all ;;
   esac
+  # The keys are the plugins' own: give each your choice.
+  "$repo/bin/omarchy-desktop" keys "$(conf_get keys)" >/dev/null || warn "couldn't apply the key choice to the plugins"
   echo "  keybindings: $(conf_get keys) ${dim}(change any time: omarchy-desktop keys all|new|off)${off}"
 fi
 
 # --- 3 hook up -------------------------------------------------------------------
 step 3 "Hooking into Omarchy"
-# Hyprland: hypr/desktop.lua after your own files.
+# Hyprland: each plugin adds its own line to hyprland.lua (Desktop Core's
+# hypr-include). An earlier version's hypr/desktop.lua line goes.
 hl="$HOME/.config/hypr/hyprland.lua"
-if ! grep -q 'require("hypr.desktop")' "$hl"; then
+if grep -q '^require("hypr.desktop")$' "$hl"; then
   cp "$hl" "$hl.bak.$(date +%s)"
-  line='-- The taskbar/Super-menu desktop (omarchy-desktop): hypr/desktop.lua.\nrequire("hypr.desktop")'
-  if grep -q '^require("default.hypr.toggles")' "$hl"; then
-    sed -i "s|^require(\"default.hypr.toggles\")|$line\nrequire(\"default.hypr.toggles\")|" "$hl"
-  else
-    printf '\n%b\n' "$line" >> "$hl"
-  fi
-  echo "  hyprland.lua loads hypr/desktop.lua"
+  sed -i '/^-- The taskbar\/Super-menu desktop (omarchy-desktop)/d; /^require("hypr.desktop")$/d' "$hl"
+  echo "  hyprland.lua: the desktop's old line removed (the plugins add their own)"
 fi
 
 # The bar: the Taskbar (the plugin; in place of the desktop's old taskbar

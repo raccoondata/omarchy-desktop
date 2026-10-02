@@ -4,8 +4,6 @@
 # means the whole folder (files dropped upstream are removed on update).
 # Everything else in your home folder is yours and is never touched.
 
-.config/hypr/desktop.lua
-.config/hypr/desktop/
 
 .config/omarchy/selfcheck
 .config/omarchy/hooks/post-update.d/desktop-selfcheck.hook

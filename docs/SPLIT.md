@@ -98,3 +98,10 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
    access is on; `omarchy-desktop remote on|off` adds or removes it), the
    bundle installer, config history to omarchy-config (done: its script and
    timer are omarchy-config's; Rescue offers its undo only when it's there).
+6. The bundle (done locally): no Hyprland file of its own any more (Caps
+   Lock as Super is the Super Menu's capsSuper; the installer removes the
+   old require("hypr.desktop") line). `omarchy-desktop keys all|new|off`
+   writes each plugin's key settings. The settings split per plugin: the
+   Taskbar's window has only the taskbar's (Taskbar, Windows, Look); Setup >
+   Desktop (Desktop Core) has the shared ones and opens each plugin's;
+   Rescue has its own. Left: setup-system's packages per plugin, releases.

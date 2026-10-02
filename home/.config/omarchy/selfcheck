@@ -134,8 +134,6 @@ if $remote; then
   "$omarchy/plugins/remote-access/bin/setup-system" --check 2>/dev/null && ok "remote access's system parts in place" \
     || warn "remote access's system parts missing: run ~/.config/omarchy/plugins/remote-access/bin/setup-system"
 fi
-grep -q 'require("hypr.desktop")' "$HOME/.config/hypr/hyprland.lua" 2>/dev/null && ok "hyprland.lua loads the desktop (hypr/desktop.lua)" \
-  || bad "hyprland.lua doesn't load hypr/desktop.lua: no desktop keybindings (run omarchy-desktop update)"
 
 # --- agents (the Agent Tools plugin) -------------------------------------------------
 at="$HOME/.config/omarchy/plugins/agent-tools"

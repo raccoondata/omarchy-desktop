@@ -148,9 +148,10 @@ of your own (say `hypr/mine.lua`) and load it at the end of `hyprland.lua`.
 | Super+Shift+Escape, twice ✚ | restart into Windows (only with Windows) | – |
 
 With all of them, Caps Lock works as a second Super key (real Caps Lock: both
-Shifts), and Compose moves to Right Alt (`hypr/desktop/input.lua`).
+Shifts), and Compose moves to Right Alt (Setup > Super Menu > Caps Lock as
+Super).
 
-Mouse (always on, in `hypr/desktop/core.lua`): middle-drag a window's top strip to move it (onto a workspace number
+Mouse (always on, the Windows and Taskbar plugins'): middle-drag a window's top strip to move it (onto a workspace number
 moves it there, to a screen edge snaps it); Shift+click a taskbar icon for a
 new window. Esc in the screenshot editor folds its ask panel first.
 
