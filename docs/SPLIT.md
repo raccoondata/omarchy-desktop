@@ -84,6 +84,11 @@ word). Until then the working ids are plain (`desktop-core`, `line-icons`).
 3. super-menu (done locally): its own key file, Host.qml as its link to the
    rest; Desktop Core counts app use. First release: line-icons and
    super-menu, after a visual pass.
-4. windows, then taskbar (and the settings window splits per plugin).
+4. windows (done locally): keys, switcher, middle-drag, snapping and its
+   preview, title bars and the Hyprland plugins (build, load, post-update
+   rebuild) are its; the taskbar keeps drops on workspace numbers and tells
+   it when the pointer is over one (IPC windows overTaskbar), and minimizes
+   and restores through Desktop Core's window. Then taskbar (and the
+   settings window splits per plugin).
 5. rescue, remote-access, the bundle installer, config history to
    omarchy-config.
