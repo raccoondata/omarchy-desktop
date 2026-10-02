@@ -107,6 +107,11 @@ need_plugin() {  # need_plugin <id> <name> <repo> [widget]
       exit 1
     fi
   fi
+  # One that was already there has to be whole too.
+  if ! omarchy-plugin-validate "$dir" >/dev/null 2>&1; then
+    echo "  ${bold}the $name plugin at $dir isn't valid${off} (omarchy-plugin-validate $dir); nothing was changed."
+    exit 1
+  fi
   if ! jq -e --arg id "$id" 'any(.plugins[]?; .id == $id)' "$omarchy/shell.json" >/dev/null 2>&1; then
     [[ -n $widget ]] && { omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true; }
     if [[ -z $widget ]] && omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy-plugin-enable "$id" >/dev/null 2>&1; then

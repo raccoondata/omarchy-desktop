@@ -109,6 +109,14 @@ case "${1:-status}" in
       fi
       g merge -q --ff-only "origin/$branch"
     fi
+    # The plugins the bundle added (yours are yours to update): each from
+    # its own repository, when it has one.
+    for dir in "$omarchy"/plugins/*/; do
+      id=$(basename "$dir")
+      [[ "$(sed -n "s/^plugin_${id//-/_}=//p" "$omarchy/desktop.conf" 2>/dev/null | tail -1)" == added ]] || continue
+      git -C "$dir" remote get-url origin >/dev/null 2>&1 || continue
+      omarchy-plugin-update "$id" --yes >/dev/null 2>&1 && echo "  plugin $id: up to date" || echo "  ${bold}plugin $id: couldn't update${off} (omarchy plugin update $id)"
+    done
     "$repo/install.sh" --update
     ;;
 
@@ -150,7 +158,16 @@ case "${1:-status}" in
           "$plugin/bin/teardown" >/dev/null
           omarchy-plugin-disable remote-access >/dev/null 2>&1 || true
           omarchy-plugin-remove remote-access --yes >/dev/null 2>&1 || true
+          if [[ -d $plugin ]]; then
+            # No shell to ask: out of shell.json, the folder aside.
+            tmp="$(mktemp)"
+            jq '.plugins = ((.plugins // []) | map(select(.id != "remote-access")))' "$omarchy/shell.json" > "$tmp" \
+              && mv "$tmp" "$omarchy/shell.json" || rm -f "$tmp"
+            aside="$HOME/.local/state/omarchy-desktop/backups/remote-access-$(date +%F-%H%M%S)"
+            mkdir -p "${aside%/*}" && mv "$plugin" "$aside"
+          fi
         fi
+        set_conf plugin_remote_access ""
         set_conf remote off
         echo "Remote access is off." ;;
       *) echo "usage: omarchy-desktop remote on|off"; exit 2 ;;

@@ -43,9 +43,13 @@ if [[ -f $shell ]]; then
       else .bar.layout[$side] = (.bar.layout[$side] // [] | (map(.id) | index($prev)) as $i
         | if $prev == "" then [{"id": "omarchy.media"}] + . elif $i == null then . + [{"id": "omarchy.media"}]
           else .[:$i+1] + [{"id": "omarchy.media"}] + .[$i+1:] end) end' "$shell" > "$tmp" && mv "$tmp" "$shell"
+  # Noted once per install: the next install notes where it is then.
+  sed -i '/^media_was=/d' "$omarchy/desktop.conf" 2>/dev/null || true
 fi
 menu="$omarchy/extensions/omarchy-menu.jsonc"
-[[ -f $menu ]] && sed -i -E '/^\s*"(system\.lock|system\.reboot-windows|setup\.taskbar|update\.desktop)":/d' "$menu"
+# Only the bundle's own entry (the plugins' are in their blocks; their
+# teardown takes them), and an old version's entries by their exact actions.
+[[ -f $menu ]] && sed -i -E '/^\s*"update\.desktop":/d; /"action": ?"\$HOME\/\.config\/omarchy\/(lock|reboot-to-windows)"/d' "$menu"
 # The rescue console block in ~/.bashrc (from its comment to its fi), when
 # the bundle added Rescue.
 added rescue && [[ -f $HOME/.bashrc ]] && python3 - "$HOME/.bashrc" <<'PY'
@@ -79,7 +83,7 @@ for id in remote-access taskbar windows rescue screenshots agent-tools hot-corne
   if [[ $mark == added && -d $dir && ! -L $dir ]]; then
     "$dir/bin/teardown" >/dev/null 2>&1 || true
     omarchy-plugin-disable "$id" >/dev/null 2>&1 || true
-    omarchy-plugin-remove "$id" --yes >/dev/null 2>&1
+    omarchy-plugin-remove "$id" --yes >/dev/null 2>&1 || true
     if [[ -d $dir ]]; then
       # No shell to ask (not in a session): out of shell.json, the folder aside.
       tmp="$(mktemp)"
@@ -87,7 +91,13 @@ for id in remote-access taskbar windows rescue screenshots agent-tools hot-corne
         && mv "$tmp" "$omarchy/shell.json" || rm -f "$tmp"
       mkdir -p "$backup/plugins" && mv "$dir" "$backup/plugins/$id"
     fi
-    [[ -d $dir ]] && echo "  ! couldn't remove the $id plugin ($dir)" || echo "  removed the $id plugin (the desktop added it)"
+    if [[ -d $dir ]]; then
+      echo "  ! couldn't remove the $id plugin ($dir)"
+    else
+      echo "  removed the $id plugin (the desktop added it)"
+      # No longer the bundle's: one you install yourself later stays yours.
+      sed -i "/^plugin_${id//-/_}=/d" "$omarchy/desktop.conf" 2>/dev/null || true
+    fi
   elif [[ -d $dir ]]; then
     echo "  (the $id plugin stays, you added it: $dir/bin/teardown, then omarchy plugin remove $id)"
   fi

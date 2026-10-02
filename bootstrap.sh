@@ -86,6 +86,8 @@ main() {
   else
     mkdir -p "$(dirname "$dest")"
     gh repo clone "$repo" "$dest" -- -q || fail "couldn't download the desktop."
+    # The released branch (what updates follow), whatever the repo's default.
+    git -C "$dest" checkout -q stable 2>/dev/null || true
   fi
   tell "Starting the installer. When it asks a question, the suggested answer"
   tell "is fine: just press Enter."
