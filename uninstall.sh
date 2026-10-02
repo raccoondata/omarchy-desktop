@@ -73,7 +73,7 @@ systemctl --user daemon-reload
 
 echo "- system files"
 sudo rm -f /etc/omarchy-rescue.issue "/etc/systemd/system/getty@tty3.service.d/rescue-issue.conf" \
-  /etc/sudoers.d/50-chvt /etc/sudoers.d/50-reboot-to-windows
+  /etc/sudoers.d/50-chvt /etc/sudoers.d/50-reboot-to-windows /usr/local/lib/omarchy-rescue/bootnext
 sudo systemctl daemon-reload
 
 hyprctl reload >/dev/null 2>&1 || true
